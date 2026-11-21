@@ -2267,11 +2267,9 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        /* Core built-in word */
         if (handle_builtin(tok, w))
             continue;
 
-        /* Built-in heap start address (:a) */
         if (strcmp(tok, "__heap_start") == 0) {
             emit_ir(IR_PUSH_HEAP_START, w);
             tpush(TY_A);
@@ -2309,7 +2307,6 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        /* Compile-time constant */
         idx = find_const(tok);
         if (idx >= 0) {
             const ConstSym *cs = consts.data[idx];
@@ -2330,7 +2327,6 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        /* User word call */
         idx = ir4_find_func(tok);
         if (idx >= 0) {
             FuncSig *callee = funcs.data[idx];

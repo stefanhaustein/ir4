@@ -23,10 +23,7 @@ static void cpm_end(int main_idx) {
         exit(1);
     }
 
-    /* Patch the initial JP 0x0000 at offset 0 (base + 1) to jump here */
     patch16(1, entry_addr);
-
-    /* CALL main */
     emit8_16(Z80_CALL, sig->addr);
 
     if (sig->out_types.len == 1) {
@@ -53,12 +50,10 @@ static void cpm_end(int main_idx) {
 
         patch16(pos_patch, cb_cur_addr());
 
-        /* CALL print_u16 (patched below) */
         emit8(Z80_CALL);
         pos_patch = cb_pc();
         emit16(0x0000);
 
-        /* Print CR LF */
         emit8_8(Z80_LD_C_N, 2);
         emit8_8(Z80_LD_E_N, '\r');
         emit8_16(Z80_CALL, CPM_BDOS);
