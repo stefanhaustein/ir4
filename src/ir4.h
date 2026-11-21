@@ -235,6 +235,8 @@ typedef struct {
                      size_t total_locals, Bool is_recursive);
     void (*fn_end)(const FuncSig *sig, const LocalVar *locals, size_t total_locals);
     void (*call)(size_t target_addr);
+    int (*tail_call)(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
+                     size_t total_locals);
     void (*call_extern)(const FuncSig *sig);
 
     void (*push_w)(i32 val);

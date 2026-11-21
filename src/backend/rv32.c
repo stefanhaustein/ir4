@@ -200,6 +200,21 @@ static void rv_call(size_t target_addr) {
     emit32(enc_j(diff, RV_RA));
 }
 
+static int rv_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
+                        size_t total_locals) {
+    i32 diff;
+    (void)sig;
+    (void)locals;
+    (void)total_locals;
+    rv_addi(RV_SP, RV_FP, 0);
+    rv_lw(RV_FP, 0, RV_SP);
+    rv_lw(RV_RA, 4, RV_SP);
+    rv_addi(RV_SP, RV_SP, 8);
+    diff = (i32)target_addr - (i32)cb_cur_addr();
+    emit32(enc_j(diff, RV_ZERO));
+    return 1;
+}
+
 static void rv_emit_extern_call(const char *name) {
     cb_add_extern_reloc(cb_pc(), name);
     emit32(enc_u(0, RV_T0, 0x37UL));           /* LUI t0, 0 */
@@ -977,6 +992,7 @@ const Backend be_rv32 = {"rv32",
                          rv_fn_begin,
                          rv_fn_end,
                          rv_call,
+                         rv_tail_call,
                          rv_call_extern,
                          rv_push_w,
                          rv_push_a,

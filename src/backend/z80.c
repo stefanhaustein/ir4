@@ -273,6 +273,16 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_
 
 static void z80_call(size_t target_addr) { emit8_16(Z80_CALL, (u16)target_addr); }
 
+static int z80_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
+                         size_t total_locals) {
+    (void)locals;
+    if (sig->in_types.len != 0 || (sig->is_recursive && total_locals > 0))
+        return 0;
+    z80_peep_barrier();
+    emit8_16(Z80_JP, (u16)target_addr);
+    return 1;
+}
+
 static void z80_call_extern(const FuncSig *sig) {
     u8 used_bc = 0;
     u8 used_de = 0;
@@ -1862,6 +1872,7 @@ const Backend be_z80 = {"z80",
                         z80_fn_begin,
                         z80_fn_end,
                         z80_call,
+                        z80_tail_call,
                         z80_call_extern,
                         z80_push_w,
                         z80_push_a,

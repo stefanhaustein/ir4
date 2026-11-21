@@ -2458,6 +2458,20 @@ static void emit_word(size_t fidx) {
                                         words.data[target]->reloc_cnt);
                     break;
                 }
+                if (funcs.data[target]->has_addr && be->tail_call && i + 1 < w->ir_len &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_FN_END &&
+                    !ir_is_br_target(w, i + 1)) {
+#if IR4_ENABLE_6502
+                    if (be == &be_6502) {
+                        be_6502_set_call_bank(funcs.data[target]->bank);
+                    }
+#endif
+                    if (be->tail_call(funcs.data[target]->addr, sig, w->locals.data,
+                                      w->locals.len)) {
+                        i++;
+                        break;
+                    }
+                }
                 {
                 size_t call_addr = be->cur_addr();
                 size_t call_pc = cb_pc();

@@ -375,6 +375,24 @@ static void m6502_call(size_t target_addr) {
     emit8_16(m6502_compact ? BC_CALL : M6502_JSR, (u16)target_addr);
 }
 
+static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
+                           size_t total_locals) {
+    u16 tbank = m6502_call_target_bank;
+    m6502_call_target_bank = 0;
+    (void)sig;
+    (void)locals;
+    (void)total_locals;
+    if (m6502_compact)
+        return 0;
+    if (!m6502_static_frame && (m6502_big_bytes > 0 || m6502_frame_bytes > 0))
+        return 0;
+    if (cb_is_banked() && tbank != 0 && tbank != cb_cur_bank())
+        return 0;
+    be_6502_peep_fence();
+    emit8_16(0x4C, (u16)target_addr); /* JMP abs */
+    return 1;
+}
+
 static void m6502_call_extern(const FuncSig *sig) {
     size_t i;
     u8 has_a = 0, has_x = 0, has_y = 0;
@@ -3158,6 +3176,7 @@ const Backend be_6502 = {"6502",
                          m6502_fn_begin,
                          m6502_fn_end,
                          m6502_call,
+                         m6502_tail_call,
                          m6502_call_extern,
                          m6502_push_w,
                          m6502_push_a,
