@@ -1562,6 +1562,136 @@ static void ez_emit_br_back(BranchCond cond, size_t target_addr) {
     }
 }
 
+static int ez_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
+                          size_t *patch_offset) {
+    u8 swap_ops;
+    u8 jcc = 0;
+
+    if (op < OP_EQ || op > OP_AGT)
+        return 0;
+
+    if (has_imm && imm == 0 && (op == OP_EQ || op == OP_NE || op == OP_AEQ || op == OP_ANE)) {
+        ez_pop_hl();
+        emit8(EZ80_EX_DE_HL);
+        emit8_24(EZ80_LD_HL_N24, 0);
+        emit8(EZ80_OR_A);
+        emit8(EZ80_ED);
+        emit8(EZ80_ED_SBC_HL_DE);
+        jcc = (op == OP_EQ || op == OP_AEQ) ? EZ80_JP_NZ : EZ80_JP_Z;
+        if (is_fwd) {
+            emit8(jcc);
+            *patch_offset = cb_pc();
+            emit24(0);
+        } else {
+            emit8_24(jcc, (u32)target_addr);
+        }
+        return 1;
+    }
+
+    swap_ops = (op == OP_GT || op == OP_LE || op == OP_UGT || op == OP_ULE || op == OP_AGT);
+    if (has_imm) {
+        if (swap_ops) {
+            ez_pop_de();
+            emit8_24(EZ80_LD_HL_N24, (u32)imm);
+        } else {
+            ez_pop_hl();
+            emit8_24(EZ80_LD_DE_N24, (u32)imm);
+        }
+    } else {
+        if (swap_ops) {
+            ez_pop_hl();
+            ez_pop_de();
+        } else {
+            ez_pop_de();
+            ez_pop_hl();
+        }
+    }
+
+    emit8(EZ80_OR_A);
+    emit8(EZ80_ED);
+    emit8(EZ80_ED_SBC_HL_DE);
+
+    switch (op) {
+    case OP_EQ:
+    case OP_AEQ:
+        jcc = EZ80_JP_NZ;
+        break;
+    case OP_NE:
+    case OP_ANE:
+        jcc = EZ80_JP_Z;
+        break;
+    case OP_ULT:
+    case OP_UGT:
+    case OP_ALT:
+    case OP_AGT:
+        jcc = EZ80_JP_NC;
+        break;
+    case OP_UGE:
+    case OP_ULE:
+        jcc = EZ80_JP_C;
+        break;
+    case OP_LT:
+    case OP_GT:
+    case OP_GE:
+    case OP_LE: {
+        u8 is_lt = (op == OP_LT || op == OP_GT);
+        u16 ov_pc;
+        emit8(EZ80_JP_PE);
+        ov_pc = (u16)cb_pc();
+        emit24(0);
+        if (is_fwd) {
+            u16 skip1_pc, skip2_pc;
+            u8 skip_noov = is_lt ? EZ80_JP_M : EZ80_JP_P;
+            u8 skip_ov = is_lt ? EZ80_JP_P : EZ80_JP_M;
+            emit8(skip_noov);
+            skip1_pc = (u16)cb_pc();
+            emit24(0);
+            emit8_8(0x18, 4); /* JR +4 */
+            patch24(ov_pc, (u32)cb_cur_addr());
+            emit8(skip_ov);
+            skip2_pc = (u16)cb_pc();
+            emit24(0);
+            emit8(EZ80_JP);
+            *patch_offset = cb_pc();
+            emit24(0);
+            patch24(skip1_pc, (u32)cb_cur_addr());
+            patch24(skip2_pc, (u32)cb_cur_addr());
+        } else {
+            u16 skip_pc;
+            u8 j_noov = is_lt ? EZ80_JP_P : EZ80_JP_M;
+            u8 j_ov = is_lt ? EZ80_JP_M : EZ80_JP_P;
+            emit8_24(j_noov, (u32)target_addr);
+            emit8(EZ80_JP);
+            skip_pc = (u16)cb_pc();
+            emit24(0);
+            patch24(ov_pc, (u32)cb_cur_addr());
+            emit8_24(j_ov, (u32)target_addr);
+            patch24(skip_pc, (u32)cb_cur_addr());
+        }
+        return 1;
+    }
+    default:
+        return 0;
+    }
+
+    if (is_fwd) {
+        emit8(jcc);
+        *patch_offset = cb_pc();
+        emit24(0);
+    } else {
+        emit8_24(jcc, (u32)target_addr);
+    }
+    return 1;
+}
+
+static int ez_cmp_br_fwd(IrOp op, int has_imm, i32 imm, size_t *patch_offset) {
+    return ez_cmp_br_emit(op, has_imm, imm, 1, 0, patch_offset);
+}
+
+static int ez_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
+    return ez_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
+}
+
 static void ez_patch_fwd(size_t patch_offset) { patch24(patch_offset, (u32)cb_cur_addr()); }
 
 static void ez_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
@@ -1621,6 +1751,8 @@ const Backend be_ez80 = {"ez80",
                          ez_local_mem,
                          ez_emit_br_fwd,
                          ez_emit_br_back,
+                         ez_cmp_br_fwd,
+                         ez_cmp_br_back,
                          ez_patch_fwd,
                          ez_patch_call,
                          ez_push_fn,

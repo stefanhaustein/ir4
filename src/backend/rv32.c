@@ -734,6 +734,104 @@ static void rv_emit_br_back(BranchCond cond, size_t target_addr) {
     }
 }
 
+static int rv_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
+                          size_t *patch_offset) {
+    u32 rs1 = RV_T0;
+    u32 rs2 = (has_imm && imm == 0) ? RV_ZERO : RV_T1;
+    u32 f3_true, f3_false;
+    int swap_ops = 0;
+
+    switch (op) {
+    case OP_EQ:
+    case OP_AEQ:
+        f3_true = 0;
+        f3_false = 1;
+        break;
+    case OP_NE:
+    case OP_ANE:
+        f3_true = 1;
+        f3_false = 0;
+        break;
+    case OP_LT:
+        f3_true = 4;
+        f3_false = 5;
+        break;
+    case OP_GE:
+        f3_true = 5;
+        f3_false = 4;
+        break;
+    case OP_GT:
+        swap_ops = 1;
+        f3_true = 4;
+        f3_false = 5;
+        break;
+    case OP_LE:
+        swap_ops = 1;
+        f3_true = 5;
+        f3_false = 4;
+        break;
+    case OP_ULT:
+    case OP_ALT:
+        f3_true = 6;
+        f3_false = 7;
+        break;
+    case OP_UGE:
+        f3_true = 7;
+        f3_false = 6;
+        break;
+    case OP_UGT:
+    case OP_AGT:
+        swap_ops = 1;
+        f3_true = 6;
+        f3_false = 7;
+        break;
+    case OP_ULE:
+        swap_ops = 1;
+        f3_true = 7;
+        f3_false = 6;
+        break;
+    default:
+        return 0;
+    }
+
+    if (has_imm) {
+        if (imm != 0)
+            rv_li(RV_T1, (u32)imm);
+        pop_reg(RV_T0);
+    } else {
+        pop_reg(RV_T1);
+        pop_reg(RV_T0);
+    }
+    if (swap_ops) {
+        u32 tmp = rs1;
+        rs1 = rs2;
+        rs2 = tmp;
+    }
+    if (is_fwd) {
+        emit32(enc_b(8, rs2, rs1, f3_true));
+        *patch_offset = cb_pc();
+        emit32(enc_j(0, RV_ZERO));
+    } else {
+        i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+        if (diff >= -4096 && diff <= 4094) {
+            emit32(enc_b(diff, rs2, rs1, f3_false));
+        } else {
+            emit32(enc_b(8, rs2, rs1, f3_true));
+            diff = (i32)target_addr - (i32)cb_cur_addr();
+            emit32(enc_j(diff, RV_ZERO));
+        }
+    }
+    return 1;
+}
+
+static int rv_cmp_br_fwd(IrOp op, int has_imm, i32 imm, size_t *patch_offset) {
+    return rv_cmp_br_emit(op, has_imm, imm, 1, 0, patch_offset);
+}
+
+static int rv_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
+    return rv_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
+}
+
 static void rv_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
     patch32(patch_offset, enc_j(diff, RV_ZERO));
@@ -879,6 +977,8 @@ const Backend be_rv32 = {"rv32",
                          NULL,
                          rv_emit_br_fwd,
                          rv_emit_br_back,
+                         rv_cmp_br_fwd,
+                         rv_cmp_br_back,
                          rv_patch_fwd,
                          rv_patch_call,
                          rv_push_fn,

@@ -743,12 +743,51 @@ static void a64_emit_br_back(BranchCond cond, size_t target_addr) {
     }
 }
 
+static int a64_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
+                           size_t *patch_offset) {
+    u32 cond;
+    if (op < OP_EQ || op > OP_AGT)
+        return 0;
+    if (has_imm && (imm < 0 || imm > 4095))
+        return 0;
+    cond = a64_cmp_cond(op);
+    if (has_imm) {
+        pop_x0();
+        emit32(0xF100001FUL | ((u32)imm << 10)); /* CMP X0, #imm */
+    } else {
+        pop_x1();
+        pop_x0();
+        emit32(0xEB01001FUL); /* CMP X0, X1 */
+    }
+    if (is_fwd) {
+        *patch_offset = cb_pc();
+        emit32(0x54000000UL | (cond ^ 1UL)); /* B.(cond^1) rel19 */
+    } else {
+        i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+        u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
+        emit32(0x54000000UL | (imm19 << 5) | (cond ^ 1UL));
+    }
+    return 1;
+}
+
+static int a64_cmp_br_fwd(IrOp op, int has_imm, i32 imm, size_t *patch_offset) {
+    return a64_cmp_br_emit(op, has_imm, imm, 1, 0, patch_offset);
+}
+
+static int a64_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
+    return a64_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
+}
+
 static void a64_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
     u8 top = cb_data()[patch_offset + 3];
     if (top == 0xB4) {
         u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
         patch32(patch_offset, 0xB4000000UL | (imm19 << 5));
+    } else if (top == 0x54) {
+        u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
+        u32 cond_bits = (u32)(cb_data()[patch_offset] & 0x0F);
+        patch32(patch_offset, 0x54000000UL | (imm19 << 5) | cond_bits);
     } else {
         u32 imm26 = ((u32)(diff >> 2)) & 0x03FFFFFFUL;
         patch32(patch_offset, 0x14000000UL | imm26);
@@ -871,6 +910,8 @@ const Backend be_arm64 = {"arm64",
                           NULL,
                           a64_emit_br_fwd,
                           a64_emit_br_back,
+                          a64_cmp_br_fwd,
+                          a64_cmp_br_back,
                           a64_patch_fwd,
                           a64_patch_call,
                           a64_push_fn,

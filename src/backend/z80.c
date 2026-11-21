@@ -1583,6 +1583,118 @@ static void z80_emit_br_back(BranchCond cond, size_t target_addr) {
     }
 }
 
+static int z80_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
+                           size_t *patch_offset) {
+    u8 swap_ops;
+    u8 jcc = 0;
+
+    if (op < OP_EQ || op > OP_AGT)
+        return 0;
+
+    if (has_imm && imm == 0 && (op == OP_EQ || op == OP_NE || op == OP_AEQ || op == OP_ANE)) {
+        z80_pop(Z80_POP_HL);
+        emit8(Z80_LD_A_H);
+        emit8(Z80_OR_L);
+        jcc = (op == OP_EQ || op == OP_AEQ) ? 0xC2 : Z80_JP_Z; /* JP NZ : JP Z */
+        if (is_fwd) {
+            emit8(jcc);
+            *patch_offset = cb_pc();
+            emit16(0x0000);
+        } else {
+            emit8_16(jcc, (u16)target_addr);
+        }
+        return 1;
+    }
+
+    swap_ops = (op == OP_GT || op == OP_LE || op == OP_UGT || op == OP_ULE || op == OP_AGT);
+    if (has_imm) {
+        if (swap_ops) {
+            z80_pop(Z80_POP_DE);
+            emit8_16(Z80_LD_HL_NN, (u16)imm);
+        } else {
+            z80_pop(Z80_POP_HL);
+            emit8_16(Z80_LD_DE_NN, (u16)imm);
+        }
+    } else {
+        if (swap_ops) {
+            z80_pop(Z80_POP_HL);
+            emit8(Z80_POP_DE);
+        } else {
+            z80_pop(Z80_POP_DE);
+            emit8(Z80_POP_HL);
+        }
+    }
+
+    emit8(Z80_OR_A);
+    z80_sbc_hl_de();
+
+    switch (op) {
+    case OP_EQ:
+    case OP_AEQ:
+        jcc = 0xC2; /* JP NZ */
+        break;
+    case OP_NE:
+    case OP_ANE:
+        jcc = Z80_JP_Z;
+        break;
+    case OP_ULT:
+    case OP_UGT:
+    case OP_ALT:
+    case OP_AGT:
+        jcc = 0xD2; /* JP NC */
+        break;
+    case OP_UGE:
+    case OP_ULE:
+        jcc = 0xDA; /* JP C */
+        break;
+    case OP_LT:
+    case OP_GT:
+    case OP_GE:
+    case OP_LE: {
+        u16 a0 = cb_cur_addr();
+        u8 is_lt = (op == OP_LT || op == OP_GT);
+        if (is_fwd) {
+            u8 skip_noov = is_lt ? Z80_JP_M : Z80_JP_P;
+            u8 skip_ov = is_lt ? Z80_JP_P : Z80_JP_M;
+            emit8_16(Z80_JP_PE, (u16)(a0 + 8));
+            emit8_16(skip_noov, (u16)(a0 + 14));
+            emit8_8(Z80_JR, 3);
+            emit8_16(skip_ov, (u16)(a0 + 14));
+            emit8(Z80_JP);
+            *patch_offset = cb_pc();
+            emit16(0x0000);
+        } else {
+            u8 j_noov = is_lt ? Z80_JP_P : Z80_JP_M;
+            u8 j_ov = is_lt ? Z80_JP_M : Z80_JP_P;
+            emit8_16(Z80_JP_PE, (u16)(a0 + 8));
+            emit8_16(j_noov, (u16)target_addr);
+            emit8_8(Z80_JR, 3);
+            emit8_16(j_ov, (u16)target_addr);
+        }
+        return 1;
+    }
+    default:
+        return 0;
+    }
+
+    if (is_fwd) {
+        emit8(jcc);
+        *patch_offset = cb_pc();
+        emit16(0x0000);
+    } else {
+        emit8_16(jcc, (u16)target_addr);
+    }
+    return 1;
+}
+
+static int z80_cmp_br_fwd(IrOp op, int has_imm, i32 imm, size_t *patch_offset) {
+    return z80_cmp_br_emit(op, has_imm, imm, 1, 0, patch_offset);
+}
+
+static int z80_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
+    return z80_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
+}
+
 static void z80_patch_fwd(size_t patch_offset) {
     z80_peep_barrier();
     patch16(patch_offset, cb_cur_addr());
@@ -1718,6 +1830,8 @@ const Backend be_z80 = {"z80",
                         z80_local_mem,
                         z80_emit_br_fwd,
                         z80_emit_br_back,
+                        z80_cmp_br_fwd,
+                        z80_cmp_br_back,
                         z80_patch_fwd,
                         z80_patch_call,
                         z80_push_fn,

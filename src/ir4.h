@@ -256,6 +256,8 @@ typedef struct {
 
     size_t (*emit_br_fwd)(BranchCond cond);
     void (*emit_br_back)(BranchCond cond, size_t target_addr);
+    int (*cmp_br_fwd)(IrOp op, int has_imm, i32 imm, size_t *patch_offset);
+    int (*cmp_br_back)(IrOp op, int has_imm, i32 imm, size_t target_addr);
     void (*patch_fwd)(size_t patch_offset);
     void (*patch_call)(size_t call_pc, size_t call_addr, size_t target_addr);
     size_t (*push_fn)(size_t target_addr);

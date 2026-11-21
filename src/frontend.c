@@ -2245,6 +2245,16 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
     }
 }
 
+static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
+    size_t j;
+    for (j = 0; j < w->ir_len; j++) {
+        const IrInstr *bi = &ir_buf.data[w->ir_start + j];
+        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
+            return 1;
+    }
+    return 0;
+}
+
 static void emit_word(size_t fidx) {
     static SizeVec ir_addr;
     FuncSig *sig = funcs.data[fidx];
@@ -2327,8 +2337,30 @@ static void emit_word(size_t fidx) {
                             i++;
                             break;
                         }
-                    } else if (aop >= OP_EQ && aop <= OP_UGE) {
-                        if (be->cmp_imm && be->cmp_imm(aop, imm)) {
+                    } else if (aop >= OP_EQ && aop <= OP_AGT) {
+                        if (i + 2 < w->ir_len && !ir_is_br_target(w, i + 1) &&
+                            !ir_is_br_target(w, i + 2)) {
+                            const IrInstr *bins = &ir_buf.data[w->ir_start + i + 2];
+                            if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ &&
+                                be->cmp_br_fwd) {
+                                size_t patch_off = 0;
+                                if (be->cmp_br_fwd(aop, 1, imm, &patch_off)) {
+                                    PendingBr *pb = VEC_ADD(pending);
+                                    pb->patch_offset = patch_off;
+                                    pb->target_ir = bins->u.br.target;
+                                    i += 2;
+                                    break;
+                                }
+                            } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
+                                       be->cmp_br_back) {
+                                if (be->cmp_br_back(aop, 1, imm,
+                                                    ir_addr.data[bins->u.br.target])) {
+                                    i += 2;
+                                    break;
+                                }
+                            }
+                        }
+                        if (aop <= OP_UGE && be->cmp_imm && be->cmp_imm(aop, imm)) {
                             i++;
                             break;
                         }
@@ -2400,6 +2432,26 @@ static void emit_word(size_t fidx) {
                 be->stack_op(ins->u.stk.op, ins->u.stk.t1, ins->u.stk.t2);
                 break;
             case IR_ALU_OP:
+                if (ins->u.op >= OP_EQ && ins->u.op <= OP_AGT && i + 1 < w->ir_len &&
+                    !ir_is_br_target(w, i + 1)) {
+                    const IrInstr *bins = &ir_buf.data[w->ir_start + i + 1];
+                    if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ && be->cmp_br_fwd) {
+                        size_t patch_off = 0;
+                        if (be->cmp_br_fwd(ins->u.op, 0, 0, &patch_off)) {
+                            PendingBr *pb = VEC_ADD(pending);
+                            pb->patch_offset = patch_off;
+                            pb->target_ir = bins->u.br.target;
+                            i++;
+                            break;
+                        }
+                    } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
+                               be->cmp_br_back) {
+                        if (be->cmp_br_back(ins->u.op, 0, 0, ir_addr.data[bins->u.br.target])) {
+                            i++;
+                            break;
+                        }
+                    }
+                }
                 be->op(ins->u.op);
                 break;
             case IR_CALL: {
