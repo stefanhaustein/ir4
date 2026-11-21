@@ -25,10 +25,10 @@ data __agon_spr_pal
 end
 
 \ 64 hardware sprites; mapped to VDP slots 63-id so sprite 0 renders in front.
-fn sprcount ( -> :i ) 64 end
-fn sprdepth ( -> :i ) 8 end
-fn sprmaxw  ( -> :i ) 256 end
-fn sprmaxh  ( -> :i ) 256 end
+const sprcount 64
+const sprdepth 8
+const sprmaxw  256
+const sprmaxh  256
 
 fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
   img 0 < img 255 > or w 0 <= or h 0 <= or ncolors 0 < or if 0 return then

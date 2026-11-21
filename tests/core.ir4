@@ -219,6 +219,10 @@ fn test_inline_var ( n :i -> :i )
   base acc +
 end
 
+const CORE_C1 10
+const CORE_C2 32
+const CORE_C3 0x0100
+
 fn main ( -> :i )
   test_stack
   dup 0 <> if return then drop
@@ -247,4 +251,8 @@ fn main ( -> :i )
   1 test_long_branch 500 48 assert_eq
   dup 0 <> if return then drop
   5 test_inline_var 50 49 assert_eq
+  dup 0 <> if return then drop
+  CORE_C1 CORE_C2 + 42 50 assert_eq
+  dup 0 <> if return then drop
+  CORE_C3 i>a a>i 256 51 assert_eq
 end

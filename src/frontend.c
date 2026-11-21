@@ -611,6 +611,32 @@ static int find_buffer(const char *name) {
     return -1;
 }
 
+typedef struct {
+    const char *name;
+    StackType type;
+    i32 w_val;
+    u32 a_val;
+    double f_val;
+    u16 req_group;
+    u8 req_rank;
+    u8 is_default;
+} ConstSym;
+
+VEC_OF(ConstVec, ConstSym *);
+static ConstVec consts;
+
+static int find_const(const char *name) {
+    size_t i;
+    const char *p = intern_find(name);
+    if (!p)
+        return -1;
+    for (i = 0; i < consts.len; i++) {
+        if (consts.data[i]->name == p)
+            return (int)i;
+    }
+    return -1;
+}
+
 size_t ir4_func_addr(size_t idx) {
     if (idx >= funcs.len)
         ir4_die("function index out of bounds");
@@ -760,6 +786,54 @@ static int try_fold_const_w(IrOp op, i32 a, i32 b, i32 *out) {
         case OP_SUB:
             *out = sext_word(ua - ub, be->word_bytes);
             return 1;
+        case OP_MUL:
+            *out = sext_word(ua * ub, be->word_bytes);
+            return 1;
+        case OP_UDIV:
+            if (ub == 0)
+                return 0;
+            *out = sext_word(ua / ub, be->word_bytes);
+            return 1;
+        case OP_UMOD:
+            if (ub == 0)
+                return 0;
+            *out = sext_word(ua % ub, be->word_bytes);
+            return 1;
+        case OP_DIV:
+        case OP_MOD: {
+            i32 smin = (be->word_bytes == 2) ? -32768L : -8388608L;
+            if (sb == 0 || (sa == smin && sb == -1))
+                return 0;
+            *out = (op == OP_DIV) ? (sa / sb) : (sa % sb);
+            return 1;
+        }
+        case OP_AND:
+            *out = sext_word(ua & ub, be->word_bytes);
+            return 1;
+        case OP_OR:
+            *out = sext_word(ua | ub, be->word_bytes);
+            return 1;
+        case OP_XOR:
+            *out = sext_word(ua ^ ub, be->word_bytes);
+            return 1;
+        case OP_LSHIFT:
+            if (ub >= (u32)(be->word_bytes * 8))
+                return 0;
+            *out = sext_word(ua << ub, be->word_bytes);
+            return 1;
+        case OP_RSHIFT:
+            if (ub >= (u32)(be->word_bytes * 8))
+                return 0;
+            *out = sext_word(ua >> ub, be->word_bytes);
+            return 1;
+        case OP_ARSHIFT:
+            if (ub >= (u32)(be->word_bytes * 8))
+                return 0;
+            if (sa >= 0 || ub == 0)
+                *out = sext_word(ua >> ub, be->word_bytes);
+            else
+                *out = sext_word((ua >> ub) | (~0UL << (be->word_bytes * 8 - ub)), be->word_bytes);
+            return 1;
         case OP_EQ:
             *out = (sa == sb) ? -1 : 0;
             return 1;
@@ -809,6 +883,38 @@ static int try_fold_const_w(IrOp op, i32 a, i32 b, i32 *out) {
         return 1;
     case OP_SUB:
         *out = (i32)((u32)a - (u32)b);
+        return 1;
+    case OP_AND:
+        *out = (i32)((u32)a & (u32)b);
+        return 1;
+    case OP_OR:
+        *out = (i32)((u32)a | (u32)b);
+        return 1;
+    case OP_XOR:
+        *out = (i32)((u32)a ^ (u32)b);
+        return 1;
+    case OP_MUL:
+        if (be->word_bytes == 8)
+            return 0;
+        *out = (i32)((u32)a * (u32)b);
+        return 1;
+    case OP_LSHIFT:
+        if (be->word_bytes == 8 || (u32)b >= 32)
+            return 0;
+        *out = (i32)((u32)a << (u32)b);
+        return 1;
+    case OP_RSHIFT:
+        if ((be->word_bytes == 8 && a < 0) || (u32)b >= 32)
+            return 0;
+        *out = (i32)((u32)a >> (u32)b);
+        return 1;
+    case OP_ARSHIFT:
+        if ((u32)b >= 32)
+            return 0;
+        if (a >= 0 || (u32)b == 0)
+            *out = (i32)((u32)a >> (u32)b);
+        else
+            *out = (i32)(((u32)a >> (u32)b) | (~0UL << (32 - (u32)b)));
         return 1;
     case OP_EQ:
         *out = (a == b) ? -1 : 0;
@@ -965,6 +1071,13 @@ static int handle_builtin(const char *tok, WordIR *w) {
             tstack.len -= need;
             if (builtins[i].out != TY_NONE)
                 tpush(builtins[i].out);
+            if (builtins[i].op == OP_INVERT && w->ir_len >= fold_fence + 1) {
+                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                if (p1->kind == IR_PUSH_W) {
+                    p1->u.w = ~p1->u.w;
+                    return 1;
+                }
+            }
             if ((builtins[i].op == OP_W2A || builtins[i].op == OP_W2I32 ||
                  builtins[i].op == OP_U2I32) &&
                 w->ir_len >= fold_fence + 1) {
@@ -1024,6 +1137,27 @@ static int handle_builtin(const char *tok, WordIR *w) {
             }
             if (w->ir_len >= fold_fence + 1) {
                 IrOp rop = builtins[i].op;
+                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                if (p1->kind == IR_PUSH_W) {
+                    if ((p1->u.w == 0 &&
+                         (rop == OP_ADD || rop == OP_SUB || rop == OP_AADD || rop == OP_ASUB ||
+                          rop == OP_OR || rop == OP_XOR || rop == OP_LSHIFT || rop == OP_RSHIFT ||
+                          rop == OP_ARSHIFT)) ||
+                        (p1->u.w == -1 && rop == OP_AND)) {
+                        w->ir_len--;
+                        ir_buf.len--;
+                        return 1;
+                    }
+                    if (p1->u.w == 0 && (rop == OP_MUL || rop == OP_AND)) {
+                        p1->kind = IR_STACK_OP;
+                        p1->u.stk.op = OP_DROP;
+                        p1->u.stk.t1 = TY_W;
+                        p1->u.stk.t2 = TY_NONE;
+                        ins = emit_ir(IR_PUSH_W, w);
+                        ins->u.w = 0;
+                        return 1;
+                    }
+                }
                 if (rop == OP_MUL || rop == OP_UDIV || rop == OP_UMOD || rop == OP_MUL32 ||
                     rop == OP_UDIV32 || rop == OP_UMOD32) {
                     IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
@@ -2122,6 +2256,27 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
+        /* Compile-time constant */
+        idx = find_const(tok);
+        if (idx >= 0) {
+            const ConstSym *cs = consts.data[idx];
+            tpush(cs->type);
+            if (cs->type == TY_W) {
+                ins = emit_ir(IR_PUSH_W, w);
+                ins->u.w = cs->w_val;
+            } else if (cs->type == TY_A) {
+                ins = emit_ir(IR_PUSH_A, w);
+                ins->u.a = cs->a_val;
+            } else if (cs->type == TY_I32) {
+                ins = emit_ir(IR_PUSH_I32, w);
+                ins->u.w = cs->w_val;
+            } else {
+                ins = emit_ir(IR_PUSH_F, w);
+                ins->u.f = cs->f_val;
+            }
+            continue;
+        }
+
         /* User word call */
         idx = ir4_find_func(tok);
         if (idx >= 0) {
@@ -2709,6 +2864,79 @@ static void compile_data(void) {
     ir4_die("unexpected EOF in 'data' (missing 'end')");
 }
 
+static void compile_const(int is_default) {
+    const char *name;
+    const char *val_tok;
+    StackType ty;
+    i32 iv = 0;
+    double fv = 0.0;
+    int is_int;
+    int is_float;
+    u16 cur_grp = src_stack.data[src_stack.len - 1].req_group;
+    u8 cur_rank = src_stack.data[src_stack.len - 1].req_rank;
+    int ex_idx;
+    ConstSym cs;
+
+    name = next_tok_intern();
+    if (!name)
+        ir4_die("expected constant name after 'const'");
+    if (find_buffer(name) >= 0 || ir4_find_func(name) >= 0)
+        ir4_die("constant name conflicts with existing global or function");
+
+    val_tok = next_tok();
+    if (!val_tok)
+        ir4_die("expected literal value after constant name");
+    is_int = parse_int(val_tok, &iv);
+    is_float = !is_int && parse_float(val_tok, &fv);
+
+    memset(&cs, 0, sizeof(ConstSym));
+    cs.name = name;
+    cs.req_group = cur_grp;
+    cs.req_rank = cur_rank;
+    cs.is_default = (u8)is_default;
+
+    if (is_int) {
+        ty = TY_W;
+        if (be->word_bytes == 2 && (iv < -32768 || iv > 65535))
+            ir4_die(":i constant out of 16-bit range");
+        if (be->word_bytes == 3 && (iv < -8388608L || iv > 16777215L))
+            ir4_die(":i constant out of 24-bit range");
+        cs.w_val = iv;
+    } else if (is_float) {
+        ty = TY_F;
+        cs.f_val = fv;
+    } else {
+        ir4_die("expected integer or float literal after constant name");
+        return;
+    }
+    cs.type = ty;
+
+    ex_idx = find_const(name);
+    if (ex_idx >= 0) {
+        ConstSym *ex = consts.data[ex_idx];
+        if (cur_grp == 0 || ex->req_group != cur_grp)
+            ir4_die("duplicate constant definition");
+        if (cur_rank == ex->req_rank) {
+            if (is_default && ex->is_default)
+                ir4_die("duplicate 'default' constant definition");
+            if (!is_default && !ex->is_default)
+                ir4_die("duplicate constant definition");
+        }
+        if (ex->type != ty)
+            ir4_die("override type does not match 'default' constant");
+        if ((is_default && cur_rank == ex->req_rank) || (cur_rank > ex->req_rank))
+            return;
+        *ex = cs;
+        return;
+    }
+
+    {
+        ConstSym *ncs = NEW(ConstSym);
+        *ncs = cs;
+        VEC_PUSH(consts, ncs);
+    }
+}
+
 void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
                         const char *platform) {
     const char *tok;
@@ -2736,6 +2964,7 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
     funcs.len = 0;
     words.len = 0;
     buffers.len = 0;
+    consts.len = 0;
     ir_buf.len = 0;
     raw_code_buf.len = 0;
     inline_blocks.len = 0;
@@ -2750,6 +2979,8 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
     while ((tok = next_tok()) != NULL) {
         if (strcmp(tok, "fn") == 0) {
             compile_word(0, 0);
+        } else if (strcmp(tok, "const") == 0) {
+            compile_const(0);
         } else if (strcmp(tok, "default") == 0 || strcmp(tok, "hot") == 0) {
             int is_default = 0;
             int is_hot = 0;
@@ -2769,9 +3000,13 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
                 if (is_default)
                     ir4_die("'default' is not supported on 'code'");
                 compile_code(is_hot);
+            } else if (tok && strcmp(tok, "const") == 0) {
+                if (is_hot)
+                    ir4_die("'hot' is not supported on 'const'");
+                compile_const(is_default);
             } else {
                 if (!tok || strcmp(tok, "fn") != 0) {
-                    ir4_die("expected 'fn' or 'code' after function modifier");
+                    ir4_die("expected 'fn', 'const', or 'code' after function modifier");
                 }
                 compile_word(is_default, is_hot);
             }

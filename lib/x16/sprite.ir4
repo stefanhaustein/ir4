@@ -10,10 +10,10 @@ var __x16_img_lo :bytes 64
 var __x16_img_hi :bytes 64
 var __x16_img_sz :bytes 64
 
-fn sprcount ( -> :i ) 128 end
-fn sprdepth ( -> :i ) 8 end
-fn sprmaxw  ( -> :i ) 64 end
-fn sprmaxh  ( -> :i ) 64 end
+const sprcount 128
+const sprdepth 8
+const sprmaxw  64
+const sprmaxh  64
 
 fn __x16_spr_size_code ( n :i -> :i )
   n 8 <= if 0 return then

@@ -23,6 +23,14 @@ ORDER = [
 PLATFORMS = sorted(["c64", "x16", "agon", "zx81", "cpm"])
 
 FN_RE = re.compile(r"^((?:(?:default|hot)\s+)*)fn\s+(\S+)\s*\(([^)]*)\)")
+CONST_RE = re.compile(r"^(?:default\s+)?const\s+(\S+)\s+(\S+)")
+
+
+def const_type(val: str) -> str:
+    low = val.lower()
+    if "." in val or (("e" in low) and not low.startswith(("0x", "$"))):
+        return ":f"
+    return ":i"
 
 
 def parse_lib(path: Path):
@@ -46,6 +54,15 @@ def parse_lib(path: Path):
             if not name.startswith("__"):
                 doc = " ".join(pending)
                 sig_str = f"**{name}** ( {sig} )" if sig else f"**{name}** ( )"
+                entries.append((name, sig_str, doc))
+            pending = []
+            continue
+        m = CONST_RE.match(stripped)
+        if m:
+            name, val = m.group(1), m.group(2)
+            if not name.startswith("__"):
+                doc = " ".join(pending)
+                sig_str = f"**{name}** ( -> {const_type(val)} )"
                 entries.append((name, sig_str, doc))
             pending = []
             continue

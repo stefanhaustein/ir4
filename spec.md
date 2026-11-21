@@ -13,7 +13,7 @@ IR4th compiles via direct 2-pass machine-code generation (with dead-code elimina
 
 ### 1.2 Lexical Categories
 * **Type Tokens (`TYPE`):** Any token starting with a leading colon (`:`) is strictly a type specifier (`:i`, `:i32`, `:a`, `:f`).
-* **Keywords:** Reserved syntax and control-flow tokens (`fn`, `default`, `hot`, `fwd`, `init`, `code`, `inline`, `end`, `require`, `extern`, `var`, `:bytes`, `data`, `:i8`, `:i16`, `:i32`, `align`, `->`, `+->`, `&`, `__heap_start`, `return`, `if`, `else`, `then`, `begin`, `while`, `repeat`, `::`, `jmp`, `jz`, `(`, `)`).
+* **Keywords:** Reserved syntax and control-flow tokens (`fn`, `default`, `hot`, `const`, `fwd`, `init`, `code`, `inline`, `end`, `require`, `extern`, `var`, `:bytes`, `data`, `:i8`, `:i16`, `:i32`, `align`, `->`, `+->`, `&`, `__heap_start`, `return`, `if`, `else`, `then`, `begin`, `while`, `repeat`, `::`, `jmp`, `jz`, `(`, `)`).
 * **Numeric Literals:** Decimal (`0`, `42`, `-10`), hexadecimal (`0xFF`, `$4000`), or floating-point (`3.14`, `-0.5`).
 * **Identifiers (`IDENT`):** Any non-numeric token without a leading colon that is not a keyword.
 
@@ -82,7 +82,20 @@ var <name> :bytes <size> \ Raw byte buffer
 * `var <name> :bytes <size>` allocates `<size>` bytes aligned to `word_bytes`; referencing `<name>` pushes its `:a` base address (`( -> :a )`).
 * **`__heap_start`:** Built-in constant pushing the `:a` address immediately following all static code, `data`, `var`, and target runtime data.
 
-### 3.3 Pre-Initialized Data (`data ... end`)
+### 3.3 Compile-Time Constants (`const`)
+Top-level compile-time constants can be declared outside word definitions:
+
+```forth
+const KEY_ESC 27
+const PI 3.14159
+default const SCREEN_W 80
+```
+
+* The value must be an integer literal (inferred as `:i`, checked against the target's `word_bytes` range) or a floating-point literal (inferred as `:f`).
+* Referencing `<name>` inside a function pushes the literal directly onto the stack (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
+* Constants declared with `default const` may be overridden by a `const` with the same inferred type within the same `require` group.
+
+### 3.4 Pre-Initialized Data (`data ... end`)
 Top-level read-only tables and constants can be defined outside word definitions:
 
 ```forth
@@ -102,7 +115,7 @@ end
 * `align` advances the data pointer to the next multiple of `word_bytes`.
 * `data` blocks are semantically read-only and must be declared before they are referenced.
 
-### 3.4 Including Files (`require`)
+### 3.5 Including Files (`require`)
 Top-level `require` loads another `.ir4` source file at most once (include-once semantics):
 
 ```forth
@@ -114,10 +127,10 @@ require "<filename>"
   1. `<root>/<platform>/<filename>` and any parent platform directories (e.g. `-t x16` checks `x16/` then `c64/`, `-t agon` checks `agon/`)
   2. `<root>/<cpu>/<filename>` (e.g. `6502/i32.ir4`, `z80/mem.ir4`, `ez80/...`)
   3. `<root>/<filename>` (portable fallback)
-* Functions declared with `default fn` may be overridden by a non-default `fn` or `code` definition with a matching signature within the same `require` group. Overrides outside that `require` group, duplicate `default fn`s, and duplicate non-default definitions are rejected.
+* Functions declared with `default fn` (and constants declared with `default const`) may be overridden by a non-default definition with a matching signature or type within the same `require` group. Overrides outside that `require` group, duplicate `default` declarations, and duplicate non-default definitions are rejected.
 * Repeated `require` directives for an already-loaded file path are ignored.
 
-### 3.5 External Functions (`extern`)
+### 3.6 External Functions (`extern`)
 Top-level `extern` declares an external platform/OS function:
 
 ```forth

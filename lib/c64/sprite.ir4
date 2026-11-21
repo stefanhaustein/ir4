@@ -14,10 +14,10 @@ data __c64_spr_inv_tbl
   254 :i8 253 :i8 251 :i8 247 :i8 239 :i8 223 :i8 191 :i8 127 :i8
 end
 
-fn sprcount ( -> :i ) 8 end
-fn sprdepth ( -> :i ) 2 end
-fn sprmaxw  ( -> :i ) 24 end
-fn sprmaxh  ( -> :i ) 21 end
+const sprcount 8
+const sprdepth 2
+const sprmaxw  24
+const sprmaxh  21
 
 fn __c64_spr_bit ( reg :i bit :i on :i )
   reg i>a -> var r :a

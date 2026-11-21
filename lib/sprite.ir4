@@ -3,16 +3,16 @@
 require "gfx.ir4"
 
 \ Number of hardware sprite slots (0 = hardware sprites unsupported)
-default fn sprcount ( -> :i ) 0 end
+default const sprcount 0
 
 \ Sprite color depth in bits per pixel (default: 0)
-default fn sprdepth ( -> :i ) 0 end
+default const sprdepth 0
 
 \ Maximum sprite width in pixels (default: 0)
-default fn sprmaxw  ( -> :i ) 0 end
+default const sprmaxw 0
 
 \ Maximum sprite height in pixels (default: 0)
-default fn sprmaxh  ( -> :i ) 0 end
+default const sprmaxh 0
 
 \ Define sprite image/frame *img* of screen size *w* x *h*.
 \ *data* holds *w* * *h* unsigned bytes (0 = transparent, 1..*ncolors* = 1-based palette index).
