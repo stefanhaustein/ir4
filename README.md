@@ -61,6 +61,16 @@ make test-z80     # Build CP/M .com binaries and run them via tnylpo (if install
 make test-ez80    # Build Agon MOS binaries and run them via fab-agon-emulator (if installed)
 ```
 
+## Reference Implementation
+
+Because `ir4c` includes multiple backends, peephole passes, banking, and compact modes, [ref/ir4p.pas](ref/ir4p.pas) provides an unoptimized, single-pass reference compiler for QEMU `virt` (RV32IMF) in ~2,660 lines of standalone classic Pascal (`fpc -Mtp`). It implements the full language specification and serves as both a readable spec walkthrough and an independent test oracle:
+
+```sh
+fpc -Mtp -O2 -FEbuild ref/ir4p.pas
+./build/ir4p tests/core.ir4 -o build/core_p.elf
+qemu-system-riscv32 -machine virt -bios none -nographic -kernel build/core_p.elf
+```
+
 ## Usage
 
 Compile with `ir4c`:
@@ -106,6 +116,7 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 ## Repository Layout
 
 - [src/](src/) — Compiler frontend, code buffer, and target backends
+- [ref/](ref/) — Unoptimized single-pass RV32IMF reference compiler in classic Pascal ([ir4p.pas](ref/ir4p.pas))
 - [lib/](lib/) — Companion library and platform overrides
 - [examples/](examples/) — Standalone example programs
 - [tests/](tests/) — Cross-target test suite and negative compiler tests in [tests/errors/](tests/errors/)
