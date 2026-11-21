@@ -1,4 +1,4 @@
-/* be_rv32.c - RISC-V RV32IM Binary Backend for IR4th (Strict C89)
+/* rv32.c - RISC-V RV32IM Binary Backend for IR4th (Strict C89)
  * Uniform 32-bit cells (W: and A: are both 4 bytes; floats not implemented in v1).
  * Register & Stack Convention:
  *   - sp (x2):  Hardware call/frame stack (ra, fp, locals)
