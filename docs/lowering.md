@@ -1,6 +1,6 @@
 # IR4th Lowering Guide
 
-Practical patterns for compiler and language frontends targeting IR4th. For exact syntax and semantics, see [spec.md](../spec.md).
+Practical patterns for compiler and language frontends targeting IR4th. For exact syntax and semantics, see [spec.md](spec.md).
 
 ## 1. Types & Portability
 
