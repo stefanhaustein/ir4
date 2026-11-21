@@ -46,9 +46,9 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i )
   0 2 gotoxy
   s_term type0 termwidth typei 120 emit termheight typei 32 emit
   narrow 0 = if 32 emit then
-  70 print_key s_colk type0 6 fgcolor fg 2 typeh_w 7 fgcolor 32 emit
+  70 print_key s_colk type0 6 fgcolor fg 2 typehw 7 fgcolor 32 emit
   narrow 0 = if 32 emit then
-  66 print_key s_colk type0 6 fgcolor bg 2 typeh_w 7 fgcolor 32 emit
+  66 print_key s_colk type0 6 fgcolor bg 2 typehw 7 fgcolor 32 emit
   narrow 0 = if 32 emit then
   88 print_key
   6 fgcolor
@@ -61,7 +61,7 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i )
   begin row_i 3 < while
     0 r0 1 + row_i + gotoxy
     7 fgcolor 0 bgcolor
-    narrow 0 = if base 2 typeh_w 58 emit then
+    narrow 0 = if base 2 typehw 58 emit then
     fg fgcolor bg bgcolor
     0 -> var col :i
     begin col 32 < while
@@ -172,7 +172,7 @@ fn main ( )
     k -> prev_k
     0 9 gotoxy
     use_x if s_xinkey else s_inkey then type0
-    6 fgcolor last_k 2 typeh_w 32 emit 40 emit
+    6 fgcolor last_k 2 typehw 32 emit 40 emit
     last_k 32 >= last_k 126 <= and if last_k xemit else 46 emit then
     41 emit s_cnt type0 key_cnt typei 7 fgcolor
     13 emit
@@ -187,7 +187,7 @@ fn main ( )
       then
       p joystate -> var j :i
       6 fgcolor
-      j 8 typeb_w s_hexp type0 j 2 typeh_w 41 emit
+      j 8 typebw s_hexp type0 j 2 typehw 41 emit
       7 fgcolor
       1 +-> p
     repeat

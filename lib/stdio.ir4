@@ -64,7 +64,7 @@ fn typei ( n :i )
 end
 
 \ Print *n* as signed decimal, right-aligned with spaces to width *w*
-fn typei_w ( n :i w :i )
+fn typeiw ( n :i w :i )
   0 -> var d :i
   n -> var t :i
   t 0 < if
@@ -91,7 +91,7 @@ fn typei_w ( n :i w :i )
 end
 
 \ Print *n* as *w* zero-padded uppercase hex digits
-fn typeh_w ( n :i w :i )
+fn typehw ( n :i w :i )
   begin
     w 0 >
   while
@@ -115,11 +115,11 @@ fn typeh ( n :i )
     t 4 u>> -> t
     1 +-> w
   repeat
-  n w typeh_w
+  n w typehw
 end
 
 \ Print *n* as *w* zero-padded binary digits
-fn typeb_w ( n :i w :i )
+fn typebw ( n :i w :i )
   begin
     w 0 >
   while
@@ -138,7 +138,7 @@ fn typeb ( n :i )
     t 1 u>> -> t
     1 +-> w
   repeat
-  n w typeb_w
+  n w typebw
 end
 
 \ Clear screen and home cursor (ANSI default)

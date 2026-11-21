@@ -29,9 +29,9 @@ fn main ( -> :i )
   32 emit
   65535 typeu
   32 emit
-  7 4 typei_w
+  7 4 typeiw
   32 emit
-  0xBEEF 4 typeh_w
+  0xBEEF 4 typehw
   32 emit
 
   \ mem.ir4: fillchar, memcpy, memcmp
