@@ -3063,6 +3063,26 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
     jtab_targets.len = 0;
     add_builtin_const("true", -1);
     add_builtin_const("false", 0);
+    add_builtin_const("size_i", (i32)be->word_bytes);
+    add_builtin_const("size_a", (i32)be->addr_bytes);
+    add_builtin_const("size_f", (i32)be->float_bytes);
+    {
+        static const char *const known_targets[] = {
+            "z80", "ez80", "6502", "arm64", "rv32", "bc",
+            "cpm", "zx81", "agon", "sim65", "c64",  "x16", "virt", "obj", "jit"};
+        const char *par = platform_parent(platform_name);
+        size_t ti;
+        for (ti = 0; ti < sizeof(known_targets) / sizeof(known_targets[0]); ti++) {
+            const char *t = known_targets[ti];
+            char cname[32];
+            int active = (strcmp(be->name, t) == 0) ||
+                         (platform_name && strcmp(platform_name, t) == 0) ||
+                         (par && strcmp(par, t) == 0);
+            strcpy(cname, "target_");
+            strcat(cname, t);
+            add_builtin_const(cname, active ? -1 : 0);
+        }
+    }
     ir_buf.len = 0;
     raw_code_buf.len = 0;
     inline_blocks.len = 0;

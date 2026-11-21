@@ -58,9 +58,10 @@ Lower `switch` based on case density:
   - If the index is already masked (e.g. `3 and`), omit the `u>=` guard.
   - Note: on 6502, a single `jtab` supports up to 256 entries.
 - **Sparse cases:** Lower to a chain of `dup <const> = if drop ... jmp sw_done then` (or binary search), which uses `cmp_br_fwd` directly.
-- **Dispatch / vtables across functions:** Store `& fn_name` entries in a `data ... end` block, scale the index by pointer width (computed via `& probe_b & probe_a adiff` or a platform constant), load with `a@`, and invoke via typed indirect call `( <inputs> -> <outputs> )`.
+- **Dispatch / vtables across functions:** Store `& fn_name` entries in a `data ... end` block, scale the index by `size_a` (pointer width in bytes), load with `a@`, and invoke via typed indirect call `( <inputs> -> <outputs> )`.
 
 ## 6. Constants & Platform Abstraction
 
 - Emit `const NAME VALUE` for compile-time `:i` or `:f` constants; they participate in constant folding and immediate instruction fusion (`add_imm`, `bit_imm`, `cmp_imm`, `shift_imm`).
+- Use built-in `size_i`, `size_a`, `size_f` for type widths and `target_<name>` (`true`/`false`) for target/platform checks.
 - Use `default const` and `default fn` in portable libraries so target-specific `require` overrides can specialize them cleanly.

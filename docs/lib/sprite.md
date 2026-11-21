@@ -15,7 +15,7 @@ Hardware sprites (optional override per platform)
 - **sprcount** ( -> :i ) — Number of hardware sprite slots (0 = hardware sprites unsupported)
   - *agon:* 64 hardware sprites; mapped to VDP slots 63-id so sprite 0 renders in front.
 
-- **sprdepth** ( -> :i ) — Sprite color depth in bits per pixel (default: 0)
+- **sprdepth** ( -> :i ) — Maximum sprite color depth in bits per pixel (default: 0)
 - **sprimg** ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
 
   Define sprite image/frame *img* of screen size *w* x *h*. *data* holds *w* * *h* unsigned bytes (0 = transparent, 1..*ncolors* = 1-based palette index). *pal* holds *ncolors* unsigned bytes (color values returned by gfxrgb). Returns -1 on success, 0 if unsupported or out of sprite resources.

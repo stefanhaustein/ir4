@@ -95,6 +95,7 @@ default const SCREEN_W 80
 * The value must be an integer literal (inferred as `:i`, checked against the target's `word_bytes` range) or a floating-point literal (inferred as `:f`).
 * Referencing `<name>` inside a function pushes the literal directly onto the stack (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
 * Constants declared with `default const` may be overridden by a `const` with the same inferred type within the same `require` group.
+* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with all active hierarchy levels (`platform`, parent platform, and architecture) set to `true`.
 
 ### 3.4 Pre-Initialized Data (`data ... end`)
 Top-level read-only tables and constants can be defined outside word definitions:

@@ -283,4 +283,13 @@ fn main ( -> :i )
   2 test_jtab 25 56 assert_eq
   dup 0 <> if return then drop
   3 test_jtab 5 57 assert_eq
+  dup 0 <> if return then drop
+  size_i 2 >= true 58 assert_eq
+  dup 0 <> if return then drop
+  size_a 2 >= true 59 assert_eq
+  dup 0 <> if return then drop
+  size_f 4 >= true 60 assert_eq
+  dup 0 <> if return then drop
+  target_z80 target_6502 or target_arm64 or target_rv32 or target_ez80 or target_bc or
+  true 61 assert_eq
 end
