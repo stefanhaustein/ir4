@@ -8,7 +8,7 @@ IR4(th) is aimed at language builders as a compiler backend target rather than a
 
 See [docs/spec.md](docs/spec.md) for the full language specification and the [Lowering Guide](docs/lowering.md) for patterns targeting IR4(th) from a compiler frontend.
 
-This project is based on [hi5](https://github.com/stefanhaustein/hi5), an earlier IR stack language prototype implemented in KMP with Z80 support.
+This project is based on [hi5](https://github.com/stefanhaustein/hi5), an earlier IR stack language prototype implemented in KMP with Z80 support motivated by [Pasta80](https://github.com/pleumann/pasta80).
 
 
 ## Examples
