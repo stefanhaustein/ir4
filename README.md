@@ -111,7 +111,6 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 - [tests/](tests/) — Cross-target test suite and negative compiler tests in [tests/errors/](tests/errors/)
 - [tools/](tools/) — Relocatable runtime generators and developer tools
 - [docs/](docs/) — Platform documentation and screenshots
-- [docs/spec.md](docs/spec.md) — IR4(th) language specification
 
 ## Demo Videos
 
