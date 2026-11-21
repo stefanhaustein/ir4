@@ -1032,34 +1032,27 @@ begin
   PushReg(RV_T0);
 end;
 
-procedure EmitLocalGet(slot: Integer);
-var
-  off: LongInt;
+procedure EmitLocalMem(isStore: Boolean; reg: Cardinal; off: LongInt);
 begin
-  off := locals[slot].fpOff;
-  if (off >= -2048) and (off <= 2047) then
-    RvLw(RV_T0, off, RV_FP)
-  else begin
-    RvLi(RV_T0, Cardinal(off));
-    Emit32(EncR($00, RV_T0, RV_FP, 0, RV_T0, $33));
-    RvLw(RV_T0, 0, RV_T0);
+  if (off >= -2048) and (off <= 2047) then begin
+    if isStore then RvSw(reg, off, RV_FP) else RvLw(reg, off, RV_FP);
+  end else begin
+    RvLi(RV_T1, Cardinal(off));
+    Emit32(EncR($00, RV_T1, RV_FP, 0, RV_T1, $33));
+    if isStore then RvSw(reg, 0, RV_T1) else RvLw(reg, 0, RV_T1);
   end;
+end;
+
+procedure EmitLocalGet(slot: Integer);
+begin
+  EmitLocalMem(False, RV_T0, locals[slot].fpOff);
   PushReg(RV_T0);
 end;
 
 procedure EmitLocalSet(slot: Integer);
-var
-  off: LongInt;
 begin
-  off := locals[slot].fpOff;
   PopReg(RV_T0);
-  if (off >= -2048) and (off <= 2047) then
-    RvSw(RV_T0, off, RV_FP)
-  else begin
-    RvLi(RV_T1, Cardinal(off));
-    Emit32(EncR($00, RV_T1, RV_FP, 0, RV_T1, $33));
-    RvSw(RV_T0, 0, RV_T1);
-  end;
+  EmitLocalMem(True, RV_T0, locals[slot].fpOff);
 end;
 
 procedure EmitFnEpilogue;
@@ -1071,255 +1064,222 @@ begin
   Emit32(EncI(0, RV_RA, 0, RV_ZERO, $67));
 end;
 
-{ --- Built-in Words --- }
+{ --- Built-in Words (table-driven for ALU, comparisons, FP, and memory) --- }
+
+type
+  TAluOpDef = record
+    name: string[11];
+    in1, in2, outTy: TStackType;
+    f7, f3: Byte;
+  end;
+
+  TCmpOpDef = record
+    name: string[7];
+    inTy: TStackType;
+    isEqNe, isNeOrInv, swapOps: Boolean;
+    f3: Byte;
+  end;
+
+  TFpOpDef = record
+    name: string[7];
+    code: Byte;
+    swapOps, invert: Boolean;
+  end;
+
+  TMemOpDef = record
+    name: string[5];
+    ty: TStackType;
+    f3: Byte;
+  end;
+
+const
+  ALU_OPS: array[0..28] of TAluOpDef = (
+    (name: '+';      in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 0),
+    (name: 'a+';     in1: tyA;   in2: tyW;   outTy: tyA;   f7: $00; f3: 0),
+    (name: '-';      in1: tyW;   in2: tyW;   outTy: tyW;   f7: $20; f3: 0),
+    (name: 'a-';     in1: tyA;   in2: tyW;   outTy: tyA;   f7: $20; f3: 0),
+    (name: 'adiff';  in1: tyA;   in2: tyA;   outTy: tyW;   f7: $20; f3: 0),
+    (name: '*';      in1: tyW;   in2: tyW;   outTy: tyW;   f7: $01; f3: 0),
+    (name: '/';      in1: tyW;   in2: tyW;   outTy: tyW;   f7: $01; f3: 4),
+    (name: 'mod';    in1: tyW;   in2: tyW;   outTy: tyW;   f7: $01; f3: 6),
+    (name: 'u/';     in1: tyW;   in2: tyW;   outTy: tyW;   f7: $01; f3: 5),
+    (name: 'umod';   in1: tyW;   in2: tyW;   outTy: tyW;   f7: $01; f3: 7),
+    (name: 'and';    in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 7),
+    (name: 'or';     in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 6),
+    (name: 'xor';    in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 4),
+    (name: '<<';     in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 1),
+    (name: 'u>>';    in1: tyW;   in2: tyW;   outTy: tyW;   f7: $00; f3: 5),
+    (name: '>>';     in1: tyW;   in2: tyW;   outTy: tyW;   f7: $20; f3: 5),
+    (name: 'i32+';   in1: tyI32; in2: tyI32; outTy: tyI32; f7: $00; f3: 0),
+    (name: 'i32-';   in1: tyI32; in2: tyI32; outTy: tyI32; f7: $20; f3: 0),
+    (name: 'i32*';   in1: tyI32; in2: tyI32; outTy: tyI32; f7: $01; f3: 0),
+    (name: 'i32/';   in1: tyI32; in2: tyI32; outTy: tyI32; f7: $01; f3: 4),
+    (name: 'i32mod'; in1: tyI32; in2: tyI32; outTy: tyI32; f7: $01; f3: 6),
+    (name: 'u32/';   in1: tyI32; in2: tyI32; outTy: tyI32; f7: $01; f3: 5),
+    (name: 'u32mod'; in1: tyI32; in2: tyI32; outTy: tyI32; f7: $01; f3: 7),
+    (name: 'i32and'; in1: tyI32; in2: tyI32; outTy: tyI32; f7: $00; f3: 7),
+    (name: 'i32or';  in1: tyI32; in2: tyI32; outTy: tyI32; f7: $00; f3: 6),
+    (name: 'i32xor'; in1: tyI32; in2: tyI32; outTy: tyI32; f7: $00; f3: 4),
+    (name: 'i32<<';  in1: tyI32; in2: tyW;   outTy: tyI32; f7: $00; f3: 1),
+    (name: 'u32>>';  in1: tyI32; in2: tyW;   outTy: tyI32; f7: $00; f3: 5),
+    (name: 'i32>>';  in1: tyI32; in2: tyW;   outTy: tyI32; f7: $20; f3: 5)
+  );
+
+  CMP_OPS: array[0..25] of TCmpOpDef = (
+    (name: '=';     inTy: tyW;   isEqNe: True;  isNeOrInv: False; swapOps: False; f3: 0),
+    (name: 'a=';    inTy: tyA;   isEqNe: True;  isNeOrInv: False; swapOps: False; f3: 0),
+    (name: 'i32=';  inTy: tyI32; isEqNe: True;  isNeOrInv: False; swapOps: False; f3: 0),
+    (name: '<>';    inTy: tyW;   isEqNe: True;  isNeOrInv: True;  swapOps: False; f3: 0),
+    (name: 'a<>';   inTy: tyA;   isEqNe: True;  isNeOrInv: True;  swapOps: False; f3: 0),
+    (name: 'i32<>'; inTy: tyI32; isEqNe: True;  isNeOrInv: True;  swapOps: False; f3: 0),
+    (name: '<';     inTy: tyW;   isEqNe: False; isNeOrInv: False; swapOps: False; f3: 2),
+    (name: 'i32<';  inTy: tyI32; isEqNe: False; isNeOrInv: False; swapOps: False; f3: 2),
+    (name: '>';     inTy: tyW;   isEqNe: False; isNeOrInv: False; swapOps: True;  f3: 2),
+    (name: 'i32>';  inTy: tyI32; isEqNe: False; isNeOrInv: False; swapOps: True;  f3: 2),
+    (name: '<=';    inTy: tyW;   isEqNe: False; isNeOrInv: True;  swapOps: True;  f3: 2),
+    (name: 'i32<='; inTy: tyI32; isEqNe: False; isNeOrInv: True;  swapOps: True;  f3: 2),
+    (name: '>=';    inTy: tyW;   isEqNe: False; isNeOrInv: True;  swapOps: False; f3: 2),
+    (name: 'i32>='; inTy: tyI32; isEqNe: False; isNeOrInv: True;  swapOps: False; f3: 2),
+    (name: 'u<';    inTy: tyW;   isEqNe: False; isNeOrInv: False; swapOps: False; f3: 3),
+    (name: 'a<';    inTy: tyA;   isEqNe: False; isNeOrInv: False; swapOps: False; f3: 3),
+    (name: 'u32<';  inTy: tyI32; isEqNe: False; isNeOrInv: False; swapOps: False; f3: 3),
+    (name: 'u>';    inTy: tyW;   isEqNe: False; isNeOrInv: False; swapOps: True;  f3: 3),
+    (name: 'a>';    inTy: tyA;   isEqNe: False; isNeOrInv: False; swapOps: True;  f3: 3),
+    (name: 'u32>';  inTy: tyI32; isEqNe: False; isNeOrInv: False; swapOps: True;  f3: 3),
+    (name: 'u<=';   inTy: tyW;   isEqNe: False; isNeOrInv: True;  swapOps: True;  f3: 3),
+    (name: 'a<=';   inTy: tyA;   isEqNe: False; isNeOrInv: True;  swapOps: True;  f3: 3),
+    (name: 'u32<='; inTy: tyI32; isEqNe: False; isNeOrInv: True;  swapOps: True;  f3: 3),
+    (name: 'u>=';   inTy: tyW;   isEqNe: False; isNeOrInv: True;  swapOps: False; f3: 3),
+    (name: 'a>=';   inTy: tyA;   isEqNe: False; isNeOrInv: True;  swapOps: False; f3: 3),
+    (name: 'u32>='; inTy: tyI32; isEqNe: False; isNeOrInv: True;  swapOps: False; f3: 3)
+  );
+
+  FP_BIN_OPS: array[0..3] of TFpOpDef = (
+    (name: 'f+'; code: $00; swapOps: False; invert: False),
+    (name: 'f-'; code: $04; swapOps: False; invert: False),
+    (name: 'f*'; code: $08; swapOps: False; invert: False),
+    (name: 'f/'; code: $0C; swapOps: False; invert: False)
+  );
+
+  FP_CMP_OPS: array[0..5] of TFpOpDef = (
+    (name: 'f=';  code: 2; swapOps: False; invert: False),
+    (name: 'f<>'; code: 2; swapOps: False; invert: True),
+    (name: 'f<';  code: 1; swapOps: False; invert: False),
+    (name: 'f>';  code: 1; swapOps: True;  invert: False),
+    (name: 'f<='; code: 0; swapOps: False; invert: False),
+    (name: 'f>='; code: 0; swapOps: True;  invert: False)
+  );
+
+  LOAD_OPS: array[0..7] of TMemOpDef = (
+    (name: 'u8@';  ty: tyW;   f3: 4),
+    (name: 'i8@';  ty: tyW;   f3: 0),
+    (name: 'u16@'; ty: tyW;   f3: 5),
+    (name: 'i16@'; ty: tyW;   f3: 1),
+    (name: '@';    ty: tyW;   f3: 2),
+    (name: 'a@';   ty: tyA;   f3: 2),
+    (name: 'f@';   ty: tyF;   f3: 2),
+    (name: 'i32@'; ty: tyI32; f3: 2)
+  );
+
+  STORE_OPS: array[0..5] of TMemOpDef = (
+    (name: 'i8!';  ty: tyW;   f3: 0),
+    (name: 'i16!'; ty: tyW;   f3: 1),
+    (name: '!';    ty: tyW;   f3: 2),
+    (name: 'a!';   ty: tyA;   f3: 2),
+    (name: 'f!';   ty: tyF;   f3: 2),
+    (name: 'i32!'; ty: tyI32; f3: 2)
+  );
 
 function HandleBuiltin(const tok: TShortName): Boolean;
 var
+  i: Integer;
   t1, t2, t3: TStackType;
 begin
   HandleBuiltin := True;
 
-  if (tok = '+') or (tok = 'a+') then begin
-    if tok = 'a+' then begin TPopExpect(tyW); TPopExpect(tyA); TPush(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); end;
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if (tok = '-') or (tok = 'a-') then begin
-    if tok = 'a-' then begin TPopExpect(tyW); TPopExpect(tyA); TPush(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); end;
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($20, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'adiff' then begin
-    TPopExpect(tyA); TPopExpect(tyA); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($20, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = '*' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = '/' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 4, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'mod' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 6, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'u/' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'umod' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 7, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'and' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 7, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'or' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 6, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'xor' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 4, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'invert' then begin
-    TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T0);
-    Emit32(EncI(-1, RV_T0, 4, RV_T0, $13)); PushReg(RV_T0);
-  end else if tok = 'neg' then begin
-    TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T0);
-    Emit32(EncR($20, RV_T0, RV_ZERO, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = '<<' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 1, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'u>>' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = '>>' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($20, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
+  for i := 0 to High(ALU_OPS) do
+    if tok = ALU_OPS[i].name then begin
+      TPopExpect(ALU_OPS[i].in2);
+      TPopExpect(ALU_OPS[i].in1);
+      TPush(ALU_OPS[i].outTy);
+      PopReg(RV_T1);
+      PopReg(RV_T0);
+      Emit32(EncR(ALU_OPS[i].f7, RV_T1, RV_T0, ALU_OPS[i].f3, RV_T0, $33));
+      PushReg(RV_T0);
+      Exit;
+    end;
 
-  end else if (tok = '=') or (tok = 'a=') then begin
-    if tok = 'a=' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitEqNe(False);
-  end else if (tok = '<>') or (tok = 'a<>') then begin
-    if tok = 'a<>' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitEqNe(True);
-  end else if tok = '<' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); EmitCmp(2, False, False);
-  end else if tok = '>' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); EmitCmp(2, True, False);
-  end else if tok = '<=' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); EmitCmp(2, True, True);
-  end else if tok = '>=' then begin
-    TPopExpect(tyW); TPopExpect(tyW); TPush(tyW); EmitCmp(2, False, True);
-  end else if (tok = 'u<') or (tok = 'a<') then begin
-    if tok = 'a<' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitCmp(3, False, False);
-  end else if (tok = 'u>') or (tok = 'a>') then begin
-    if tok = 'a>' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitCmp(3, True, False);
-  end else if (tok = 'u<=') or (tok = 'a<=') then begin
-    if tok = 'a<=' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitCmp(3, True, True);
-  end else if (tok = 'u>=') or (tok = 'a>=') then begin
-    if tok = 'a>=' then begin TPopExpect(tyA); TPopExpect(tyA); end
-    else begin TPopExpect(tyW); TPopExpect(tyW); end;
-    TPush(tyW); EmitCmp(3, False, True);
+  for i := 0 to High(CMP_OPS) do
+    if tok = CMP_OPS[i].name then begin
+      TPopExpect(CMP_OPS[i].inTy);
+      TPopExpect(CMP_OPS[i].inTy);
+      TPush(tyW);
+      if CMP_OPS[i].isEqNe then EmitEqNe(CMP_OPS[i].isNeOrInv)
+      else EmitCmp(CMP_OPS[i].f3, CMP_OPS[i].swapOps, CMP_OPS[i].isNeOrInv);
+      Exit;
+    end;
 
-  end else if tok = 'i32+' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32-' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($20, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32*' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32/' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 4, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32mod' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 6, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'u32/' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'u32mod' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($01, RV_T1, RV_T0, 7, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32and' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 7, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32or' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 6, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32xor' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 4, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32invert' then begin
-    TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T0);
-    Emit32(EncI(-1, RV_T0, 4, RV_T0, $13)); PushReg(RV_T0);
-  end else if tok = 'i32neg' then begin
-    TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T0);
-    Emit32(EncR($20, RV_T0, RV_ZERO, 0, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32<<' then begin
-    TPopExpect(tyW); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 1, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'u32>>' then begin
-    TPopExpect(tyW); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($00, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32>>' then begin
-    TPopExpect(tyW); TPopExpect(tyI32); TPush(tyI32);
-    PopReg(RV_T1); PopReg(RV_T0);
-    Emit32(EncR($20, RV_T1, RV_T0, 5, RV_T0, $33)); PushReg(RV_T0);
-  end else if tok = 'i32=' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitEqNe(False);
-  end else if tok = 'i32<>' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitEqNe(True);
-  end else if tok = 'i32<' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(2, False, False);
-  end else if tok = 'i32>' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(2, True, False);
-  end else if tok = 'i32<=' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(2, True, True);
-  end else if tok = 'i32>=' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(2, False, True);
-  end else if tok = 'u32<' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(3, False, False);
-  end else if tok = 'u32>' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(3, True, False);
-  end else if tok = 'u32<=' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(3, True, True);
-  end else if tok = 'u32>=' then begin
-    TPopExpect(tyI32); TPopExpect(tyI32); TPush(tyW); EmitCmp(3, False, True);
+  for i := 0 to High(FP_BIN_OPS) do
+    if tok = FP_BIN_OPS[i].name then begin
+      TPopExpect(tyF); TPopExpect(tyF); TPush(tyF);
+      PopF(RV_FT1); PopF(RV_FT0);
+      Emit32(EncR(FP_BIN_OPS[i].code, RV_FT1, RV_FT0, 7, RV_FT0, $53));
+      PushF(RV_FT0);
+      Exit;
+    end;
 
-  end else if (tok = 'f+') or (tok = 'f-') or (tok = 'f*') or (tok = 'f/') then begin
-    TPopExpect(tyF); TPopExpect(tyF); TPush(tyF);
-    PopF(RV_FT1); PopF(RV_FT0);
-    if tok = 'f+' then Emit32(EncR($00, RV_FT1, RV_FT0, 7, RV_FT0, $53))
-    else if tok = 'f-' then Emit32(EncR($04, RV_FT1, RV_FT0, 7, RV_FT0, $53))
-    else if tok = 'f*' then Emit32(EncR($08, RV_FT1, RV_FT0, 7, RV_FT0, $53))
-    else Emit32(EncR($0C, RV_FT1, RV_FT0, 7, RV_FT0, $53));
-    PushF(RV_FT0);
+  for i := 0 to High(FP_CMP_OPS) do
+    if tok = FP_CMP_OPS[i].name then begin
+      TPopExpect(tyF); TPopExpect(tyF); TPush(tyW);
+      PopF(RV_FT1); PopF(RV_FT0);
+      if FP_CMP_OPS[i].swapOps then
+        Emit32(EncR($50, RV_FT0, RV_FT1, FP_CMP_OPS[i].code, RV_T0, $53))
+      else
+        Emit32(EncR($50, RV_FT1, RV_FT0, FP_CMP_OPS[i].code, RV_T0, $53));
+      if FP_CMP_OPS[i].invert then
+        Emit32(EncI(1, RV_T0, 4, RV_T0, $13));
+      Emit32(EncR($20, RV_T0, RV_ZERO, 0, RV_T0, $33));
+      PushReg(RV_T0);
+      Exit;
+    end;
+
+  for i := 0 to High(LOAD_OPS) do
+    if tok = LOAD_OPS[i].name then begin
+      TPopExpect(tyA);
+      TPush(LOAD_OPS[i].ty);
+      PopReg(RV_T0);
+      Emit32(EncI(0, RV_T0, LOAD_OPS[i].f3, RV_T0, $03));
+      PushReg(RV_T0);
+      Exit;
+    end;
+
+  for i := 0 to High(STORE_OPS) do
+    if tok = STORE_OPS[i].name then begin
+      TPopExpect(tyA);
+      TPopExpect(STORE_OPS[i].ty);
+      PopReg(RV_T0);
+      PopReg(RV_T1);
+      Emit32(EncS(0, RV_T1, RV_T0, STORE_OPS[i].f3));
+      Exit;
+    end;
+
+  if (tok = 'invert') or (tok = 'i32invert') then begin
+    if tok = 'invert' then t1 := tyW else t1 := tyI32;
+    TPopExpect(t1); TPush(t1);
+    PopReg(RV_T0);
+    Emit32(EncI(-1, RV_T0, 4, RV_T0, $13));
+    PushReg(RV_T0);
+  end else if (tok = 'neg') or (tok = 'i32neg') then begin
+    if tok = 'neg' then t1 := tyW else t1 := tyI32;
+    TPopExpect(t1); TPush(t1);
+    PopReg(RV_T0);
+    Emit32(EncR($20, RV_T0, RV_ZERO, 0, RV_T0, $33));
+    PushReg(RV_T0);
   end else if tok = 'fnegate' then begin
     TPopExpect(tyF); TPush(tyF);
     PopF(RV_FT0);
-    Emit32(EncR($10, RV_FT0, RV_FT0, 1, RV_FT0, $53)); { FSGNJN.S }
+    Emit32(EncR($10, RV_FT0, RV_FT0, 1, RV_FT0, $53));
     PushF(RV_FT0);
-  end else if (tok = 'f=') or (tok = 'f<>') or (tok = 'f<') or (tok = 'f>') or
-              (tok = 'f<=') or (tok = 'f>=') then begin
-    TPopExpect(tyF); TPopExpect(tyF); TPush(tyW);
-    PopF(RV_FT1); PopF(RV_FT0);
-    if tok = 'f=' then Emit32(EncR($50, RV_FT1, RV_FT0, 2, RV_T0, $53))
-    else if tok = 'f<>' then begin
-      Emit32(EncR($50, RV_FT1, RV_FT0, 2, RV_T0, $53));
-      Emit32(EncI(1, RV_T0, 4, RV_T0, $13));
-    end else if tok = 'f<' then Emit32(EncR($50, RV_FT1, RV_FT0, 1, RV_T0, $53))
-    else if tok = 'f>' then Emit32(EncR($50, RV_FT0, RV_FT1, 1, RV_T0, $53))
-    else if tok = 'f<=' then Emit32(EncR($50, RV_FT1, RV_FT0, 0, RV_T0, $53))
-    else Emit32(EncR($50, RV_FT0, RV_FT1, 0, RV_T0, $53));
-    Emit32(EncR($20, RV_T0, RV_ZERO, 0, RV_T0, $33));
-    PushReg(RV_T0);
-
-  end else if tok = 'u8@' then begin
-    TPopExpect(tyA); TPush(tyW);
-    PopReg(RV_T0); Emit32(EncI(0, RV_T0, 4, RV_T0, $03)); PushReg(RV_T0);
-  end else if tok = 'i8@' then begin
-    TPopExpect(tyA); TPush(tyW);
-    PopReg(RV_T0); Emit32(EncI(0, RV_T0, 0, RV_T0, $03)); PushReg(RV_T0);
-  end else if tok = 'i8!' then begin
-    TPopExpect(tyA); TPopExpect(tyW);
-    PopReg(RV_T0); PopReg(RV_T1); Emit32(EncS(0, RV_T1, RV_T0, 0));
-  end else if tok = 'u16@' then begin
-    TPopExpect(tyA); TPush(tyW);
-    PopReg(RV_T0); Emit32(EncI(0, RV_T0, 5, RV_T0, $03)); PushReg(RV_T0);
-  end else if tok = 'i16@' then begin
-    TPopExpect(tyA); TPush(tyW);
-    PopReg(RV_T0); Emit32(EncI(0, RV_T0, 1, RV_T0, $03)); PushReg(RV_T0);
-  end else if tok = 'i16!' then begin
-    TPopExpect(tyA); TPopExpect(tyW);
-    PopReg(RV_T0); PopReg(RV_T1); Emit32(EncS(0, RV_T1, RV_T0, 1));
-  end else if (tok = '@') or (tok = 'a@') or (tok = 'f@') or (tok = 'i32@') then begin
-    TPopExpect(tyA);
-    if tok = 'a@' then TPush(tyA)
-    else if tok = 'f@' then TPush(tyF)
-    else if tok = 'i32@' then TPush(tyI32)
-    else TPush(tyW);
-    PopReg(RV_T0); RvLw(RV_T0, 0, RV_T0); PushReg(RV_T0);
-  end else if (tok = '!') or (tok = 'a!') or (tok = 'f!') or (tok = 'i32!') then begin
-    TPopExpect(tyA);
-    if tok = 'a!' then TPopExpect(tyA)
-    else if tok = 'f!' then TPopExpect(tyF)
-    else if tok = 'i32!' then TPopExpect(tyI32)
-    else TPopExpect(tyW);
-    PopReg(RV_T0); PopReg(RV_T1); RvSw(RV_T1, 0, RV_T0);
 
   end else if tok = 'i>a' then begin
     TPopExpect(tyW); TPush(tyA);
