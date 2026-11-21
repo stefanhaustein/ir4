@@ -94,10 +94,7 @@ static void z80_neg_de(void) {
 }
 
 /* --- Backend Interface Implementation --- */
-static size_t z80_cur_addr(void) {
-    z80_peep_barrier();
-    return cb_cur_addr();
-}
+static size_t z80_cur_addr(void) { return cb_cur_addr(); }
 
 static U8Vec z80_is_static_slot;
 static u16 z80_static_base = 0;
@@ -1837,4 +1834,5 @@ const Backend be_z80 = {"z80",
                         z80_push_fn,
                         z80_patch_fn,
                         z80_icall,
-                        NULL};
+                        NULL,
+                        z80_peep_barrier};

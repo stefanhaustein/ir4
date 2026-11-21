@@ -2279,18 +2279,8 @@ static void emit_word(size_t fidx) {
     be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
 
     for (i = 0; i <= w->ir_len; i++) {
-#if IR4_ENABLE_6502
-        if (be == &be_6502) {
-            size_t j;
-            for (j = 0; j < w->ir_len; j++) {
-                const IrInstr *bi = &ir_buf.data[w->ir_start + j];
-                if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == i) {
-                    be_6502_peep_fence();
-                    break;
-                }
-            }
-        }
-#endif
+        if (be->peep_fence && ir_is_br_target(w, i))
+            be->peep_fence();
         for (p = 0; p < pending.len; p++) {
             if (pending.data[p].target_ir == i) {
                 be->patch_fwd(pending.data[p].patch_offset);
@@ -2514,11 +2504,8 @@ static void emit_word(size_t fidx) {
                 const InlineBlock *ib = &inline_blocks.data[ins->u.inl_idx];
                 if (strcmp(be->name, "bc") == 0)
                     ir4_die("'inline' is not supported on bytecode target");
-#if IR4_ENABLE_6502
-                if (be == &be_6502) {
-                    be_6502_peep_fence();
-                }
-#endif
+                if (be->peep_fence)
+                    be->peep_fence();
                 emit_raw_code_block(ib->raw_start, ib->raw_len, ib->reloc_start, ib->reloc_cnt);
                 break;
             }

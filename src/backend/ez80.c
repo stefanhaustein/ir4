@@ -88,18 +88,39 @@ static void ez_ld_data_hl(size_t data_off) {
 }
 
 static size_t ez_stack_bytes = 0;
+static size_t ez_last_push_pc = 0;
+static u8 ez_last_push_op = 0;
+
+static void ez_peep_fence(void) { ez_last_push_op = 0; }
 
 static void ez_push_hl(void) {
     emit8(EZ80_PUSH_HL);
+    ez_last_push_op = EZ80_PUSH_HL;
+    ez_last_push_pc = cb_pc();
     ez_stack_bytes += 3;
 }
 
 static void ez_pop_hl(void) {
+    if (ez_last_push_op == EZ80_PUSH_HL && cb_pc() == ez_last_push_pc) {
+        cb_rewind(1);
+        ez_last_push_op = 0;
+        ez_stack_bytes -= 3;
+        return;
+    }
+    ez_last_push_op = 0;
     emit8(EZ80_POP_HL);
     ez_stack_bytes -= 3;
 }
 
 static void ez_pop_de(void) {
+    if (ez_last_push_op == EZ80_PUSH_HL && cb_pc() == ez_last_push_pc) {
+        cb_rewind(1);
+        emit8(EZ80_EX_DE_HL);
+        ez_last_push_op = 0;
+        ez_stack_bytes -= 3;
+        return;
+    }
+    ez_last_push_op = 0;
     emit8(EZ80_POP_DE);
     ez_stack_bytes -= 3;
 }
@@ -1758,4 +1779,5 @@ const Backend be_ez80 = {"ez80",
                          ez_push_fn,
                          ez_patch_fn,
                          ez_icall,
-                         ez_stack_data_off};
+                         ez_stack_data_off,
+                         ez_peep_fence};

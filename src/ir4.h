@@ -264,6 +264,7 @@ typedef struct {
     void (*patch_fn)(size_t patch_pc, size_t patch_addr, size_t target_addr);
     void (*icall)(void);
     size_t (*stack_data_off)(void);
+    void (*peep_fence)(void);
 } Backend;
 
 /* Error reporting (implemented in frontend.c) */

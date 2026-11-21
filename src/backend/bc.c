@@ -570,4 +570,5 @@ const Backend be_bc = {"bc",
                        bc_push_fn,
                        bc_patch_fn,
                        bc_icall,
-                       bc_stack_data_off};
+                       bc_stack_data_off,
+                       NULL};

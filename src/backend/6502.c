@@ -3123,4 +3123,5 @@ const Backend be_6502 = {"6502",
                          m6502_push_fn,
                          m6502_patch_fn,
                          m6502_icall,
-                         be_6502_stack_data_off};
+                         be_6502_stack_data_off,
+                         be_6502_peep_fence};

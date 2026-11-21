@@ -917,4 +917,5 @@ const Backend be_arm64 = {"arm64",
                           a64_push_fn,
                           a64_patch_fn,
                           a64_icall,
+                          NULL,
                           NULL};
