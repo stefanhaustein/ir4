@@ -14,21 +14,21 @@ size_t cb_pc(void);
 size_t cb_cur_addr(void);
 const u8 *cb_data(void);
 
-void emit8(u8 b);
-void emit16(u16 w);
-void emit24(u32 w);
-void emit32(u32 w);
-void emit8_8(u8 a, u8 b);
-void emit8_16(u8 a, u16 w);
-void emit8_8_8(u8 a, u8 b, u8 c);
+void cb_emit8(u8 b);
+void cb_emit16(u16 w);
+void cb_emit24(u32 w);
+void cb_emit32(u32 w);
+void cb_emit8_8(u8 a, u8 b);
+void cb_emit8_16(u8 a, u16 w);
+void cb_emit8_8_8(u8 a, u8 b, u8 c);
 void cb_rewind(size_t n);
 
-void patch8(size_t patch_offset, u8 val);
-void patch16(size_t patch_offset, u16 target_addr);
-void patch24(size_t patch_offset, u32 target_addr);
-void patch32(size_t patch_offset, u32 val);
-void put_le16(u8 *p, u16 v);
-void put_le32(u8 *p, u32 v);
+void cb_patch8(size_t patch_offset, u8 val);
+void cb_patch16(size_t patch_offset, u16 target_addr);
+void cb_patch24(size_t patch_offset, u32 target_addr);
+void cb_patch32(size_t patch_offset, u32 val);
+void cb_put_le16(u8 *p, u16 v);
+void cb_put_le32(u8 *p, u32 v);
 Bool cb_write_raw(FILE *fp, Bool include_data);
 
 size_t cb_alloc_data(size_t size, u8 align);

@@ -2460,17 +2460,17 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
     size_t base_pc = cb_pc();
     size_t base_addr = be->cur_addr();
     for (i = 0; i < raw_len; i++) {
-        emit8(raw_code_buf.data[raw_start + i]);
+        cb_emit8(raw_code_buf.data[raw_start + i]);
     }
     for (i = 0; i < reloc_cnt; i++) {
         const CodeReloc *rel = &code_relocs.data[reloc_start + i];
         size_t pc = base_pc + rel->ir_off;
         if (rel->kind == CODE_REL_SELF) {
-            patch16(pc, (u16)(base_addr + rel->addend));
+            cb_patch16(pc, (u16)(base_addr + rel->addend));
         } else if (rel->kind == CODE_REL_STACK) {
 #if IR4_ENABLE_6502
             if (be == &be_6502 && be_6502_stack_zp_base() != 0) {
-                patch16(pc, (u16)(be_6502_stack_zp_base() + rel->addend));
+                cb_patch16(pc, (u16)(be_6502_stack_zp_base() + rel->addend));
             } else
 #endif
             {
@@ -2525,9 +2525,9 @@ static void emit_word(size_t fidx) {
         sig->has_addr = 1;
         emit_raw_code_block(w->ir_start, w->ir_len, w->reloc_start, w->reloc_cnt);
         if (strcmp(be->name, "6502") == 0)
-            emit8(0x60); /* RTS */
+            cb_emit8(0x60); /* RTS */
         else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
-            emit8(0xC9); /* RET */
+            cb_emit8(0xC9); /* RET */
         else
             ir4_die("'code' is not supported on this backend");
         return;

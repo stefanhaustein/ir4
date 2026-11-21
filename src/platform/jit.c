@@ -35,29 +35,29 @@ static void arm64_run_jit(size_t main_idx) {
     }
 
     /* Emit C-ABI trampoline calling IR4th 'main' and popping result into X0 */
-    emit16(0x7BFD);
-    emit16(0xA9BF); /* STP X29, X30, [SP, #-16]! */
-    emit16(0x0FFC);
-    emit16(0xF81F); /* STR X28, [SP, #-16]! */
-    emit16(0x03FC);
-    emit16(0xAA00); /* MOV X28, X0 */
+    cb_emit16(0x7BFD);
+    cb_emit16(0xA9BF); /* STP X29, X30, [SP, #-16]! */
+    cb_emit16(0x0FFC);
+    cb_emit16(0xF81F); /* STR X28, [SP, #-16]! */
+    cb_emit16(0x03FC);
+    cb_emit16(0xAA00); /* MOV X28, X0 */
     diff = (i32)main_addr - (i32)cb_cur_addr();
     imm26 = ((u32)(diff >> 2)) & 0x03FFFFFFUL;
-    emit16((u16)((0x94000000UL | imm26) & 0xFFFFU));
-    emit16((u16)(((0x94000000UL | imm26) >> 16) & 0xFFFFU));
+    cb_emit16((u16)((0x94000000UL | imm26) & 0xFFFFU));
+    cb_emit16((u16)(((0x94000000UL | imm26) >> 16) & 0xFFFFU));
     if (sig->out_types.len == 1) {
-        emit16(0x07E0);
-        emit16(0xF841); /* LDR X0, [SP], #16 */
+        cb_emit16(0x07E0);
+        cb_emit16(0xF841); /* LDR X0, [SP], #16 */
     } else {
-        emit16(0x0000);
-        emit16(0xD280); /* MOV X0, #0 */
+        cb_emit16(0x0000);
+        cb_emit16(0xD280); /* MOV X0, #0 */
     }
-    emit16(0x07FC);
-    emit16(0xF841); /* LDR X28, [SP], #16 */
-    emit16(0x7BFD);
-    emit16(0xA8C1); /* LDP X29, X30, [SP], #16 */
-    emit16(0x03C0);
-    emit16(0xD65F); /* RET */
+    cb_emit16(0x07FC);
+    cb_emit16(0xF841); /* LDR X28, [SP], #16 */
+    cb_emit16(0x7BFD);
+    cb_emit16(0xA8C1); /* LDP X29, X30, [SP], #16 */
+    cb_emit16(0x03C0);
+    cb_emit16(0xD65F); /* RET */
 
     {
         size_t map_sz = cb_pc() ? cb_pc() : 1;
@@ -108,10 +108,10 @@ static void arm64_run_jit(size_t main_idx) {
                     exit(1);
                 }
                 addr = (unsigned long)sym;
-                patch32(off, (u32)(0xD2800009UL | (((addr >> 0) & 0xFFFFUL) << 5)));
-                patch32(off + 4, (u32)(0xF2A00009UL | (((addr >> 16) & 0xFFFFUL) << 5)));
-                patch32(off + 8, (u32)(0xF2C00009UL | (((addr >> 32) & 0xFFFFUL) << 5)));
-                patch32(off + 12, (u32)(0xF2E00009UL | (((addr >> 48) & 0xFFFFUL) << 5)));
+                cb_patch32(off, (u32)(0xD2800009UL | (((addr >> 0) & 0xFFFFUL) << 5)));
+                cb_patch32(off + 4, (u32)(0xF2A00009UL | (((addr >> 16) & 0xFFFFUL) << 5)));
+                cb_patch32(off + 8, (u32)(0xF2C00009UL | (((addr >> 32) & 0xFFFFUL) << 5)));
+                cb_patch32(off + 12, (u32)(0xF2E00009UL | (((addr >> 48) & 0xFFFFUL) << 5)));
             }
         }
 

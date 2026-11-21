@@ -40,31 +40,31 @@ void be_6502_cbm_begin(size_t base, int is_x16) {
     stub_end = (u16)(base + 8 + len);
     next_line = (u16)(base + 6 + len);
 
-    emit16(next_line);
-    emit16(10);
-    emit8(0x9E); /* BASIC SYS token */
+    cb_emit16(next_line);
+    cb_emit16(10);
+    cb_emit8(0x9E); /* BASIC SYS token */
     for (i = 0; i < len; i++)
-        emit8((u8)digits[i]);
-    emit8(0x00);
-    emit16(0x0000);
+        cb_emit8((u8)digits[i]);
+    cb_emit8(0x00);
+    cb_emit16(0x0000);
     (void)stub_end;
 
     if (!is_x16) {
         /* Unmap BASIC ROM ($A000-$BFFF -> RAM) while keeping KERNAL/I/O */
-        emit8_8(M6502_LDA_ZP, 0x01);
-        emit8_8(M6502_AND_IMM, 0xFE);
-        emit8_8(M6502_STA_ZP, 0x01);
+        cb_emit8_8(M6502_LDA_ZP, 0x01);
+        cb_emit8_8(M6502_AND_IMM, 0xFE);
+        cb_emit8_8(M6502_STA_ZP, 0x01);
     }
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     c64_jmp_pc = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
 }
 
 static void c64_begin(size_t base) { be_6502_cbm_begin(base, 0); }
 
 int be_6502_cbm_write(FILE *fp, size_t base) {
     u8 hdr[2];
-    put_le16(hdr, base);
+    cb_put_le16(hdr, base);
     if (fwrite(hdr, 1, sizeof(hdr), fp) != sizeof(hdr))
         return 0;
     return cb_write_raw(fp, 1);
@@ -89,111 +89,111 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         exit(1);
     }
 
-    patch16(c64_jmp_pc, entry_addr);
+    cb_patch16(c64_jmp_pc, entry_addr);
 
     /* CLD; LDX #init_x (initialize IR4th data stack without clobbering hardware SP) */
-    emit8(M6502_CLD);
-    emit8_8(M6502_LDX_IMM, be_6502_stack_zp_init_x());
+    cb_emit8(M6502_CLD);
+    cb_emit8_8(M6502_LDX_IMM, be_6502_stack_zp_init_x());
 
     /* JSR main */
-    emit8_16(M6502_JSR, sig->addr);
+    cb_emit8_16(M6502_JSR, sig->addr);
 
     if (sig->out_types.len == 1) {
         u8 zp_stk = be_6502_stack_zp_base();
         /* Pop 16-bit signed value from (stack_base,X) into tmp_lo/tmp_hi */
         if (zp_stk != 0) {
-            emit8_8(0xB5, zp_stk); /* LDA zp,X */
-            emit8_8(M6502_STA_ZP, tmp_lo);
-            emit8_8(0xB5, (u8)(zp_stk + 1)); /* LDA zp+1,X */
-            emit8_8(M6502_STA_ZP, tmp_hi);
+            cb_emit8_8(0xB5, zp_stk); /* LDA zp,X */
+            cb_emit8_8(M6502_STA_ZP, tmp_lo);
+            cb_emit8_8(0xB5, (u8)(zp_stk + 1)); /* LDA zp+1,X */
+            cb_emit8_8(M6502_STA_ZP, tmp_hi);
         } else {
             u16 stk_off = be_6502_stack_data_off();
-            emit8(M6502_LDA_ABSX);
+            cb_emit8(M6502_LDA_ABSX);
             cb_add_data_reloc(cb_pc(), stk_off);
-            emit16(0x0000);
-            emit8_8(M6502_STA_ZP, tmp_lo);
-            emit8(M6502_LDA_ABSX);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_STA_ZP, tmp_lo);
+            cb_emit8(M6502_LDA_ABSX);
             cb_add_data_reloc(cb_pc(), (u16)(stk_off + 1));
-            emit16(0x0000);
-            emit8_8(M6502_STA_ZP, tmp_hi);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_STA_ZP, tmp_hi);
         }
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
 
         /* If tmp_hi < 0, print '-' and negate tmp_lo/tmp_hi */
-        emit8_8(M6502_LDA_ZP, tmp_hi);
-        emit8_8(M6502_BPL, 18);
+        cb_emit8_8(M6502_LDA_ZP, tmp_hi);
+        cb_emit8_8(M6502_BPL, 18);
 
-        emit8_8(M6502_LDA_IMM, '-');
-        emit8(M6502_JSR);
+        cb_emit8_8(M6502_LDA_IMM, '-');
+        cb_emit8(M6502_JSR);
         putchar_call1 = cb_pc();
-        emit16(0x0000);
-        emit8(M6502_SEC);
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_SBC_ZP, tmp_lo);
-        emit8_8(M6502_STA_ZP, tmp_lo);
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_SBC_ZP, tmp_hi);
-        emit8_8(M6502_STA_ZP, tmp_hi);
+        cb_emit16(0x0000);
+        cb_emit8(M6502_SEC);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_SBC_ZP, tmp_lo);
+        cb_emit8_8(M6502_STA_ZP, tmp_lo);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_SBC_ZP, tmp_hi);
+        cb_emit8_8(M6502_STA_ZP, tmp_hi);
 
         /* JSR print_u16 */
-        emit8(M6502_JSR);
+        cb_emit8(M6502_JSR);
         print_call1 = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
 
         /* Print PETSCII CR (13) */
-        emit8_8(M6502_LDA_IMM, 13);
-        emit8(M6502_JSR);
+        cb_emit8_8(M6502_LDA_IMM, 13);
+        cb_emit8(M6502_JSR);
         putchar_call2 = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
     }
 
     if (!is_x16) {
         /* Restore BASIC ROM before returning to READY. */
-        emit8_8(M6502_LDA_ZP, 0x01);
-        emit8_8(M6502_ORA_IMM, 0x01);
-        emit8_8(M6502_STA_ZP, 0x01);
+        cb_emit8_8(M6502_LDA_ZP, 0x01);
+        cb_emit8_8(M6502_ORA_IMM, 0x01);
+        cb_emit8_8(M6502_STA_ZP, 0x01);
     }
-    emit8(M6502_RTS);
+    cb_emit8(M6502_RTS);
 
     if (sig->out_types.len == 1) {
         print_u16_addr = cb_cur_addr();
-        patch16(print_call1, print_u16_addr);
+        cb_patch16(print_call1, print_u16_addr);
 
         /* div10: tmp_lo/tmp_hi /= 10, A = remainder */
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_LDY_IMM, 16);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDY_IMM, 16);
         div_loop_pc = cb_pc();
-        emit8_8(M6502_ASL_ZP, tmp_lo);
-        emit8_8(M6502_ROL_ZP, tmp_hi);
-        emit8(M6502_ROL_A);
-        emit8_8(M6502_CMP_IMM, 10);
-        emit8_8(M6502_BCC, 4);
-        emit8_8(M6502_SBC_IMM, 10);
-        emit8_8(M6502_INC_ZP, tmp_lo);
-        emit8(M6502_DEY);
-        emit8_8(M6502_BNE, (u8)(div_loop_pc - (cb_pc() + 2)));
+        cb_emit8_8(M6502_ASL_ZP, tmp_lo);
+        cb_emit8_8(M6502_ROL_ZP, tmp_hi);
+        cb_emit8(M6502_ROL_A);
+        cb_emit8_8(M6502_CMP_IMM, 10);
+        cb_emit8_8(M6502_BCC, 4);
+        cb_emit8_8(M6502_SBC_IMM, 10);
+        cb_emit8_8(M6502_INC_ZP, tmp_lo);
+        cb_emit8(M6502_DEY);
+        cb_emit8_8(M6502_BNE, (u8)(div_loop_pc - (cb_pc() + 2)));
 
-        emit8(M6502_PHA);
-        emit8_8(M6502_LDA_ZP, tmp_lo);
-        emit8_8(M6502_ORA_ZP, tmp_hi);
-        emit8_8(M6502_BEQ, 3);
-        emit8(M6502_JSR);
+        cb_emit8(M6502_PHA);
+        cb_emit8_8(M6502_LDA_ZP, tmp_lo);
+        cb_emit8_8(M6502_ORA_ZP, tmp_hi);
+        cb_emit8_8(M6502_BEQ, 3);
+        cb_emit8(M6502_JSR);
         print_call2 = cb_pc();
-        emit16(0x0000);
-        patch16(print_call2, print_u16_addr);
+        cb_emit16(0x0000);
+        cb_patch16(print_call2, print_u16_addr);
 
-        emit8(M6502_PLA);
-        emit8(M6502_CLC);
-        emit8_8(M6502_ADC_IMM, '0');
-        emit8(M6502_JSR);
+        cb_emit8(M6502_PLA);
+        cb_emit8(M6502_CLC);
+        cb_emit8_8(M6502_ADC_IMM, '0');
+        cb_emit8(M6502_JSR);
         putchar_call3 = cb_pc();
-        emit16(0x0000);
-        emit8(M6502_RTS);
+        cb_emit16(0x0000);
+        cb_emit8(M6502_RTS);
 
-        patch16(putchar_call1, C64_CHROUT);
-        patch16(putchar_call2, C64_CHROUT);
-        patch16(putchar_call3, C64_CHROUT);
+        cb_patch16(putchar_call1, C64_CHROUT);
+        cb_patch16(putchar_call2, C64_CHROUT);
+        cb_patch16(putchar_call3, C64_CHROUT);
     }
 }
 

@@ -10,15 +10,15 @@ static void agon_begin(size_t base) {
     size_t i;
     (void)base;
     /* Reserve JP start (4 bytes) + pad to 0x40 + "MOS" header (5 bytes) */
-    emit8(EZ80_JP);
-    emit24(0);
+    cb_emit8(EZ80_JP);
+    cb_emit24(0);
     for (i = 4; i < 0x40; i++)
-        emit8(0x00);
-    emit8('M');
-    emit8('O');
-    emit8('S');
-    emit8(0x00); /* header version 0 */
-    emit8(0x01); /* ADL = 1 (24-bit) */
+        cb_emit8(0x00);
+    cb_emit8('M');
+    cb_emit8('O');
+    cb_emit8('S');
+    cb_emit8(0x00); /* header version 0 */
+    cb_emit8(0x01); /* ADL = 1 (24-bit) */
 }
 
 static void agon_end(int main_idx) {
@@ -32,25 +32,25 @@ static void agon_end(int main_idx) {
         exit(1);
     }
 
-    patch24(1, entry);
+    cb_patch24(1, entry);
 
     /* Initialize BSS return stack pointer */
-    emit8(EZ80_LD_HL_N24);
+    cb_emit8(EZ80_LD_HL_N24);
     cb_add_data_reloc24(cb_pc(), rtop_off);
-    emit24(0);
-    emit8(EZ80_LD_NN_HL);
+    cb_emit24(0);
+    cb_emit8(EZ80_LD_NN_HL);
     cb_add_data_reloc24(cb_pc(), rsp_off);
-    emit24(0);
+    cb_emit24(0);
 
-    emit8(EZ80_CALL);
-    emit24((u32)sig->addr);
+    cb_emit8(EZ80_CALL);
+    cb_emit24((u32)sig->addr);
 
     if (sig->out_types.len == 1) {
-        emit8(EZ80_POP_BC); /* preserve main() return value in BC for test harness */
+        cb_emit8(EZ80_POP_BC); /* preserve main() return value in BC for test harness */
     }
-    emit8(EZ80_LD_HL_N24);
-    emit24(0); /* MOS exit code */
-    emit8(EZ80_RET);
+    cb_emit8(EZ80_LD_HL_N24);
+    cb_emit24(0); /* MOS exit code */
+    cb_emit8(EZ80_RET);
 }
 
 const Platform plat_ez80_agon = {"--agon", &be_ez80, 0x040000UL, "agon", true,

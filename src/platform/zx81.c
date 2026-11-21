@@ -7,7 +7,7 @@
 
 static void zx81_begin(size_t base) {
     (void)base;
-    emit8_16(Z80_JP, 0x0000);
+    cb_emit8_16(Z80_JP, 0x0000);
 }
 
 static void zx81_end(int main_idx) {
@@ -19,15 +19,15 @@ static void zx81_end(int main_idx) {
         exit(1);
     }
 
-    patch16(1, entry_addr);
-    emit8_16(Z80_CALL, sig->addr);
+    cb_patch16(1, entry_addr);
+    cb_emit8_16(Z80_CALL, sig->addr);
     if (sig->out_types.len == 1) {
-        emit8(0xC1); /* POP BC (return value for RAND USR) */
+        cb_emit8(0xC1); /* POP BC (return value for RAND USR) */
     } else {
-        emit8(0x01); /* LD BC, 0 */
-        emit16(0x0000);
+        cb_emit8(0x01); /* LD BC, 0 */
+        cb_emit16(0x0000);
     }
-    emit8(Z80_RET);
+    cb_emit8(Z80_RET);
 }
 
 static int zx81_write(FILE *fp, size_t base) {
@@ -54,22 +54,22 @@ static int zx81_write(FILE *fp, size_t base) {
     /* System variables $4009..$407C (116 bytes) */
     memset(sysvars, 0, sizeof(sysvars));
     sysvars[0x400A - 0x4009] = 0x01; /* E_PPC = 1 */
-    put_le16(&sysvars[0x400C - 0x4009], (u16)dfile_addr);
-    put_le16(&sysvars[0x400E - 0x4009], (u16)(dfile_addr + 1));
-    put_le16(&sysvars[0x4010 - 0x4009], (u16)vars_addr);
-    put_le16(&sysvars[0x4014 - 0x4009], (u16)eline_addr);
-    put_le16(&sysvars[0x4016 - 0x4009], (u16)(eline_addr + 1));
-    put_le16(&sysvars[0x401A - 0x4009], (u16)stk_addr);
-    put_le16(&sysvars[0x401C - 0x4009], (u16)stk_addr);
-    put_le16(&sysvars[0x401F - 0x4009], 0x405D); /* MEM = MEMBOT */
+    cb_put_le16(&sysvars[0x400C - 0x4009], (u16)dfile_addr);
+    cb_put_le16(&sysvars[0x400E - 0x4009], (u16)(dfile_addr + 1));
+    cb_put_le16(&sysvars[0x4010 - 0x4009], (u16)vars_addr);
+    cb_put_le16(&sysvars[0x4014 - 0x4009], (u16)eline_addr);
+    cb_put_le16(&sysvars[0x4016 - 0x4009], (u16)(eline_addr + 1));
+    cb_put_le16(&sysvars[0x401A - 0x4009], (u16)stk_addr);
+    cb_put_le16(&sysvars[0x401C - 0x4009], (u16)stk_addr);
+    cb_put_le16(&sysvars[0x401F - 0x4009], 0x405D); /* MEM = MEMBOT */
     sysvars[0x4022 - 0x4009] = 2;                 /* DF_SZ */
     sysvars[0x4023 - 0x4009] = 1;                 /* S_TOP */
     sysvars[0x4025 - 0x4009] = 0xFF;              /* LAST_K */
     sysvars[0x4026 - 0x4009] = 0xFF;
     sysvars[0x4027 - 0x4009] = 0xFF;
     sysvars[0x4028 - 0x4009] = 55;                /* MARGIN (PAL 50Hz) */
-    put_le16(&sysvars[0x4029 - 0x4009], 0x407D);  /* NXTLIN = Line 1 (autostart) */
-    put_le16(&sysvars[0x4030 - 0x4009], 0x0C8D);  /* T_ADDR */
+    cb_put_le16(&sysvars[0x4029 - 0x4009], 0x407D);  /* NXTLIN = Line 1 (autostart) */
+    cb_put_le16(&sysvars[0x4030 - 0x4009], 0x0C8D);  /* T_ADDR */
     sysvars[0x4034 - 0x4009] = 0xFF;              /* FRAMES */
     sysvars[0x4035 - 0x4009] = 0xFF;
     sysvars[0x4038 - 0x4009] = 0xBC;              /* PR_CC */
@@ -81,7 +81,7 @@ static int zx81_write(FILE *fp, size_t base) {
     /* Line 1 ($407D): 1 RAND USR VAL "16529" */
     line1[0] = 0x00;
     line1[1] = 0x01;
-    put_le16(&line1[2], 11);
+    cb_put_le16(&line1[2], 11);
     line1[4] = 0xF9;  /* RAND */
     line1[5] = 0xD4;  /* USR */
     line1[6] = 0xC5;  /* VAL */
@@ -97,7 +97,7 @@ static int zx81_write(FILE *fp, size_t base) {
     /* Line 2 ($408C): 2 REM <code + data + bss + NL> */
     line2_hdr[0] = 0x00;
     line2_hdr[1] = 0x02;
-    put_le16(&line2_hdr[2], (u16)rem_body_len);
+    cb_put_le16(&line2_hdr[2], (u16)rem_body_len);
     line2_hdr[4] = 0xEA; /* REM */
 
     if (fwrite(sysvars, 1, sizeof(sysvars), fp) != sizeof(sysvars) ||

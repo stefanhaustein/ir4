@@ -109,20 +109,20 @@ size_t be_6502_stack_data_off(void) {
 static void emit_stack_op(u8 opcode, u8 disp) {
     if (stack_zp_base != 0) {
         /* Every abs,X stack opcode in be_6502 maps to zp,X via (opcode - 0x08). */
-        emit8_8((u8)(opcode - 0x08), (u8)(stack_zp_base + disp));
+        cb_emit8_8((u8)(opcode - 0x08), (u8)(stack_zp_base + disp));
         return;
     }
     ensure_data_alloc();
-    emit8(opcode);
+    cb_emit8(opcode);
     cb_add_data_reloc(cb_pc(), (u16)(stack_data_off + disp));
-    emit16(0x0000);
+    cb_emit16(0x0000);
 }
 
 static void emit_local_op(u8 opcode, u8 byte_off) {
     ensure_data_alloc();
-    emit8(opcode);
+    cb_emit8(opcode);
     cb_add_data_reloc(cb_pc(), (u16)(locals_data_off + byte_off));
-    emit16(0x0000);
+    cb_emit16(0x0000);
 }
 
 /* --- 6502 Stack & Local Frame Helpers --- */
@@ -130,9 +130,9 @@ static void m6502_lda_local(u8 o) { emit_local_op(0xB9, o); } /* LDA abs,Y */
 static void m6502_sta_local(u8 o) { emit_local_op(0x99, o); } /* STA abs,Y */
 static void m6502_ldy_lfp(void) {
     ensure_data_alloc();
-    emit8(0xAC);
+    cb_emit8(0xAC);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000);
+    cb_emit16(0x0000);
 } /* LDY lfp */
 
 static void m6502_lda_stk(u8 d) { emit_stack_op(M6502_LDA_ABSX, d); }
@@ -161,9 +161,9 @@ static u16 m6502_static_base = 0;
 
 static void m6502_emit_local_store(u16 off) {
     if (m6502_static_frame) {
-        emit8(M6502_STA_ABS);
+        cb_emit8(M6502_STA_ABS);
         cb_add_data_reloc(cb_pc(), (u16)(m6502_static_base + off));
-        emit16(0x0000);
+        cb_emit16(0x0000);
     } else {
         m6502_sta_local((u8)off);
     }
@@ -201,18 +201,18 @@ static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *l
 
     if (m6502_compact) {
         ensure_6502_vm();
-        emit8_16(M6502_JSR, vm_enter_addr);
+        cb_emit8_16(M6502_JSR, vm_enter_addr);
         if (m6502_static_frame) {
             if (m6502_frame_bytes > 0)
                 m6502_static_base = cb_alloc_data(m6502_frame_bytes, 1);
         } else {
             if (m6502_frame_bytes > 0) {
                 ensure_data_alloc();
-                emit8_8(BC_ENTER, (u8)m6502_frame_bytes);
+                cb_emit8_8(BC_ENTER, (u8)m6502_frame_bytes);
             }
             if (m6502_big_bytes > 0) {
                 ensure_big_alloc();
-                emit8_16(BC_ENTER_BIG, m6502_big_bytes);
+                cb_emit8_16(BC_ENTER_BIG, m6502_big_bytes);
             }
         }
         for (i = param_cnt; i > 0; i--) {
@@ -223,9 +223,9 @@ static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *l
             if (locals[i].size > 0)
                 continue;
             if (locals[i].type == TY_F || locals[i].type == TY_I32) {
-                emit8(BC_PUSH_0_32);
+                cb_emit8(BC_PUSH_0_32);
             } else {
-                emit8(BC_PUSH_IMM7_BASE);
+                cb_emit8(BC_PUSH_IMM7_BASE);
             }
             m6502_bc_local_op(LOCAL_SET, i, locals[i].type);
         }
@@ -240,56 +240,56 @@ static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *l
         if (m6502_frame_bytes > 0) {
             ensure_data_alloc();
             /* Save caller's lfp and allocate m6502_frame_bytes downward */
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), lfp_data_off);
-            emit16(0x0000); /* LDA lfp */
-            emit8(M6502_PHA);
-            emit8(M6502_SEC);
-            emit8_8(M6502_SBC_IMM, (u8)m6502_frame_bytes);
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000); /* LDA lfp */
+            cb_emit8(M6502_PHA);
+            cb_emit8(M6502_SEC);
+            cb_emit8_8(M6502_SBC_IMM, (u8)m6502_frame_bytes);
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), lfp_data_off);
-            emit16(0x0000);   /* STA lfp */
-            emit8(M6502_TAY); /* TAY (Y = new lfp) */
+            cb_emit16(0x0000);   /* STA lfp */
+            cb_emit8(M6502_TAY); /* TAY (Y = new lfp) */
         }
         if (m6502_big_bytes > 0) {
             ensure_big_alloc();
             /* Lazy-init bfp = m6502_ram_top if bfp+1 == 0 */
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
-            emit8_8(M6502_BNE, 10);
-            emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top & 0xFF));
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_BNE, 10);
+            cb_emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top & 0xFF));
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), bfp_data_off);
-            emit16(0x0000);
-            emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top >> 8));
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top >> 8));
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
+            cb_emit16(0x0000);
             /* Save caller's bfp and allocate m6502_big_bytes downward */
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), bfp_data_off);
-            emit16(0x0000);
-            emit8(M6502_PHA);
-            emit8(M6502_LDA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8(M6502_PHA);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
-            emit8(M6502_PHA);
-            emit8(M6502_SEC);
-            emit8(M6502_LDA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8(M6502_PHA);
+            cb_emit8(M6502_SEC);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), bfp_data_off);
-            emit16(0x0000);
-            emit8_8(M6502_SBC_IMM, (u8)(m6502_big_bytes & 0xFF));
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_SBC_IMM, (u8)(m6502_big_bytes & 0xFF));
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), bfp_data_off);
-            emit16(0x0000);
-            emit8(M6502_LDA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
-            emit8_8(M6502_SBC_IMM, (u8)(m6502_big_bytes >> 8));
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_SBC_IMM, (u8)(m6502_big_bytes >> 8));
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
+            cb_emit16(0x0000);
         }
     }
 
@@ -304,12 +304,12 @@ static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *l
             m6502_emit_local_store((u16)(off + b));
         }
         for (b = 0; b < sz; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
     }
 
     /* Zero-initialize scalar scratch locals after '|' */
     if (total_locals > param_cnt) {
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         for (i = param_cnt; i < total_locals; i++) {
             u16 off = m6502_local_off.data[i];
             u8 sz = (locals[i].type == TY_F || locals[i].type == TY_I32) ? 4 : 2;
@@ -331,48 +331,48 @@ static void m6502_fn_end(const FuncSig *sig, const LocalVar *locals, size_t tota
     if (m6502_compact) {
         if (!m6502_static_frame) {
             if (m6502_big_bytes > 0)
-                emit8(BC_LEAVE_BIG);
+                cb_emit8(BC_LEAVE_BIG);
             if (m6502_frame_bytes > 0)
-                emit8(BC_LEAVE);
+                cb_emit8(BC_LEAVE);
         }
-        emit8(BC_RET);
+        cb_emit8(BC_RET);
         return;
     }
 
     if (!m6502_static_frame) {
         if (m6502_big_bytes > 0) {
             ensure_big_alloc();
-            emit8(M6502_PLA);
-            emit8(M6502_STA_ABS);
+            cb_emit8(M6502_PLA);
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-            emit16(0x0000);
-            emit8(M6502_PLA);
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8(M6502_PLA);
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), bfp_data_off);
-            emit16(0x0000);
+            cb_emit16(0x0000);
         }
         if (m6502_frame_bytes > 0) {
             ensure_data_alloc();
-            emit8(M6502_PLA);
-            emit8(M6502_STA_ABS);
+            cb_emit8(M6502_PLA);
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), lfp_data_off);
-            emit16(0x0000); /* STA lfp */
+            cb_emit16(0x0000); /* STA lfp */
         }
     }
 
-    emit8(M6502_RTS);
+    cb_emit8(M6502_RTS);
 }
 
 static void m6502_call(size_t target_addr) {
     u16 tbank = m6502_call_target_bank;
     m6502_call_target_bank = 0;
     if (cb_is_banked() && tbank != 0 && tbank != cb_cur_bank()) {
-        emit8_16(M6502_JSR, m6502_bank_call_addr);
-        emit8((u8)(m6502_phys_bank_offset + tbank));
-        emit16((u16)target_addr);
+        cb_emit8_16(M6502_JSR, m6502_bank_call_addr);
+        cb_emit8((u8)(m6502_phys_bank_offset + tbank));
+        cb_emit16((u16)target_addr);
         return;
     }
-    emit8_16(m6502_compact ? BC_CALL : M6502_JSR, (u16)target_addr);
+    cb_emit8_16(m6502_compact ? BC_CALL : M6502_JSR, (u16)target_addr);
 }
 
 static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
@@ -390,7 +390,7 @@ static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig
     if (cb_is_banked() && tbank != 0 && tbank != cb_cur_bank())
         return 0;
     be_6502_peep_fence();
-    emit8_16(0x4C, (u16)target_addr); /* JMP abs */
+    cb_emit8_16(0x4C, (u16)target_addr); /* JMP abs */
     return 1;
 }
 
@@ -400,16 +400,16 @@ static void m6502_call_extern(const FuncSig *sig) {
     if (m6502_compact) {
         u16 jmp_patch;
         u16 stub_addr;
-        emit8(BC_JMP);
+        cb_emit8(BC_JMP);
         jmp_patch = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
         stub_addr = cb_cur_addr();
         m6502_compact = 0;
         m6502_call_extern(sig);
         m6502_compact = 1;
-        emit8(M6502_RTS);
-        patch16(jmp_patch, cb_cur_addr());
-        emit8_16(BC_CALL, stub_addr);
+        cb_emit8(M6502_RTS);
+        cb_patch16(jmp_patch, cb_cur_addr());
+        cb_emit8_16(BC_CALL, stub_addr);
         return;
     }
     if (!sig->has_addr)
@@ -421,55 +421,55 @@ static void m6502_call_extern(const FuncSig *sig) {
         const char *r = sig->in_regs.data[i - 1];
         m6502_lda_stk(0);
         if (strcmp(r, "A") == 0) {
-            emit8_8(M6502_STA_ZP, zp_scratch);
+            cb_emit8_8(M6502_STA_ZP, zp_scratch);
             has_a = 1;
         } else if (strcmp(r, "X") == 0) {
-            emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+            cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
             has_x = 1;
         } else if (strcmp(r, "Y") == 0) {
-            emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
+            cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
             has_y = 1;
         } else {
             ir4_die("6502 extern only supports A, X, and Y registers");
         }
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
     }
 
-    emit8_8(M6502_STX_ZP, (u8)(zp_scratch + 3));
+    cb_emit8_8(M6502_STX_ZP, (u8)(zp_scratch + 3));
     if (has_a)
-        emit8_8(M6502_LDA_ZP, zp_scratch);
+        cb_emit8_8(M6502_LDA_ZP, zp_scratch);
     if (has_x) {
-        emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 1));
+        cb_emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 1));
     }
     if (has_y) {
-        emit8_8(M6502_LDY_ZP, (u8)(zp_scratch + 2));
+        cb_emit8_8(M6502_LDY_ZP, (u8)(zp_scratch + 2));
     }
 
     if (cb_is_banked() && sig->addr >= 0xC000 && m6502_kernal_call_addr != 0) {
-        emit8_16(M6502_JSR, m6502_kernal_call_addr);
-        emit16(sig->addr);
+        cb_emit8_16(M6502_JSR, m6502_kernal_call_addr);
+        cb_emit16(sig->addr);
     } else {
-        emit8_16(M6502_JSR, sig->addr);
+        cb_emit8_16(M6502_JSR, sig->addr);
     }
 
     if (sig->out_types.len == 1) {
         const char *r = sig->out_reg;
         if (strcmp(r, "X") == 0) {
-            emit8(M6502_TXA);
+            cb_emit8(M6502_TXA);
         } else if (strcmp(r, "Y") == 0) {
-            emit8(M6502_TYA);
+            cb_emit8(M6502_TYA);
         } else if (strcmp(r, "A") != 0) {
             ir4_die("6502 extern return only supports A, X, and Y registers");
         }
-        emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 3));
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 3));
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(1);
     } else {
-        emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 3));
+        cb_emit8_8(M6502_LDX_ZP, (u8)(zp_scratch + 3));
     }
 }
 
@@ -478,18 +478,18 @@ static void m6502_push_w(i32 val) {
     if (m6502_compact) {
         i16 sv = (i16)v;
         if (sv >= 0 && sv <= 127) {
-            emit8((u8)(BC_PUSH_IMM7_BASE | sv));
+            cb_emit8((u8)(BC_PUSH_IMM7_BASE | sv));
         } else if (sv >= -128 && sv < 0) {
-            emit8_8(BC_PUSH_I8, (u8)(sv & 0xFF));
+            cb_emit8_8(BC_PUSH_I8, (u8)(sv & 0xFF));
         } else {
-            emit8_16(BC_PUSH_I16, v);
+            cb_emit8_16(BC_PUSH_I16, v);
         }
         return;
     }
     m6502_push2();
-    emit8_8(M6502_LDA_IMM, (u8)(v & 0xFF));
+    cb_emit8_8(M6502_LDA_IMM, (u8)(v & 0xFF));
     m6502_sta_stk(0);
-    emit8_8(M6502_LDA_IMM, (u8)((v >> 8) & 0xFF));
+    cb_emit8_8(M6502_LDA_IMM, (u8)((v >> 8) & 0xFF));
     m6502_sta_stk(1);
 }
 
@@ -531,18 +531,18 @@ static void m6502_push_f(double val) {
     encode_wozfp(val, bytes);
     if (m6502_compact) {
         if (val == 0.0) {
-            emit8(BC_PUSH_0_32);
+            cb_emit8(BC_PUSH_0_32);
             return;
         }
-        emit8(BC_PUSH_I32);
+        cb_emit8(BC_PUSH_I32);
         for (b = 0; b < 4; b++)
-            emit8(bytes[b]);
+            cb_emit8(bytes[b]);
         return;
     }
     for (b = 0; b < 4; b++)
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
     for (b = 0; b < 4; b++) {
-        emit8_8(M6502_LDA_IMM, bytes[b]);
+        cb_emit8_8(M6502_LDA_IMM, bytes[b]);
         m6502_sta_stk(b);
     }
 }
@@ -552,17 +552,17 @@ static void m6502_push_i32(i32 val) {
     u32 u = (u32)val;
     if (m6502_compact) {
         if (u == 0) {
-            emit8(BC_PUSH_0_32);
+            cb_emit8(BC_PUSH_0_32);
             return;
         }
-        emit8(BC_PUSH_I32);
-        emit32(u);
+        cb_emit8(BC_PUSH_I32);
+        cb_emit32(u);
         return;
     }
     for (b = 0; b < 4; b++)
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
     for (b = 0; b < 4; b++) {
-        emit8_8(M6502_LDA_IMM, (u8)((u >> (b * 8)) & 0xFF));
+        cb_emit8_8(M6502_LDA_IMM, (u8)((u >> (b * 8)) & 0xFF));
         m6502_sta_stk(b);
     }
 }
@@ -570,19 +570,19 @@ static void m6502_push_i32(i32 val) {
 static void m6502_push_data(size_t offset) {
     u16 lo_pos, hi_pos;
     if (m6502_compact) {
-        emit8(BC_PUSH_I16);
+        cb_emit8(BC_PUSH_I16);
         cb_add_data_reloc(cb_pc(), offset);
-        emit16(0x0000);
+        cb_emit16(0x0000);
         return;
     }
     m6502_push2();
-    emit8(M6502_LDA_IMM);
+    cb_emit8(M6502_LDA_IMM);
     lo_pos = cb_pc();
-    emit8(0x00); /* LDA #<addr */
+    cb_emit8(0x00); /* LDA #<addr */
     m6502_sta_stk(0);
-    emit8(M6502_LDA_IMM);
+    cb_emit8(M6502_LDA_IMM);
     hi_pos = cb_pc();
-    emit8(0x00); /* LDA #>addr */
+    cb_emit8(0x00); /* LDA #>addr */
     m6502_sta_stk(1);
     cb_add_data_reloc_split(lo_pos, hi_pos, offset);
 }
@@ -596,13 +596,13 @@ static void m6502_local_get(size_t slot, StackType type, u16 stack_bytes) {
         m6502_push2();
     else {
         for (b = 0; b < sz; b++)
-            emit8(M6502_DEX);
+            cb_emit8(M6502_DEX);
     }
     if (m6502_static_frame) {
         for (b = 0; b < sz; b++) {
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(m6502_static_base + off + b));
-            emit16(0x0000);
+            cb_emit16(0x0000);
             m6502_sta_stk(b);
         }
     } else {
@@ -629,7 +629,7 @@ static void m6502_local_set(size_t slot, StackType type, u16 stack_bytes) {
         m6502_pop2();
     else {
         for (b = 0; b < sz; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
     }
 }
 
@@ -642,36 +642,36 @@ static void m6502_local_addr(size_t slot) {
     if (m6502_local_is_big.data[slot]) {
         u16 off = m6502_local_off.data[slot];
         ensure_big_alloc();
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
-        emit8(M6502_CLC);
-        emit8(M6502_LDA_ABS);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_CLC);
+        cb_emit8(M6502_LDA_ABS);
         cb_add_data_reloc(cb_pc(), bfp_data_off);
-        emit16(0x0000);
-        emit8_8(M6502_ADC_IMM, (u8)(off & 0xFF));
+        cb_emit16(0x0000);
+        cb_emit8_8(M6502_ADC_IMM, (u8)(off & 0xFF));
         m6502_sta_stk(0);
-        emit8(M6502_LDA_ABS);
+        cb_emit8(M6502_LDA_ABS);
         cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-        emit16(0x0000);
-        emit8_8(M6502_ADC_IMM, (u8)(off >> 8));
+        cb_emit16(0x0000);
+        cb_emit8_8(M6502_ADC_IMM, (u8)(off >> 8));
         m6502_sta_stk(1);
         return;
     }
     ensure_data_alloc();
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_CLC);
-    emit8(M6502_LDA_IMM);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_CLC);
+    cb_emit8(M6502_LDA_IMM);
     lo_pos = cb_pc();
-    emit8(0x00); /* LDA #<local */
-    emit8(M6502_ADC_ABS);
+    cb_emit8(0x00); /* LDA #<local */
+    cb_emit8(M6502_ADC_ABS);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000); /* ADC lfp */
+    cb_emit16(0x0000); /* ADC lfp */
     m6502_sta_stk(0);
-    emit8(M6502_LDA_IMM);
+    cb_emit8(M6502_LDA_IMM);
     hi_pos = cb_pc();
-    emit8(0x00); /* LDA #>local */
-    emit8_8(M6502_ADC_IMM, 0x00);
+    cb_emit8(0x00); /* LDA #>local */
+    cb_emit8_8(M6502_ADC_IMM, 0x00);
     m6502_sta_stk(1);
     cb_add_data_reloc_split(lo_pos, hi_pos, (u16)(locals_data_off + m6502_local_off.data[slot]));
 }
@@ -680,26 +680,26 @@ static void m6502_local_add(size_t slot) {
     u16 off = m6502_local_off.data[slot];
     u8 b;
     if (m6502_static_frame) {
-        emit8(M6502_CLC);
+        cb_emit8(M6502_CLC);
         for (b = 0; b < 2; b++) {
             m6502_lda_stk(b);
-            emit8(M6502_ADC_ABS);
+            cb_emit8(M6502_ADC_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(m6502_static_base + off + b));
-            emit16(0x0000);
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(m6502_static_base + off + b));
-            emit16(0x0000);
+            cb_emit16(0x0000);
         }
         m6502_pop2();
         return;
     }
     m6502_ldy_lfp();
-    emit8(M6502_CLC);
+    cb_emit8(M6502_CLC);
     for (b = 0; b < 2; b++) {
         m6502_lda_stk(b);
-        emit8(0x79); /* ADC abs,Y */
+        cb_emit8(0x79); /* ADC abs,Y */
         cb_add_data_reloc(cb_pc(), (u16)(locals_data_off + off + b));
-        emit16(0x0000);
+        cb_emit16(0x0000);
         m6502_emit_local_store((u16)(off + b));
     }
     m6502_pop2();
@@ -717,59 +717,59 @@ static int m6502_local_add_imm(size_t slot, StackType type, size_t stack_bytes, 
     if (m6502_static_frame) {
         u16 addr = (u16)(m6502_static_base + off);
         if (k == 1) {
-            emit8(0xEE); /* INC abs */
+            cb_emit8(0xEE); /* INC abs */
             cb_add_data_reloc(cb_pc(), addr);
-            emit16(0x0000);
-            emit8_8(M6502_BNE, 3);
-            emit8(0xEE); /* INC abs+1 */
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_BNE, 3);
+            cb_emit8(0xEE); /* INC abs+1 */
             cb_add_data_reloc(cb_pc(), (u16)(addr + 1));
-            emit16(0x0000);
+            cb_emit16(0x0000);
             return 1;
         }
         if (k == 0xFFFF) {
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), addr);
-            emit16(0x0000);
-            emit8_8(M6502_BNE, 3);
-            emit8(0xCE); /* DEC abs+1 */
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_BNE, 3);
+            cb_emit8(0xCE); /* DEC abs+1 */
             cb_add_data_reloc(cb_pc(), (u16)(addr + 1));
-            emit16(0x0000);
-            emit8(0xCE); /* DEC abs */
+            cb_emit16(0x0000);
+            cb_emit8(0xCE); /* DEC abs */
             cb_add_data_reloc(cb_pc(), addr);
-            emit16(0x0000);
+            cb_emit16(0x0000);
             return 1;
         }
-        emit8(M6502_CLC);
-        emit8(M6502_LDA_ABS);
+        cb_emit8(M6502_CLC);
+        cb_emit8(M6502_LDA_ABS);
         cb_add_data_reloc(cb_pc(), addr);
-        emit16(0x0000);
-        emit8_8(M6502_ADC_IMM, (u8)(k & 0xFF));
-        emit8(M6502_STA_ABS);
+        cb_emit16(0x0000);
+        cb_emit8_8(M6502_ADC_IMM, (u8)(k & 0xFF));
+        cb_emit8(M6502_STA_ABS);
         cb_add_data_reloc(cb_pc(), addr);
-        emit16(0x0000);
+        cb_emit16(0x0000);
         if ((k >> 8) == 0) {
-            emit8_8(M6502_BCC, 3);
-            emit8(0xEE); /* INC abs+1 */
+            cb_emit8_8(M6502_BCC, 3);
+            cb_emit8(0xEE); /* INC abs+1 */
             cb_add_data_reloc(cb_pc(), (u16)(addr + 1));
-            emit16(0x0000);
+            cb_emit16(0x0000);
         } else {
-            emit8(M6502_LDA_ABS);
+            cb_emit8(M6502_LDA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(addr + 1));
-            emit16(0x0000);
-            emit8_8(M6502_ADC_IMM, (u8)(k >> 8));
-            emit8(M6502_STA_ABS);
+            cb_emit16(0x0000);
+            cb_emit8_8(M6502_ADC_IMM, (u8)(k >> 8));
+            cb_emit8(M6502_STA_ABS);
             cb_add_data_reloc(cb_pc(), (u16)(addr + 1));
-            emit16(0x0000);
+            cb_emit16(0x0000);
         }
         return 1;
     }
     m6502_ldy_lfp();
-    emit8(M6502_CLC);
+    cb_emit8(M6502_CLC);
     m6502_lda_local((u8)off);
-    emit8_8(M6502_ADC_IMM, (u8)(k & 0xFF));
+    cb_emit8_8(M6502_ADC_IMM, (u8)(k & 0xFF));
     m6502_emit_local_store(off);
     m6502_lda_local((u8)(off + 1));
-    emit8_8(M6502_ADC_IMM, (u8)(k >> 8));
+    cb_emit8_8(M6502_ADC_IMM, (u8)(k >> 8));
     m6502_emit_local_store((u16)(off + 1));
     return 1;
 }
@@ -803,7 +803,7 @@ static void m6502_stack_op(StackOp op, StackType t1, StackType t2) {
             m6502_push2();
         else {
             for (b = 0; b < sz1; b++)
-                emit8(M6502_DEX);
+                cb_emit8(M6502_DEX);
         }
         for (b = 0; b < sz1; b++) {
             m6502_lda_stk((u8)(sz1 + b));
@@ -815,7 +815,7 @@ static void m6502_stack_op(StackOp op, StackType t1, StackType t2) {
             m6502_pop2();
         else {
             for (b = 0; b < sz1; b++)
-                emit8(M6502_INX);
+                cb_emit8(M6502_INX);
         }
         break;
     case OP_SWAP:
@@ -824,21 +824,21 @@ static void m6502_stack_op(StackOp op, StackType t1, StackType t2) {
                 m6502_ldy_stk(b);
                 m6502_lda_stk((u8)(sz1 + b));
                 m6502_sta_stk(b);
-                emit8(M6502_TYA);
+                cb_emit8(M6502_TYA);
                 m6502_sta_stk((u8)(sz1 + b));
             }
         } else {
             /* Save TOS (sz1 <= 4 bytes) in zp_scratch, shift NOS down, store TOS */
             for (b = 0; b < sz1; b++) {
                 m6502_lda_stk(b);
-                emit8_8(M6502_STA_ZP, (u8)(zp_scratch + b));
+                cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + b));
             }
             for (b = 0; b < sz2; b++) {
                 m6502_lda_stk((u8)(sz1 + b));
                 m6502_sta_stk(b);
             }
             for (b = 0; b < sz1; b++) {
-                emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + b));
+                cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + b));
                 m6502_sta_stk((u8)(sz2 + b));
             }
         }
@@ -860,8 +860,8 @@ void be_6502_peep_fence(void) {
 }
 
 static void m6502_pop2(void) {
-    emit8(M6502_INX);
-    emit8(M6502_INX);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
     if (!m6502_compact)
         m6502_inx2_pc = cb_pc();
 }
@@ -873,8 +873,8 @@ static void m6502_push2(void) {
         return;
     }
     m6502_inx2_pc = 0;
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
 }
 
 static void m6502_int_cmp(IrOp op) {
@@ -901,24 +901,24 @@ static void m6502_int_cmp(IrOp op) {
     case OP_ANE:
         m6502_lda_stk(2);
         m6502_eor_stk(0);
-        emit8_8(M6502_STA_ZP, zp_scratch);
+        cb_emit8_8(M6502_STA_ZP, zp_scratch);
         m6502_lda_stk(3);
         m6502_eor_stk(1);
-        emit8_8(M6502_ORA_ZP, zp_scratch);
+        cb_emit8_8(M6502_ORA_ZP, zp_scratch);
         if (op == OP_EQ || op == OP_AEQ) {
             m6502_cmp_true_op = M6502_BEQ;
         } else {
             m6502_cmp_true_op = M6502_BNE;
         }
         m6502_cmp_mat_pc = cb_pc();
-        emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-        emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(2);
         m6502_sta_stk(3);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         m6502_cmp_pops = 2;
         m6502_cmp_end_pc = cb_pc();
         break;
@@ -928,7 +928,7 @@ static void m6502_int_cmp(IrOp op) {
     case OP_AGT:
     case OP_UGE:
     case OP_ULE:
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         m6502_lda_stk(lhs_off);
         m6502_sbc_stk(rhs_off);
         m6502_lda_stk((u8)(lhs_off + 1));
@@ -939,14 +939,14 @@ static void m6502_int_cmp(IrOp op) {
             m6502_cmp_true_op = M6502_BCC;
         }
         m6502_cmp_mat_pc = cb_pc();
-        emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-        emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(2);
         m6502_sta_stk(3);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         m6502_cmp_pops = 2;
         m6502_cmp_end_pc = cb_pc();
         break;
@@ -954,27 +954,27 @@ static void m6502_int_cmp(IrOp op) {
     case OP_GT:
     case OP_GE:
     case OP_LE:
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         m6502_lda_stk(lhs_off);
         m6502_sbc_stk(rhs_off);
         m6502_lda_stk((u8)(lhs_off + 1));
         m6502_sbc_stk((u8)(rhs_off + 1));
-        emit8_8(M6502_BVC, 0x02);
-        emit8_8(M6502_EOR_IMM, 0x80);
+        cb_emit8_8(M6502_BVC, 0x02);
+        cb_emit8_8(M6502_EOR_IMM, 0x80);
         if (op == OP_GE || op == OP_LE) {
             m6502_cmp_true_op = M6502_BPL;
         } else {
             m6502_cmp_true_op = M6502_BMI;
         }
         m6502_cmp_mat_pc = cb_pc();
-        emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-        emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(2);
         m6502_sta_stk(3);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         m6502_cmp_pops = 2;
         m6502_cmp_end_pc = cb_pc();
         break;
@@ -985,123 +985,123 @@ static void m6502_int_cmp(IrOp op) {
 
 static void m6502_mem_addr_setup_off(u8 y_off) {
     m6502_lda_stk(0);
-    emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
     m6502_lda_stk(1);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8_8(M6502_LDY_IMM, y_off);
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_LDY_IMM, y_off);
 }
 
 static void emit_neg_stk(u8 disp) {
-    emit8(M6502_SEC);
-    emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8(M6502_SEC);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
     m6502_sbc_stk(disp);
     m6502_sta_stk(disp);
-    emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
     m6502_sbc_stk((u8)(disp + 1));
     m6502_sta_stk((u8)(disp + 1));
 }
 
 static void emit_neg_zp(u8 zp) {
-    emit8(M6502_SEC);
-    emit8_8(M6502_LDA_IMM, 0x00);
-    emit8_8(M6502_SBC_ZP, zp);
-    emit8_8(M6502_STA_ZP, zp);
-    emit8_8(M6502_LDA_IMM, 0x00);
-    emit8_8(M6502_SBC_ZP, (u8)(zp + 1));
-    emit8_8(M6502_STA_ZP, (u8)(zp + 1));
+    cb_emit8(M6502_SEC);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_SBC_ZP, zp);
+    cb_emit8_8(M6502_STA_ZP, zp);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_SBC_ZP, (u8)(zp + 1));
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp + 1));
 }
 
 static void ensure_mul16(void) {
     u16 skip_patch, loop_pc, bcc_patch;
     if (mul16_addr)
         return;
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     skip_patch = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
     mul16_addr = cb_cur_addr();
 
     /* prod (zp0/zp1) = 0, Y = 16 */
-    emit8_8(M6502_LDA_IMM, 0x00);
-    emit8_8(M6502_STA_ZP, zp_scratch);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8_8(M6502_LDY_IMM, 16);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_LDY_IMM, 16);
 
     loop_pc = cb_pc();
     m6502_lsr_stk(1);
     m6502_ror_stk(0);
-    emit8(M6502_BCC);
+    cb_emit8(M6502_BCC);
     bcc_patch = cb_pc();
-    emit8(0x00); /* BCC skip_add */
-    emit8(M6502_CLC);
-    emit8_8(M6502_LDA_ZP, zp_scratch);
+    cb_emit8(0x00); /* BCC skip_add */
+    cb_emit8(M6502_CLC);
+    cb_emit8_8(M6502_LDA_ZP, zp_scratch);
     m6502_adc_stk(2);
-    emit8_8(M6502_STA_ZP, zp_scratch);
-    emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
     m6502_adc_stk(3);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
 
     m6502_asl_stk(2);
     m6502_lda_stk(3);
-    emit8(M6502_ROL_A); /* ROL A (avoids $3E sim65 bug) */
+    cb_emit8(M6502_ROL_A); /* ROL A (avoids $3E sim65 bug) */
     m6502_sta_stk(3);
-    emit8(M6502_DEY);
-    emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+    cb_emit8(M6502_DEY);
+    cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
 
-    emit8_8(M6502_LDA_ZP, zp_scratch);
+    cb_emit8_8(M6502_LDA_ZP, zp_scratch);
     m6502_sta_stk(2);
-    emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
     m6502_sta_stk(3);
-    emit8(M6502_INX);
-    emit8(M6502_INX);
-    emit8(M6502_RTS);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_RTS);
 
-    patch16(skip_patch, cb_cur_addr());
+    cb_patch16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_udivmod16(void) {
     u16 skip_patch, loop_pc, bcc_patch;
     if (udivmod16_addr)
         return;
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     skip_patch = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
     udivmod16_addr = cb_cur_addr();
 
     /* rem (zp0/zp1) = 0, Y = 16; quotient in stack+2/3,X */
-    emit8_8(M6502_LDA_IMM, 0x00);
-    emit8_8(M6502_STA_ZP, zp_scratch);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8_8(M6502_LDY_IMM, 16);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_LDY_IMM, 16);
 
     loop_pc = cb_pc();
     m6502_asl_stk(2);
     m6502_lda_stk(3);
-    emit8(M6502_ROL_A);
+    cb_emit8(M6502_ROL_A);
     m6502_sta_stk(3);
-    emit8_8(M6502_ROL_ZP, zp_scratch);
-    emit8_8(M6502_ROL_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_ROL_ZP, zp_scratch);
+    cb_emit8_8(M6502_ROL_ZP, (u8)(zp_scratch + 1));
 
-    emit8(M6502_SEC);
-    emit8_8(M6502_LDA_ZP, zp_scratch);
+    cb_emit8(M6502_SEC);
+    cb_emit8_8(M6502_LDA_ZP, zp_scratch);
     m6502_sbc_stk(0);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
-    emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
+    cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
     m6502_sbc_stk(1);
-    emit8(M6502_BCC);
+    cb_emit8(M6502_BCC);
     bcc_patch = cb_pc();
-    emit8(0x00); /* BCC skip_sub */
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 2));
-    emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8(0x00); /* BCC skip_sub */
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 2));
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
     emit_stack_op(0xFE, 2); /* INC stack+2,X */
-    patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
+    cb_patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
 
-    emit8(M6502_DEY);
-    emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-    emit8(M6502_RTS);
+    cb_emit8(M6502_DEY);
+    cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+    cb_emit8(M6502_RTS);
 
-    patch16(skip_patch, cb_cur_addr());
+    cb_patch16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_sdivmod16(void) {
@@ -1109,55 +1109,55 @@ static void ensure_sdivmod16(void) {
     if (sdivmod16_addr)
         return;
     ensure_udivmod16();
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     skip_patch = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
     sdivmod16_addr = cb_cur_addr();
 
     /* Save dividend sign (zp3) and quotient sign (HW stack) */
     m6502_lda_stk(3);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 3));
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 3));
     m6502_eor_stk(1);
-    emit8(M6502_PHA);
+    cb_emit8(M6502_PHA);
 
     /* If dividend < 0, negate stack+2/3,X */
     m6502_lda_stk(3);
-    emit8(M6502_BPL);
+    cb_emit8(M6502_BPL);
     p1 = cb_pc();
-    emit8(0x00);
+    cb_emit8(0x00);
     emit_neg_stk(2);
-    patch8(p1, (u8)(cb_pc() - (p1 + 1)));
+    cb_patch8(p1, (u8)(cb_pc() - (p1 + 1)));
 
     /* If divisor < 0, negate stack+0/1,X */
     m6502_lda_stk(1);
-    emit8(M6502_BPL);
+    cb_emit8(M6502_BPL);
     p2 = cb_pc();
-    emit8(0x00);
+    cb_emit8(0x00);
     emit_neg_stk(0);
-    patch8(p2, (u8)(cb_pc() - (p2 + 1)));
+    cb_patch8(p2, (u8)(cb_pc() - (p2 + 1)));
 
-    emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 3));
-    emit8(M6502_PHA);
-    emit8_16(M6502_JSR, udivmod16_addr);
+    cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 3));
+    cb_emit8(M6502_PHA);
+    cb_emit8_16(M6502_JSR, udivmod16_addr);
 
     /* Apply dividend sign to remainder (zp0/zp1) */
-    emit8(M6502_PLA);
-    emit8(M6502_BPL);
+    cb_emit8(M6502_PLA);
+    cb_emit8(M6502_BPL);
     p3 = cb_pc();
-    emit8(0x00);
+    cb_emit8(0x00);
     emit_neg_zp(zp_scratch);
-    patch8(p3, (u8)(cb_pc() - (p3 + 1)));
+    cb_patch8(p3, (u8)(cb_pc() - (p3 + 1)));
 
     /* Apply quotient sign to quotient (stack+2/3,X) */
-    emit8(M6502_PLA);
-    emit8(M6502_BPL);
+    cb_emit8(M6502_PLA);
+    cb_emit8(M6502_BPL);
     p4 = cb_pc();
-    emit8(0x00);
+    cb_emit8(0x00);
     emit_neg_stk(2);
-    patch8(p4, (u8)(cb_pc() - (p4 + 1)));
+    cb_patch8(p4, (u8)(cb_pc() - (p4 + 1)));
 
-    emit8(M6502_RTS);
-    patch16(skip_patch, cb_cur_addr());
+    cb_emit8(M6502_RTS);
+    cb_patch16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_rt_blob(u16 *addr, const u8 *code, u16 code_len, const u16 *relocs,
@@ -1168,20 +1168,20 @@ static void ensure_rt_blob(u16 *addr, const u8 *code, u16 code_len, const u16 *r
     if (*addr != 0)
         return;
 
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     jmp_skip = cb_pc();
-    emit16(0x0000); /* JMP skip */
+    cb_emit16(0x0000); /* JMP skip */
     base_pc = cb_pc();
     *addr = cb_cur_addr();
     for (i = 0; i < code_len; i++) {
-        emit8(code[i]);
+        cb_emit8(code[i]);
     }
     for (i = 0; i < reloc_cnt; i++) {
         u16 r = relocs[i];
         u16 orig = (u16)code[r] | ((u16)code[r + 1] << 8);
-        patch16((u16)(base_pc + r), (u16)(orig + *addr));
+        cb_patch16((u16)(base_pc + r), (u16)(orig + *addr));
     }
-    patch16(jmp_skip, cb_cur_addr());
+    cb_patch16(jmp_skip, cb_cur_addr());
 }
 
 static void ensure_wozfp(void) {
@@ -1193,32 +1193,32 @@ static void wozfp_pop_to(u8 zp_base) {
     u8 b;
     for (b = 0; b < 4; b++) {
         m6502_lda_stk(b);
-        emit8_8(M6502_STA_ZP, (u8)(zp_base + b));
+        cb_emit8_8(M6502_STA_ZP, (u8)(zp_base + b));
     }
     for (b = 0; b < 4; b++)
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
 }
 
 static void wozfp_push_from(u8 zp_base) {
     u8 b;
     for (b = 0; b < 4; b++)
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
     for (b = 0; b < 4; b++) {
-        emit8_8(M6502_LDA_ZP, (u8)(zp_base + b));
+        cb_emit8_8(M6502_LDA_ZP, (u8)(zp_base + b));
         m6502_sta_stk(b);
     }
 }
 
 static void wozfp_call_keep_x(u16 entry_off) {
-    emit8_8(M6502_STX_ZP, zp_scratch);
-    emit8_16(M6502_JSR, (u16)(wozfp_addr + entry_off));
-    emit8_8(M6502_LDX_ZP, zp_scratch); /* LDX zp_scratch (preserves A) */
+    cb_emit8_8(M6502_STX_ZP, zp_scratch);
+    cb_emit8_16(M6502_JSR, (u16)(wozfp_addr + entry_off));
+    cb_emit8_8(M6502_LDX_ZP, zp_scratch); /* LDX zp_scratch (preserves A) */
 }
 
 static void emit_data_abs(u8 opcode, u16 data_offset) {
-    emit8(opcode);
+    cb_emit8(opcode);
     cb_add_data_reloc(cb_pc(), data_offset);
-    emit16(0x0000);
+    cb_emit16(0x0000);
 }
 
 static int m6502_data_mem(IrOp op, size_t data_offset) {
@@ -1226,30 +1226,30 @@ static int m6502_data_mem(IrOp op, size_t data_offset) {
         return 0;
     switch (op) {
     case OP_U8FETCH:
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         emit_data_abs(0xAD, data_offset); /* LDA abs */
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(1);
         return 1;
     case OP_I8FETCH:
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         emit_data_abs(0xAD, data_offset); /* LDA abs */
         m6502_sta_stk(0);
-        emit8_8(M6502_BPL, 0x04);
-        emit8_8(M6502_LDA_IMM, 0xFF);
-        emit8_8(M6502_BMI, 0x02);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BPL, 0x04);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(M6502_BMI, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(1);
         return 1;
     case OP_FETCH:
     case OP_AFETCH:
     case OP_I16FETCH:
     case OP_U16FETCH:
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         emit_data_abs(0xAD, data_offset); /* LDA abs */
         m6502_sta_stk(0);
         emit_data_abs(0xAD, (u16)(data_offset + 1)); /* LDA abs+1 */
@@ -1258,8 +1258,8 @@ static int m6502_data_mem(IrOp op, size_t data_offset) {
     case OP_I8STORE:
         m6502_lda_stk(0);
         emit_data_abs(0x8D, data_offset); /* STA abs */
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         return 1;
     case OP_STORE:
     case OP_ASTORE:
@@ -1268,13 +1268,13 @@ static int m6502_data_mem(IrOp op, size_t data_offset) {
         emit_data_abs(0x8D, data_offset); /* STA abs */
         m6502_lda_stk(1);
         emit_data_abs(0x8D, (u16)(data_offset + 1)); /* STA abs+1 */
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         return 1;
     case OP_I32FETCH: {
         u8 b;
         for (b = 0; b < 4; b++)
-            emit8(M6502_DEX);
+            cb_emit8(M6502_DEX);
         for (b = 0; b < 4; b++) {
             emit_data_abs(0xAD, (u16)(data_offset + b));
             m6502_sta_stk(b);
@@ -1288,7 +1288,7 @@ static int m6502_data_mem(IrOp op, size_t data_offset) {
             emit_data_abs(0x8D, (u16)(data_offset + b));
         }
         for (b = 0; b < 4; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         return 1;
     }
     default:
@@ -1304,38 +1304,38 @@ static int m6502_bit_imm(IrOp op, i32 imm) {
         return 0;
     if (op == OP_AND) {
         if (lo == 0) {
-            emit8_8(M6502_LDA_IMM, 0);
+            cb_emit8_8(M6502_LDA_IMM, 0);
             m6502_sta_stk(0);
         } else if (lo != 0xFF) {
             m6502_lda_stk(0);
-            emit8_8(M6502_AND_IMM, lo);
+            cb_emit8_8(M6502_AND_IMM, lo);
             m6502_sta_stk(0);
         }
         if (hi == 0) {
-            emit8_8(M6502_LDA_IMM, 0);
+            cb_emit8_8(M6502_LDA_IMM, 0);
             m6502_sta_stk(1);
         } else if (hi != 0xFF) {
             m6502_lda_stk(1);
-            emit8_8(M6502_AND_IMM, hi);
+            cb_emit8_8(M6502_AND_IMM, hi);
             m6502_sta_stk(1);
         }
         return 1;
     }
     if (op == OP_OR) {
         if (lo == 0xFF) {
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
             m6502_sta_stk(0);
         } else if (lo != 0) {
             m6502_lda_stk(0);
-            emit8_8(M6502_ORA_IMM, lo);
+            cb_emit8_8(M6502_ORA_IMM, lo);
             m6502_sta_stk(0);
         }
         if (hi == 0xFF) {
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
             m6502_sta_stk(1);
         } else if (hi != 0) {
             m6502_lda_stk(1);
-            emit8_8(M6502_ORA_IMM, hi);
+            cb_emit8_8(M6502_ORA_IMM, hi);
             m6502_sta_stk(1);
         }
         return 1;
@@ -1343,12 +1343,12 @@ static int m6502_bit_imm(IrOp op, i32 imm) {
     if (op == OP_XOR) {
         if (lo != 0) {
             m6502_lda_stk(0);
-            emit8_8(M6502_EOR_IMM, lo);
+            cb_emit8_8(M6502_EOR_IMM, lo);
             m6502_sta_stk(0);
         }
         if (hi != 0) {
             m6502_lda_stk(1);
-            emit8_8(M6502_EOR_IMM, hi);
+            cb_emit8_8(M6502_EOR_IMM, hi);
             m6502_sta_stk(1);
         }
         return 1;
@@ -1398,47 +1398,47 @@ static int m6502_mem_imm(IrOp op, i32 off) {
         u8 aoff = (u8)((sz == 4) ? 4 : 2);
         val_off = 0;
         m6502_lda_stk(aoff);
-        emit8_8(M6502_STA_ZP, zp_scratch);
+        cb_emit8_8(M6502_STA_ZP, zp_scratch);
         m6502_lda_stk((u8)(aoff + 1));
-        emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-        emit8_8(M6502_LDY_IMM, (u8)off);
+        cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+        cb_emit8_8(M6502_LDY_IMM, (u8)off);
     } else {
         val_off = 2;
         m6502_mem_addr_setup_off((u8)off);
     }
     switch (op) {
     case OP_U8FETCH:
-        emit8_8(M6502_LDA_INDY, zp_scratch);
+        cb_emit8_8(M6502_LDA_INDY, zp_scratch);
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(1);
         break;
     case OP_I8FETCH:
-        emit8_8(M6502_LDA_INDY, zp_scratch);
+        cb_emit8_8(M6502_LDA_INDY, zp_scratch);
         m6502_sta_stk(0);
-        emit8_8(M6502_BPL, 0x04);
-        emit8_8(M6502_LDA_IMM, 0xFF);
-        emit8_8(M6502_BMI, 0x02);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BPL, 0x04);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(M6502_BMI, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(1);
         break;
     case OP_I8STORE:
     case OP_SI8STORE:
         m6502_lda_stk(val_off);
-        emit8_8(M6502_STA_INDY, zp_scratch);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8_8(M6502_STA_INDY, zp_scratch);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         break;
     case OP_FETCH:
     case OP_AFETCH:
     case OP_I16FETCH:
     case OP_U16FETCH:
-        emit8_8(M6502_LDA_INDY, zp_scratch);
+        cb_emit8_8(M6502_LDA_INDY, zp_scratch);
         m6502_sta_stk(0);
-        emit8(M6502_INY);
-        emit8_8(M6502_LDA_INDY, zp_scratch);
+        cb_emit8(M6502_INY);
+        cb_emit8_8(M6502_LDA_INDY, zp_scratch);
         m6502_sta_stk(1);
         break;
     case OP_STORE:
@@ -1448,25 +1448,25 @@ static int m6502_mem_imm(IrOp op, i32 off) {
     case OP_SASTORE:
     case OP_SI16STORE:
         m6502_lda_stk(val_off);
-        emit8_8(M6502_STA_INDY, zp_scratch);
-        emit8(M6502_INY);
+        cb_emit8_8(M6502_STA_INDY, zp_scratch);
+        cb_emit8(M6502_INY);
         m6502_lda_stk((u8)(val_off + 1));
-        emit8_8(M6502_STA_INDY, zp_scratch);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8_8(M6502_STA_INDY, zp_scratch);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         break;
     case OP_FFETCH:
     case OP_I32FETCH: {
         u8 b;
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         for (b = 0; b < 4; b++) {
-            emit8_8(M6502_LDA_INDY, zp_scratch);
+            cb_emit8_8(M6502_LDA_INDY, zp_scratch);
             m6502_sta_stk(b);
             if (b < 3)
-                emit8(M6502_INY);
+                cb_emit8(M6502_INY);
         }
         break;
     }
@@ -1476,12 +1476,12 @@ static int m6502_mem_imm(IrOp op, i32 off) {
         u8 b;
         for (b = 0; b < 4; b++) {
             m6502_lda_stk((u8)(val_off + b));
-            emit8_8(M6502_STA_INDY, zp_scratch);
+            cb_emit8_8(M6502_STA_INDY, zp_scratch);
             if (b < 3)
-                emit8(M6502_INY);
+                cb_emit8(M6502_INY);
         }
         for (b = 0; b < 6; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         break;
     }
     default:
@@ -1498,15 +1498,15 @@ static void m6502_op(IrOp op) {
     switch (op) {
     case OP_INVERT:
         m6502_lda_stk(0);
-        emit8_8(M6502_EOR_IMM, 0xFF);
+        cb_emit8_8(M6502_EOR_IMM, 0xFF);
         m6502_sta_stk(0);
         m6502_lda_stk(1);
-        emit8_8(M6502_EOR_IMM, 0xFF);
+        cb_emit8_8(M6502_EOR_IMM, 0xFF);
         m6502_sta_stk(1);
         break;
     case OP_ADD:
     case OP_AADD:
-        emit8(M6502_CLC);
+        cb_emit8(M6502_CLC);
         m6502_lda_stk(2);
         m6502_adc_stk(0);
         m6502_sta_stk(2);
@@ -1518,7 +1518,7 @@ static void m6502_op(IrOp op) {
     case OP_SUB:
     case OP_ASUB:
     case OP_ADIFF:
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         m6502_lda_stk(2);
         m6502_sbc_stk(0);
         m6502_sta_stk(2);
@@ -1558,50 +1558,50 @@ static void m6502_op(IrOp op) {
     case OP_RSHIFT:
     case OP_ARSHIFT:
         m6502_ldy_stk(0);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8_8(0xC0, 0x00); /* CPY #0 */
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8_8(0xC0, 0x00); /* CPY #0 */
         if (op == OP_LSHIFT) {
             /* Avoid ROL abs,X ($3E) due to a PC-advance bug in sim65 V2.18 */
             u16 skip_br;
             u16 loop_pc;
-            emit8(M6502_BEQ);
+            cb_emit8(M6502_BEQ);
             skip_br = cb_pc();
-            emit8(0x00);
+            cb_emit8(0x00);
             loop_pc = cb_pc();
             m6502_asl_stk(0);
             m6502_lda_stk(1);
-            emit8(M6502_ROL_A);
+            cb_emit8(M6502_ROL_A);
             m6502_sta_stk(1);
-            emit8(M6502_DEY);
-            emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_emit8(M6502_DEY);
+            cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         } else if (op == OP_RSHIFT) {
             u16 skip_br;
             u16 loop_pc;
-            emit8(M6502_BEQ);
+            cb_emit8(M6502_BEQ);
             skip_br = cb_pc();
-            emit8(0x00);
+            cb_emit8(0x00);
             loop_pc = cb_pc();
             m6502_lsr_stk(1);
             m6502_ror_stk(0);
-            emit8(M6502_DEY);
-            emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_emit8(M6502_DEY);
+            cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         } else {
             u16 skip_br;
             u16 loop_pc;
-            emit8(M6502_BEQ);
+            cb_emit8(M6502_BEQ);
             skip_br = cb_pc();
-            emit8(0x00);
+            cb_emit8(0x00);
             loop_pc = cb_pc();
             m6502_lda_stk(1);
-            emit8(0x0A); /* ASL A */
+            cb_emit8(0x0A); /* ASL A */
             m6502_ror_stk(1);
             m6502_ror_stk(0);
-            emit8(M6502_DEY);
-            emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_emit8(M6502_DEY);
+            cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         }
         break;
     case OP_EQ:
@@ -1641,83 +1641,83 @@ static void m6502_op(IrOp op) {
     case OP_BCOPY: {
         u16 skip_pages, page_loop, byte_loop, skip_tail, tail_loop;
         m6502_lda_stk(2);
-        emit8_8(M6502_STA_ZP, zp_scratch);
+        cb_emit8_8(M6502_STA_ZP, zp_scratch);
         m6502_lda_stk(3);
-        emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+        cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
         m6502_lda_stk(4);
-        emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
+        cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 2));
         m6502_lda_stk(5);
-        emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 3));
+        cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 3));
         m6502_lda_stk(0);
-        emit8(0x48); /* PHA len_lo */
+        cb_emit8(0x48); /* PHA len_lo */
         m6502_lda_stk(1);
-        emit8(0x48); /* PHA len_hi */
+        cb_emit8(0x48); /* PHA len_hi */
         for (skip_pages = 0; skip_pages < 6; skip_pages++)
-            emit8(M6502_INX);
-        emit8_8(M6502_LDY_IMM, 0x00);
-        emit8(0x68); /* PLA len_hi */
-        emit8(M6502_BEQ);
+            cb_emit8(M6502_INX);
+        cb_emit8_8(M6502_LDY_IMM, 0x00);
+        cb_emit8(0x68); /* PLA len_hi */
+        cb_emit8(M6502_BEQ);
         skip_pages = cb_pc();
-        emit8(0x00);
+        cb_emit8(0x00);
         page_loop = cb_pc();
-        emit8(0x48); /* PHA */
+        cb_emit8(0x48); /* PHA */
         byte_loop = cb_pc();
-        emit8_8(0xB1, zp_scratch);           /* LDA (zp0),Y */
-        emit8_8(0x91, (u8)(zp_scratch + 2)); /* STA (zp2),Y */
-        emit8(M6502_INY);
-        emit8_8(M6502_BNE, (u8)(byte_loop - (cb_pc() + 2)));
-        emit8_8(0xE6, (u8)(zp_scratch + 1)); /* INC zp1 */
-        emit8_8(0xE6, (u8)(zp_scratch + 3)); /* INC zp3 */
-        emit8(0x68);                         /* PLA */
-        emit8(M6502_SEC);
-        emit8_8(0xE9, 0x01); /* SBC #1 */
-        emit8_8(M6502_BNE, (u8)(page_loop - (cb_pc() + 2)));
-        patch8(skip_pages, (u8)(cb_pc() - (skip_pages + 1)));
-        emit8(0x68); /* PLA len_lo */
-        emit8(M6502_BEQ);
+        cb_emit8_8(0xB1, zp_scratch);           /* LDA (zp0),Y */
+        cb_emit8_8(0x91, (u8)(zp_scratch + 2)); /* STA (zp2),Y */
+        cb_emit8(M6502_INY);
+        cb_emit8_8(M6502_BNE, (u8)(byte_loop - (cb_pc() + 2)));
+        cb_emit8_8(0xE6, (u8)(zp_scratch + 1)); /* INC zp1 */
+        cb_emit8_8(0xE6, (u8)(zp_scratch + 3)); /* INC zp3 */
+        cb_emit8(0x68);                         /* PLA */
+        cb_emit8(M6502_SEC);
+        cb_emit8_8(0xE9, 0x01); /* SBC #1 */
+        cb_emit8_8(M6502_BNE, (u8)(page_loop - (cb_pc() + 2)));
+        cb_patch8(skip_pages, (u8)(cb_pc() - (skip_pages + 1)));
+        cb_emit8(0x68); /* PLA len_lo */
+        cb_emit8(M6502_BEQ);
         skip_tail = cb_pc();
-        emit8(0x00);
-        emit8(0xA8); /* TAY */
+        cb_emit8(0x00);
+        cb_emit8(0xA8); /* TAY */
         tail_loop = cb_pc();
-        emit8(M6502_DEY);
-        emit8_8(0xB1, zp_scratch);           /* LDA (zp0),Y */
-        emit8_8(0x91, (u8)(zp_scratch + 2)); /* STA (zp2),Y */
-        emit8(0x98);                         /* TYA */
-        emit8_8(M6502_BNE, (u8)(tail_loop - (cb_pc() + 2)));
-        patch8(skip_tail, (u8)(cb_pc() - (skip_tail + 1)));
+        cb_emit8(M6502_DEY);
+        cb_emit8_8(0xB1, zp_scratch);           /* LDA (zp0),Y */
+        cb_emit8_8(0x91, (u8)(zp_scratch + 2)); /* STA (zp2),Y */
+        cb_emit8(0x98);                         /* TYA */
+        cb_emit8_8(M6502_BNE, (u8)(tail_loop - (cb_pc() + 2)));
+        cb_patch8(skip_tail, (u8)(cb_pc() - (skip_tail + 1)));
         break;
     }
     case OP_INV32: {
         u8 b;
         for (b = 0; b < 4; b++) {
             m6502_lda_stk(b);
-            emit8_8(M6502_EOR_IMM, 0xFF);
+            cb_emit8_8(M6502_EOR_IMM, 0xFF);
             m6502_sta_stk(b);
         }
         break;
     }
     case OP_ADD32: {
         u8 b;
-        emit8(M6502_CLC);
+        cb_emit8(M6502_CLC);
         for (b = 0; b < 4; b++) {
             m6502_lda_stk((u8)(4 + b));
             m6502_adc_stk(b);
             m6502_sta_stk((u8)(4 + b));
         }
         for (b = 0; b < 4; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         break;
     }
     case OP_SUB32: {
         u8 b;
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         for (b = 0; b < 4; b++) {
             m6502_lda_stk((u8)(4 + b));
             m6502_sbc_stk(b);
             m6502_sta_stk((u8)(4 + b));
         }
         for (b = 0; b < 4; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         break;
     }
     case OP_AND32:
@@ -1735,31 +1735,31 @@ static void m6502_op(IrOp op) {
             m6502_sta_stk((u8)(4 + b));
         }
         for (b = 0; b < 4; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         break;
     }
     case OP_W2I32:
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         m6502_lda_stk(2);
         m6502_sta_stk(0);
         m6502_lda_stk(3);
         m6502_sta_stk(1);
-        emit8_8(M6502_BPL, 0x04);
-        emit8_8(M6502_LDA_IMM, 0xFF);
-        emit8_8(M6502_BMI, 0x02);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BPL, 0x04);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(M6502_BMI, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(2);
         m6502_sta_stk(3);
         break;
     case OP_U2I32:
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         m6502_lda_stk(2);
         m6502_sta_stk(0);
         m6502_lda_stk(3);
         m6502_sta_stk(1);
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_sta_stk(2);
         m6502_sta_stk(3);
         break;
@@ -1768,27 +1768,27 @@ static void m6502_op(IrOp op) {
         m6502_sta_stk(2);
         m6502_lda_stk(1);
         m6502_sta_stk(3);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         break;
     case OP_EQ32:
     case OP_NE32: {
         u8 b;
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_STA_ZP, zp_scratch);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_STA_ZP, zp_scratch);
         for (b = 0; b < 4; b++) {
             m6502_lda_stk((u8)(4 + b));
             m6502_eor_stk(b);
-            emit8_8(M6502_ORA_ZP, zp_scratch);
-            emit8_8(M6502_STA_ZP, zp_scratch);
+            cb_emit8_8(M6502_ORA_ZP, zp_scratch);
+            cb_emit8_8(M6502_STA_ZP, zp_scratch);
         }
         for (b = 0; b < 6; b++)
-            emit8(M6502_INX);
-        emit8_8(M6502_LDA_ZP, zp_scratch);
-        emit8_8(op == OP_EQ32 ? M6502_BEQ : M6502_BNE, 0x04);
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_BEQ, 0x02);
-        emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8(M6502_INX);
+        cb_emit8_8(M6502_LDA_ZP, zp_scratch);
+        cb_emit8_8(op == OP_EQ32 ? M6502_BEQ : M6502_BNE, 0x04);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BEQ, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(0);
         m6502_sta_stk(1);
         break;
@@ -1807,24 +1807,24 @@ static void m6502_op(IrOp op) {
         u8 lhs_off = swap_ops ? 0 : 4;
         u8 rhs_off = swap_ops ? 4 : 0;
         u8 b;
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         for (b = 0; b < 4; b++) {
             m6502_lda_stk((u8)(lhs_off + b));
             m6502_sbc_stk((u8)(rhs_off + b));
         }
         for (b = 0; b < 6; b++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         if (is_signed) {
-            emit8_8(M6502_BVC, 0x02);
-            emit8_8(M6502_EOR_IMM, 0x80);
-            emit8_8(0x09, 0x00); /* ORA #$00: refresh N from A after INX */
-            emit8_8(invert ? M6502_BPL : M6502_BMI, 0x04);
+            cb_emit8_8(M6502_BVC, 0x02);
+            cb_emit8_8(M6502_EOR_IMM, 0x80);
+            cb_emit8_8(0x09, 0x00); /* ORA #$00: refresh N from A after INX */
+            cb_emit8_8(invert ? M6502_BPL : M6502_BMI, 0x04);
         } else {
-            emit8_8(invert ? M6502_BCS : M6502_BCC, 0x04);
+            cb_emit8_8(invert ? M6502_BCS : M6502_BCC, 0x04);
         }
-        emit8_8(M6502_LDA_IMM, 0x00);
-        emit8_8(M6502_BEQ, 0x02);
-        emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_BEQ, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(0);
         m6502_sta_stk(1);
         break;
@@ -1833,10 +1833,10 @@ static void m6502_op(IrOp op) {
         m6502_mem_imm(op, 0);
         break;
     case OP_SEXT:
-        emit8_8(M6502_LDA_IMM, 0x00);
+        cb_emit8_8(M6502_LDA_IMM, 0x00);
         m6502_ldy_stk(0);
-        emit8_8(M6502_BPL, 0x02);
-        emit8_8(M6502_LDA_IMM, 0xFF);
+        cb_emit8_8(M6502_BPL, 0x02);
+        cb_emit8_8(M6502_LDA_IMM, 0xFF);
         m6502_sta_stk(1);
         break;
     case OP_W2A:
@@ -1845,38 +1845,38 @@ static void m6502_op(IrOp op) {
         break;
     case OP_MUL:
         ensure_mul16();
-        emit8_16(M6502_JSR, mul16_addr);
+        cb_emit8_16(M6502_JSR, mul16_addr);
         break;
     case OP_UDIV:
         ensure_udivmod16();
-        emit8_16(M6502_JSR, udivmod16_addr);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8_16(M6502_JSR, udivmod16_addr);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         break;
     case OP_UMOD:
         ensure_udivmod16();
-        emit8_16(M6502_JSR, udivmod16_addr);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8_8(M6502_LDA_ZP, zp_scratch);
+        cb_emit8_16(M6502_JSR, udivmod16_addr);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8_8(M6502_LDA_ZP, zp_scratch);
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
+        cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
         m6502_sta_stk(1);
         break;
     case OP_DIV:
         ensure_sdivmod16();
-        emit8_16(M6502_JSR, sdivmod16_addr);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8_16(M6502_JSR, sdivmod16_addr);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         break;
     case OP_MOD:
         ensure_sdivmod16();
-        emit8_16(M6502_JSR, sdivmod16_addr);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8_8(M6502_LDA_ZP, zp_scratch);
+        cb_emit8_16(M6502_JSR, sdivmod16_addr);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8_8(M6502_LDA_ZP, zp_scratch);
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
+        cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
         m6502_sta_stk(1);
         break;
     case OP_FADD:
@@ -1909,32 +1909,32 @@ static void m6502_op(IrOp op) {
         wozfp_pop_to(WOZFP_ZP_X2); /* lhs -> X2/M2 */
         wozfp_call_keep_x(RT_FP_CMP);
         /* A = $FF if lhs<rhs, 0 if lhs==rhs, 1 if lhs>rhs */
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
         if (op == OP_FEQ) {
-            emit8_8(M6502_CMP_IMM, 0x00);
-            emit8_8(M6502_BEQ, 0x04); /* BEQ true */
-            emit8_8(M6502_LDA_IMM, 0x00);
-            emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_CMP_IMM, 0x00);
+            cb_emit8_8(M6502_BEQ, 0x04); /* BEQ true */
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
         } else if (op == OP_FNE) {
-            emit8_8(M6502_CMP_IMM, 0x00);
-            emit8_8(M6502_BNE, 0x04); /* BNE true */
-            emit8_8(M6502_LDA_IMM, 0x00);
-            emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_CMP_IMM, 0x00);
+            cb_emit8_8(M6502_BNE, 0x04); /* BNE true */
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
         } else if (op == OP_FLT) {
-            emit8_8(M6502_CMP_IMM, 0xFF);
-            emit8_8(M6502_BEQ, 0x04); /* BEQ true */
-            emit8_8(M6502_LDA_IMM, 0x00);
-            emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_CMP_IMM, 0xFF);
+            cb_emit8_8(M6502_BEQ, 0x04); /* BEQ true */
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
         } else { /* OP_FGT */
-            emit8_8(M6502_CMP_IMM, 0x01);
-            emit8_8(M6502_BEQ, 0x04); /* BEQ true */
-            emit8_8(M6502_LDA_IMM, 0x00);
-            emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-            emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_CMP_IMM, 0x01);
+            cb_emit8_8(M6502_BEQ, 0x04); /* BEQ true */
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
         }
         m6502_sta_stk(0);
         m6502_sta_stk(1);
@@ -1947,11 +1947,11 @@ static void m6502_op(IrOp op) {
         ensure_wozfp();
         /* Pop 16-bit signed (lo, hi) -> M1+1 (lo), M1 (hi) */
         m6502_lda_stk(0);
-        emit8_8(M6502_STA_ZP, (u8)(WOZFP_ZP_M1 + 1));
+        cb_emit8_8(M6502_STA_ZP, (u8)(WOZFP_ZP_M1 + 1));
         m6502_lda_stk(1);
-        emit8_8(M6502_STA_ZP, WOZFP_ZP_M1);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
+        cb_emit8_8(M6502_STA_ZP, WOZFP_ZP_M1);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
         wozfp_call_keep_x(RT_FP_ITOF);
         wozfp_push_from(WOZFP_ZP_X1);
         break;
@@ -1961,26 +1961,26 @@ static void m6502_op(IrOp op) {
         ensure_wozfp();
         wozfp_pop_to(WOZFP_ZP_X1);
         /* Truncate toward zero: if M1 < 0, negate before FIX and negate result */
-        emit8_8(M6502_LDA_ZP, WOZFP_ZP_M1);
-        emit8(M6502_PHA);
-        emit8(M6502_BPL);
+        cb_emit8_8(M6502_LDA_ZP, WOZFP_ZP_M1);
+        cb_emit8(M6502_PHA);
+        cb_emit8(M6502_BPL);
         skip_neg1 = cb_pc();
-        emit8(0x00); /* BPL skip_neg1 */
+        cb_emit8(0x00); /* BPL skip_neg1 */
         wozfp_call_keep_x(RT_FP_NEG);
-        patch8(skip_neg1, (u8)(cb_pc() - (skip_neg1 + 1)));
+        cb_patch8(skip_neg1, (u8)(cb_pc() - (skip_neg1 + 1)));
         wozfp_call_keep_x(RT_FP_FTOI);
-        emit8(M6502_DEX);
-        emit8(M6502_DEX);
-        emit8_8(M6502_LDA_ZP, (u8)(WOZFP_ZP_M1 + 1));
+        cb_emit8(M6502_DEX);
+        cb_emit8(M6502_DEX);
+        cb_emit8_8(M6502_LDA_ZP, (u8)(WOZFP_ZP_M1 + 1));
         m6502_sta_stk(0);
-        emit8_8(M6502_LDA_ZP, WOZFP_ZP_M1);
+        cb_emit8_8(M6502_LDA_ZP, WOZFP_ZP_M1);
         m6502_sta_stk(1);
-        emit8(M6502_PLA);
-        emit8(M6502_BPL);
+        cb_emit8(M6502_PLA);
+        cb_emit8(M6502_BPL);
         skip_neg2 = cb_pc();
-        emit8(0x00); /* BPL skip_neg2 */
+        cb_emit8(0x00); /* BPL skip_neg2 */
         emit_neg_stk(0);
-        patch8(skip_neg2, (u8)(cb_pc() - (skip_neg2 + 1)));
+        cb_patch8(skip_neg2, (u8)(cb_pc() - (skip_neg2 + 1)));
         break;
     }
     case OP_MUL32:
@@ -2005,9 +2005,9 @@ static int m6502_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
 static size_t m6502_emit_br_fwd(BranchCond cond) {
     u16 patch_pos;
     if (m6502_compact) {
-        emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
+        cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
         patch_pos = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
         return patch_pos;
     }
     if (cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
@@ -2015,35 +2015,35 @@ static size_t m6502_emit_br_fwd(BranchCond cond) {
         u8 k;
         cb_rewind(cb_pc() - m6502_cmp_mat_pc);
         m6502_cmp_end_pc = 0;
-        emit8_8(m6502_cmp_true_op, (u8)(n_inx + 3));
+        cb_emit8_8(m6502_cmp_true_op, (u8)(n_inx + 3));
         for (k = 0; k < n_inx; k++)
-            emit8(M6502_INX);
-        emit8(M6502_JMP);
+            cb_emit8(M6502_INX);
+        cb_emit8(M6502_JMP);
         patch_pos = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
         for (k = 0; k < n_inx; k++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         return patch_pos;
     }
     m6502_cmp_end_pc = 0;
     if (cond == BR_JZ) {
         m6502_lda_stk(0);
         m6502_ora_stk(1);
-        emit8(M6502_PHP);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_PLP);
-        emit8_8(M6502_BNE, 0x03);
+        cb_emit8(M6502_PHP);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_PLP);
+        cb_emit8_8(M6502_BNE, 0x03);
     }
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     patch_pos = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
     return patch_pos;
 }
 
 static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
     if (m6502_compact) {
-        emit8_16(cond == BR_JZ ? BC_JZ : BC_JMP, (u16)target_addr);
+        cb_emit8_16(cond == BR_JZ ? BC_JZ : BC_JMP, (u16)target_addr);
         return;
     }
     if (cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
@@ -2051,73 +2051,73 @@ static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
         u8 k;
         cb_rewind(cb_pc() - m6502_cmp_mat_pc);
         m6502_cmp_end_pc = 0;
-        emit8_8(m6502_cmp_true_op, (u8)(n_inx + 3));
+        cb_emit8_8(m6502_cmp_true_op, (u8)(n_inx + 3));
         for (k = 0; k < n_inx; k++)
-            emit8(M6502_INX);
-        emit8_16(M6502_JMP, target_addr);
+            cb_emit8(M6502_INX);
+        cb_emit8_16(M6502_JMP, target_addr);
         for (k = 0; k < n_inx; k++)
-            emit8(M6502_INX);
+            cb_emit8(M6502_INX);
         return;
     }
     m6502_cmp_end_pc = 0;
     if (cond == BR_JZ) {
         m6502_lda_stk(0);
         m6502_ora_stk(1);
-        emit8(M6502_PHP);
-        emit8(M6502_INX);
-        emit8(M6502_INX);
-        emit8(M6502_PLP);
-        emit8_8(M6502_BNE, 0x03);
+        cb_emit8(M6502_PHP);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_INX);
+        cb_emit8(M6502_PLP);
+        cb_emit8_8(M6502_BNE, 0x03);
     }
-    emit8_16(M6502_JMP, target_addr);
+    cb_emit8_16(M6502_JMP, target_addr);
 }
 
 static size_t m6502_emit_jtab(size_t count) {
     size_t lo_pc, hi_pc, tbl_off, k;
     u16 tbl_addr;
     if (m6502_compact) {
-        emit8(BC_JTAB);
+        cb_emit8(BC_JTAB);
         tbl_off = cb_pc();
         for (k = 0; k < count; k++)
-            emit16(0);
+            cb_emit16(0);
         return tbl_off;
     }
     if (count > 256)
         ir4_die("'jtab' supports at most 256 entries on 6502");
     be_6502_peep_fence();
     m6502_lda_stk(0);
-    emit8(M6502_TAY);
+    cb_emit8(M6502_TAY);
     m6502_pop2();
-    emit8(0xB9); /* LDA lo_tbl,Y */
+    cb_emit8(0xB9); /* LDA lo_tbl,Y */
     lo_pc = cb_pc();
-    emit16(0);
-    emit8_8(M6502_STA_ZP, zp_scratch);
-    emit8(0xB9); /* LDA hi_tbl,Y */
+    cb_emit16(0);
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8(0xB9); /* LDA hi_tbl,Y */
     hi_pc = cb_pc();
-    emit16(0);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
+    cb_emit16(0);
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
     tbl_addr = cb_cur_addr();
-    patch16(lo_pc, tbl_addr);
-    patch16(hi_pc, (u16)(tbl_addr + count));
+    cb_patch16(lo_pc, tbl_addr);
+    cb_patch16(hi_pc, (u16)(tbl_addr + count));
     tbl_off = cb_pc();
     for (k = 0; k < count * 2; k++)
-        emit8(0);
+        cb_emit8(0);
     return tbl_off;
 }
 
 static void m6502_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     if (m6502_compact) {
-        patch16(patch_offset + idx * 2, (u16)target_addr);
+        cb_patch16(patch_offset + idx * 2, (u16)target_addr);
         return;
     }
-    patch8(patch_offset + idx, (u8)(target_addr & 0xFF));
-    patch8(patch_offset + count + idx, (u8)(target_addr >> 8));
+    cb_patch8(patch_offset + idx, (u8)(target_addr & 0xFF));
+    cb_patch8(patch_offset + count + idx, (u8)(target_addr >> 8));
 }
 
 static void m6502_patch_fwd(size_t patch_offset) {
     m6502_cmp_end_pc = 0;
-    patch16(patch_offset, (u16)cb_cur_addr());
+    cb_patch16(patch_offset, (u16)cb_cur_addr());
 }
 
 static int m6502_add_imm(i32 imm) {
@@ -2126,27 +2126,27 @@ static int m6502_add_imm(i32 imm) {
         if (d == 0)
             return 1;
         if (d == 1) {
-            emit8(BC_INC);
+            cb_emit8(BC_INC);
             return 1;
         }
         if (d == 0xFFFF) {
-            emit8(BC_DEC);
+            cb_emit8(BC_DEC);
             return 1;
         }
         if ((i16)d >= -128 && (i16)d <= 127) {
-            emit8_8(BC_ADD_IMM8, (u8)(d & 0xFF));
+            cb_emit8_8(BC_ADD_IMM8, (u8)(d & 0xFF));
             return 1;
         }
         return 0;
     }
     if (d == 0)
         return 1;
-    emit8(M6502_CLC);
+    cb_emit8(M6502_CLC);
     m6502_lda_stk(0);
-    emit8_8(M6502_ADC_IMM, (u8)(d & 0xFF));
+    cb_emit8_8(M6502_ADC_IMM, (u8)(d & 0xFF));
     m6502_sta_stk(0);
     m6502_lda_stk(1);
-    emit8_8(M6502_ADC_IMM, (u8)(d >> 8));
+    cb_emit8_8(M6502_ADC_IMM, (u8)(d >> 8));
     m6502_sta_stk(1);
     return 1;
 }
@@ -2165,11 +2165,11 @@ static int m6502_cmp_imm(IrOp op, i32 imm) {
             m6502_ora_stk(1);
         } else {
             m6502_lda_stk(0);
-            emit8_8(M6502_EOR_IMM, lo);
-            emit8_8(M6502_STA_ZP, zp_scratch);
+            cb_emit8_8(M6502_EOR_IMM, lo);
+            cb_emit8_8(M6502_STA_ZP, zp_scratch);
             m6502_lda_stk(1);
-            emit8_8(M6502_EOR_IMM, hi);
-            emit8_8(M6502_ORA_ZP, zp_scratch);
+            cb_emit8_8(M6502_EOR_IMM, hi);
+            cb_emit8_8(M6502_ORA_ZP, zp_scratch);
         }
         m6502_cmp_true_op = (op == OP_EQ) ? M6502_BEQ : M6502_BNE;
         break;
@@ -2177,19 +2177,19 @@ static int m6502_cmp_imm(IrOp op, i32 imm) {
     case OP_UGE:
         if (rhs == 0)
             return 0;
-        emit8(M6502_SEC);
+        cb_emit8(M6502_SEC);
         m6502_lda_stk(0);
-        emit8_8(M6502_SBC_IMM, lo);
+        cb_emit8_8(M6502_SBC_IMM, lo);
         m6502_lda_stk(1);
-        emit8_8(M6502_SBC_IMM, hi);
+        cb_emit8_8(M6502_SBC_IMM, hi);
         m6502_cmp_true_op = (op == OP_UGE) ? M6502_BCS : M6502_BCC;
         break;
     case OP_UGT:
     case OP_ULE:
-        emit8(M6502_SEC);
-        emit8_8(M6502_LDA_IMM, lo);
+        cb_emit8(M6502_SEC);
+        cb_emit8_8(M6502_LDA_IMM, lo);
         m6502_sbc_stk(0);
-        emit8_8(M6502_LDA_IMM, hi);
+        cb_emit8_8(M6502_LDA_IMM, hi);
         m6502_sbc_stk(1);
         m6502_cmp_true_op = (op == OP_ULE) ? M6502_BCS : M6502_BCC;
         break;
@@ -2198,35 +2198,35 @@ static int m6502_cmp_imm(IrOp op, i32 imm) {
         if (rhs == 0) {
             m6502_lda_stk(1);
         } else {
-            emit8(M6502_SEC);
+            cb_emit8(M6502_SEC);
             m6502_lda_stk(0);
-            emit8_8(M6502_SBC_IMM, lo);
+            cb_emit8_8(M6502_SBC_IMM, lo);
             m6502_lda_stk(1);
-            emit8_8(M6502_SBC_IMM, hi);
-            emit8_8(M6502_BVC, 0x02);
-            emit8_8(M6502_EOR_IMM, 0x80);
+            cb_emit8_8(M6502_SBC_IMM, hi);
+            cb_emit8_8(M6502_BVC, 0x02);
+            cb_emit8_8(M6502_EOR_IMM, 0x80);
         }
         m6502_cmp_true_op = (op == OP_GE) ? M6502_BPL : M6502_BMI;
         break;
     case OP_GT:
     case OP_LE:
-        emit8(M6502_SEC);
-        emit8_8(M6502_LDA_IMM, lo);
+        cb_emit8(M6502_SEC);
+        cb_emit8_8(M6502_LDA_IMM, lo);
         m6502_sbc_stk(0);
-        emit8_8(M6502_LDA_IMM, hi);
+        cb_emit8_8(M6502_LDA_IMM, hi);
         m6502_sbc_stk(1);
-        emit8_8(M6502_BVC, 0x02);
-        emit8_8(M6502_EOR_IMM, 0x80);
+        cb_emit8_8(M6502_BVC, 0x02);
+        cb_emit8_8(M6502_EOR_IMM, 0x80);
         m6502_cmp_true_op = (op == OP_LE) ? M6502_BPL : M6502_BMI;
         break;
     default:
         return 0;
     }
     m6502_cmp_mat_pc = cb_pc();
-    emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
-    emit8_8(M6502_LDA_IMM, 0x00);
-    emit8_8(M6502_BEQ, 0x02); /* BEQ store */
-    emit8_8(M6502_LDA_IMM, 0xFF);
+    cb_emit8_8(m6502_cmp_true_op, 0x04); /* Bxx true */
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_BEQ, 0x02); /* BEQ store */
+    cb_emit8_8(M6502_LDA_IMM, 0xFF);
     m6502_sta_stk(0);
     m6502_sta_stk(1);
     m6502_cmp_pops = 1;
@@ -2247,28 +2247,28 @@ static int m6502_shift_imm(IrOp op, u8 count) {
         if (op == OP_LSHIFT) {
             m6502_lda_stk(0);
             for (k = 0; k < rem; k++)
-                emit8(0x0A); /* ASL A */
+                cb_emit8(0x0A); /* ASL A */
             m6502_sta_stk(1);
-            emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
             m6502_sta_stk(0);
         } else if (op == OP_RSHIFT) {
             m6502_lda_stk(1);
             for (k = 0; k < rem; k++)
-                emit8(0x4A); /* LSR A */
+                cb_emit8(0x4A); /* LSR A */
             m6502_sta_stk(0);
-            emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
             m6502_sta_stk(1);
         } else {
             m6502_lda_stk(1);
             for (k = 0; k < rem; k++) {
-                emit8_8(M6502_CMP_IMM, 0x80);
-                emit8(0x6A); /* ROR A */
+                cb_emit8_8(M6502_CMP_IMM, 0x80);
+                cb_emit8(0x6A); /* ROR A */
             }
             m6502_sta_stk(0);
-            emit8_8(M6502_BPL, 0x04);
-            emit8_8(M6502_LDA_IMM, 0xFF);
-            emit8_8(M6502_BMI, 0x02);
-            emit8_8(M6502_LDA_IMM, 0x00);
+            cb_emit8_8(M6502_BPL, 0x04);
+            cb_emit8_8(M6502_LDA_IMM, 0xFF);
+            cb_emit8_8(M6502_BMI, 0x02);
+            cb_emit8_8(M6502_LDA_IMM, 0x00);
             m6502_sta_stk(1);
         }
         return 1;
@@ -2279,14 +2279,14 @@ static int m6502_shift_imm(IrOp op, u8 count) {
         if (op == OP_LSHIFT) {
             m6502_asl_stk(0);
             m6502_lda_stk(1);
-            emit8(M6502_ROL_A);
+            cb_emit8(M6502_ROL_A);
             m6502_sta_stk(1);
         } else if (op == OP_RSHIFT) {
             m6502_lsr_stk(1);
             m6502_ror_stk(0);
         } else {
             m6502_lda_stk(1);
-            emit8(0x0A); /* ASL A */
+            cb_emit8(0x0A); /* ASL A */
             m6502_ror_stk(1);
             m6502_ror_stk(0);
         }
@@ -2301,28 +2301,28 @@ static void m6502_patch_call(size_t call_pc, size_t call_addr, size_t target_add
         if (d[call_pc] == M6502_JSR) {
             u16 jmp_t = (u16)d[call_pc + 1] | ((u16)d[call_pc + 2] << 8);
             if (jmp_t == m6502_bank_call_addr) {
-                patch16(call_pc + 4, (u16)target_addr);
+                cb_patch16(call_pc + 4, (u16)target_addr);
                 return;
             }
         }
     }
-    patch16(call_pc + 1, (u16)target_addr);
+    cb_patch16(call_pc + 1, (u16)target_addr);
 }
 
 static size_t m6502_push_fn(size_t target_addr) {
     size_t pc;
     if (m6502_compact) {
-        emit8(BC_PUSH_I16);
+        cb_emit8(BC_PUSH_I16);
         pc = cb_pc();
-        emit16((u16)target_addr);
+        cb_emit16((u16)target_addr);
         return pc;
     }
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
     pc = cb_pc();
-    emit8_8(M6502_LDA_IMM, (u8)(target_addr & 0xFF));
+    cb_emit8_8(M6502_LDA_IMM, (u8)(target_addr & 0xFF));
     m6502_sta_stk(0);
-    emit8_8(M6502_LDA_IMM, (u8)((target_addr >> 8) & 0xFF));
+    cb_emit8_8(M6502_LDA_IMM, (u8)((target_addr >> 8) & 0xFF));
     m6502_sta_stk(1);
     return pc;
 }
@@ -2331,34 +2331,34 @@ static void m6502_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_add
     u16 sta_len = (stack_zp_base != 0) ? 2 : 3;
     (void)patch_addr;
     if (m6502_compact) {
-        patch16(patch_pc, (u16)target_addr);
+        cb_patch16(patch_pc, (u16)target_addr);
         return;
     }
-    patch8((u16)(patch_pc + 1), (u8)(target_addr & 0xFF));
-    patch8((u16)(patch_pc + 2 + sta_len + 1), (u8)((target_addr >> 8) & 0xFF));
+    cb_patch8((u16)(patch_pc + 1), (u8)(target_addr & 0xFF));
+    cb_patch8((u16)(patch_pc + 2 + sta_len + 1), (u8)((target_addr >> 8) & 0xFF));
 }
 
 static void m6502_icall(void) {
     if (m6502_compact) {
-        emit8(BC_ICALL);
+        cb_emit8(BC_ICALL);
         return;
     }
     m6502_lda_stk(0);
-    emit8_8(M6502_STA_ZP, zp_scratch);
+    cb_emit8_8(M6502_STA_ZP, zp_scratch);
     m6502_lda_stk(1);
-    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    emit8(M6502_INX);
-    emit8(M6502_INX);
+    cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
     if (icall_addr == 0) {
         u16 skip_jmp;
-        emit8(M6502_JMP);
+        cb_emit8(M6502_JMP);
         skip_jmp = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
         icall_addr = cb_cur_addr();
-        emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
-        patch16(skip_jmp, cb_cur_addr());
+        cb_emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
+        cb_patch16(skip_jmp, cb_cur_addr());
     }
-    emit8_16(M6502_JSR, icall_addr);
+    cb_emit8_16(M6502_JSR, icall_addr);
 }
 
 void be_6502_ensure_helpers(int need_mul, int need_div, int need_icall, int need_fp) {
@@ -2370,12 +2370,12 @@ void be_6502_ensure_helpers(int need_mul, int need_div, int need_icall, int need
     }
     if (need_icall && icall_addr == 0) {
         u16 skip_jmp;
-        emit8(M6502_JMP);
+        cb_emit8(M6502_JMP);
         skip_jmp = cb_pc();
-        emit16(0x0000);
+        cb_emit16(0x0000);
         icall_addr = cb_cur_addr();
-        emit8_16(0x6C, (u16)zp_scratch);
-        patch16(skip_jmp, cb_cur_addr());
+        cb_emit8_16(0x6C, (u16)zp_scratch);
+        cb_patch16(skip_jmp, cb_cur_addr());
     }
     if (need_fp)
         ensure_wozfp();
@@ -2386,29 +2386,29 @@ static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type) {
     u16 off = m6502_local_off.data[slot];
     if (op == LOCAL_ADD) {
         m6502_bc_local_op(LOCAL_GET, slot, type);
-        emit8(BC_ADD);
+        cb_emit8(BC_ADD);
         m6502_bc_local_op(LOCAL_SET, slot, type);
         return;
     }
     if (m6502_static_frame) {
         u16 data_off = (u16)(m6502_static_base + off);
         if (op == LOCAL_ADDR)
-            emit8(BC_PUSH_I16);
+            cb_emit8(BC_PUSH_I16);
         else if (op == LOCAL_GET)
-            emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
+            cb_emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
         else
-            emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
+            cb_emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
         cb_add_data_reloc(cb_pc(), data_off);
-        emit16(0x0000);
+        cb_emit16(0x0000);
     } else if (m6502_local_is_big.data[slot]) {
-        emit8_16(BC_LOCAL_ADDR_BIG, off);
+        cb_emit8_16(BC_LOCAL_ADDR_BIG, off);
     } else {
         if (op == LOCAL_ADDR)
-            emit8_8(BC_LOCAL_ADDR, (u8)off);
+            cb_emit8_8(BC_LOCAL_ADDR, (u8)off);
         else if (op == LOCAL_GET)
-            emit8_8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2, (u8)off);
+            cb_emit8_8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2, (u8)off);
         else
-            emit8_8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2, (u8)off);
+            cb_emit8_8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2, (u8)off);
     }
 }
 
@@ -2417,20 +2417,20 @@ static void m6502_bc_stack_op(StackOp op, StackType t1, StackType t2) {
     u8 s2 = (t2 == TY_F || t2 == TY_I32) ? 4 : 2;
     switch (op) {
     case OP_DUP:
-        emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
+        cb_emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
         break;
     case OP_DROP:
-        emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
+        cb_emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
         break;
     case OP_SWAP:
         if (s1 == 2 && s2 == 2)
-            emit8(BC_SWAP22);
+            cb_emit8(BC_SWAP22);
         else if (s1 == 4 && s2 == 2)
-            emit8(BC_SWAP24);
+            cb_emit8(BC_SWAP24);
         else if (s1 == 2 && s2 == 4)
-            emit8(BC_SWAP42);
+            cb_emit8(BC_SWAP42);
         else
-            emit8(BC_SWAP44);
+            cb_emit8(BC_SWAP44);
         break;
     }
 }
@@ -2439,223 +2439,223 @@ static void m6502_bc_op(IrOp op) {
     switch (op) {
     case OP_ADD:
     case OP_AADD:
-        emit8(BC_ADD);
+        cb_emit8(BC_ADD);
         break;
     case OP_SUB:
     case OP_ASUB:
     case OP_ADIFF:
-        emit8(BC_SUB);
+        cb_emit8(BC_SUB);
         break;
     case OP_MUL:
-        emit8(BC_MUL);
+        cb_emit8(BC_MUL);
         break;
     case OP_DIV:
-        emit8(BC_DIV);
+        cb_emit8(BC_DIV);
         break;
     case OP_MOD:
-        emit8(BC_MOD);
+        cb_emit8(BC_MOD);
         break;
     case OP_UDIV:
-        emit8(BC_UDIV);
+        cb_emit8(BC_UDIV);
         break;
     case OP_UMOD:
-        emit8(BC_UMOD);
+        cb_emit8(BC_UMOD);
         break;
     case OP_AND:
-        emit8(BC_AND);
+        cb_emit8(BC_AND);
         break;
     case OP_OR:
-        emit8(BC_OR);
+        cb_emit8(BC_OR);
         break;
     case OP_XOR:
-        emit8(BC_XOR);
+        cb_emit8(BC_XOR);
         break;
     case OP_INVERT:
-        emit8(BC_INVERT);
+        cb_emit8(BC_INVERT);
         break;
     case OP_LSHIFT:
-        emit8(BC_LSHIFT);
+        cb_emit8(BC_LSHIFT);
         break;
     case OP_ARSHIFT:
-        emit8(BC_ARSHIFT);
+        cb_emit8(BC_ARSHIFT);
         break;
     case OP_RSHIFT:
-        emit8(BC_RSHIFT);
+        cb_emit8(BC_RSHIFT);
         break;
     case OP_FADD:
-        emit8(BC_FADD);
+        cb_emit8(BC_FADD);
         break;
     case OP_FSUB:
-        emit8(BC_FSUB);
+        cb_emit8(BC_FSUB);
         break;
     case OP_FMUL:
-        emit8(BC_FMUL);
+        cb_emit8(BC_FMUL);
         break;
     case OP_FDIV:
-        emit8(BC_FDIV);
+        cb_emit8(BC_FDIV);
         break;
     case OP_FNEG:
-        emit8(BC_FNEG);
+        cb_emit8(BC_FNEG);
         break;
     case OP_ADD32:
-        emit8(BC_ADD32);
+        cb_emit8(BC_ADD32);
         break;
     case OP_SUB32:
-        emit8(BC_SUB32);
+        cb_emit8(BC_SUB32);
         break;
     case OP_AND32:
-        emit8(BC_AND32);
+        cb_emit8(BC_AND32);
         break;
     case OP_OR32:
-        emit8(BC_OR32);
+        cb_emit8(BC_OR32);
         break;
     case OP_XOR32:
-        emit8(BC_XOR32);
+        cb_emit8(BC_XOR32);
         break;
     case OP_INV32:
-        emit8(BC_INV32);
+        cb_emit8(BC_INV32);
         break;
     case OP_EQ:
     case OP_AEQ:
-        emit8(BC_EQ);
+        cb_emit8(BC_EQ);
         break;
     case OP_NE:
     case OP_ANE:
-        emit8(BC_NE);
+        cb_emit8(BC_NE);
         break;
     case OP_LT:
-        emit8(BC_LT);
+        cb_emit8(BC_LT);
         break;
     case OP_GT:
-        emit8(BC_GT);
+        cb_emit8(BC_GT);
         break;
     case OP_LE:
-        emit8(BC_LE);
+        cb_emit8(BC_LE);
         break;
     case OP_GE:
-        emit8(BC_GE);
+        cb_emit8(BC_GE);
         break;
     case OP_ULT:
     case OP_ALT:
-        emit8(BC_ULT);
+        cb_emit8(BC_ULT);
         break;
     case OP_UGT:
     case OP_AGT:
-        emit8(BC_UGT);
+        cb_emit8(BC_UGT);
         break;
     case OP_ULE:
-        emit8(BC_ULE);
+        cb_emit8(BC_ULE);
         break;
     case OP_UGE:
-        emit8(BC_UGE);
+        cb_emit8(BC_UGE);
         break;
     case OP_FEQ:
-        emit8(BC_FEQ);
+        cb_emit8(BC_FEQ);
         break;
     case OP_FNE:
-        emit8(BC_FNE);
+        cb_emit8(BC_FNE);
         break;
     case OP_FLT:
-        emit8(BC_FLT);
+        cb_emit8(BC_FLT);
         break;
     case OP_FGT:
-        emit8(BC_FGT);
+        cb_emit8(BC_FGT);
         break;
     case OP_EQ32:
-        emit8(BC_EQ32);
+        cb_emit8(BC_EQ32);
         break;
     case OP_NE32:
-        emit8(BC_NE32);
+        cb_emit8(BC_NE32);
         break;
     case OP_LT32:
-        emit8(BC_LT32);
+        cb_emit8(BC_LT32);
         break;
     case OP_GT32:
-        emit8(BC_GT32);
+        cb_emit8(BC_GT32);
         break;
     case OP_LE32:
-        emit8(BC_LE32);
+        cb_emit8(BC_LE32);
         break;
     case OP_GE32:
-        emit8(BC_GE32);
+        cb_emit8(BC_GE32);
         break;
     case OP_ULT32:
-        emit8(BC_ULT32);
+        cb_emit8(BC_ULT32);
         break;
     case OP_UGT32:
-        emit8(BC_UGT32);
+        cb_emit8(BC_UGT32);
         break;
     case OP_ULE32:
-        emit8(BC_ULE32);
+        cb_emit8(BC_ULE32);
         break;
     case OP_UGE32:
-        emit8(BC_UGE32);
+        cb_emit8(BC_UGE32);
         break;
     case OP_I8FETCH:
-        emit8(BC_I8FETCH);
+        cb_emit8(BC_I8FETCH);
         break;
     case OP_U8FETCH:
-        emit8(BC_U8FETCH);
+        cb_emit8(BC_U8FETCH);
         break;
     case OP_I8STORE:
-        emit8(BC_I8STORE);
+        cb_emit8(BC_I8STORE);
         break;
     case OP_SI8STORE:
-        emit8(BC_SWAP22);
-        emit8(BC_I8STORE);
+        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_I8STORE);
         break;
     case OP_I16FETCH:
     case OP_U16FETCH:
     case OP_FETCH:
     case OP_AFETCH:
-        emit8(BC_FETCH16);
+        cb_emit8(BC_FETCH16);
         break;
     case OP_I16STORE:
     case OP_STORE:
     case OP_ASTORE:
-        emit8(BC_STORE16);
+        cb_emit8(BC_STORE16);
         break;
     case OP_SI16STORE:
     case OP_SSTORE:
     case OP_SASTORE:
-        emit8(BC_SWAP22);
-        emit8(BC_STORE16);
+        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_STORE16);
         break;
     case OP_FFETCH:
     case OP_I32FETCH:
-        emit8(BC_FETCH32);
+        cb_emit8(BC_FETCH32);
         break;
     case OP_FSTORE:
     case OP_I32STORE:
-        emit8(BC_STORE32);
+        cb_emit8(BC_STORE32);
         break;
     case OP_SFSTORE:
-        emit8(BC_SWAP24);
-        emit8(BC_STORE32);
+        cb_emit8(BC_SWAP24);
+        cb_emit8(BC_STORE32);
         break;
     case OP_BCOPY:
-        emit8(BC_BCOPY);
+        cb_emit8(BC_BCOPY);
         break;
     case OP_SEXT:
-        emit8(BC_SEXT);
+        cb_emit8(BC_SEXT);
         break;
     case OP_W2A:
     case OP_A2W:
         break;
     case OP_W2F:
-        emit8(BC_W2F);
+        cb_emit8(BC_W2F);
         break;
     case OP_F2W:
-        emit8(BC_F2W);
+        cb_emit8(BC_F2W);
         break;
     case OP_W2I32:
-        emit8(BC_W2I32);
+        cb_emit8(BC_W2I32);
         break;
     case OP_U2I32:
-        emit8(BC_U2I32);
+        cb_emit8(BC_U2I32);
         break;
     case OP_I322W:
-        emit8(BC_I322W);
+        cb_emit8(BC_I322W);
         break;
     default:
         ir4_die("unimplemented 6502 compact op");
@@ -2663,18 +2663,18 @@ static void m6502_bc_op(IrOp op) {
 }
 
 static void emit_vm_read_ip_a(u8 ip_lo, u8 ip_hi) {
-    emit8_8(M6502_LDY_IMM, 0x00);
-    emit8_8(M6502_LDA_INDY, ip_lo);
-    emit8_8(M6502_INC_ZP, ip_lo);
-    emit8_8(M6502_BNE, 0x02);
-    emit8_8(M6502_INC_ZP, ip_hi);
+    cb_emit8_8(M6502_LDY_IMM, 0x00);
+    cb_emit8_8(M6502_LDA_INDY, ip_lo);
+    cb_emit8_8(M6502_INC_ZP, ip_lo);
+    cb_emit8_8(M6502_BNE, 0x02);
+    cb_emit8_8(M6502_INC_ZP, ip_hi);
 }
 
 static void emit_vm_save_ip(u8 ip_lo, u8 ip_hi) {
-    emit8_8(M6502_LDA_ZP, ip_lo);
-    emit8(M6502_PHA);
-    emit8_8(M6502_LDA_ZP, ip_hi);
-    emit8(M6502_PHA);
+    cb_emit8_8(M6502_LDA_ZP, ip_lo);
+    cb_emit8(M6502_PHA);
+    cb_emit8_8(M6502_LDA_ZP, ip_hi);
+    cb_emit8(M6502_PHA);
 }
 
 static void ensure_6502_vm(void) {
@@ -2698,216 +2698,216 @@ static void ensure_6502_vm(void) {
     for (i = 0; i <= BC_I322W; i++)
         handlers[i] = 0;
 
-    emit8(M6502_JMP);
+    cb_emit8(M6502_JMP);
     skip_vm = cb_pc();
-    emit16(0x0000);
+    cb_emit16(0x0000);
 
     /* vm_enter: pop return addr (fn+2), increment by 1 to point at bytecode */
     vm_enter_addr = cb_cur_addr();
-    emit8(M6502_PLA);
-    emit8_8(M6502_STA_ZP, ip_lo);
-    emit8(M6502_PLA);
-    emit8_8(M6502_STA_ZP, ip_hi);
-    emit8_8(M6502_INC_ZP, ip_lo);
-    emit8_8(M6502_BNE, 0x02);
-    emit8_8(M6502_INC_ZP, ip_hi);
+    cb_emit8(M6502_PLA);
+    cb_emit8_8(M6502_STA_ZP, ip_lo);
+    cb_emit8(M6502_PLA);
+    cb_emit8_8(M6502_STA_ZP, ip_hi);
+    cb_emit8_8(M6502_INC_ZP, ip_lo);
+    cb_emit8_8(M6502_BNE, 0x02);
+    cb_emit8_8(M6502_INC_ZP, ip_hi);
 
     /* vm_next: fetch opcode, dispatch via vm_tbl (0x80..0xFF push 0..127) */
     vm_next_addr = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_ORA_IMM, 0x00);
-    emit8(M6502_BMI);
+    cb_emit8_8(M6502_ORA_IMM, 0x00);
+    cb_emit8(M6502_BMI);
     bmi_imm7_pc = cb_pc();
-    emit8(0x00);
-    emit8(0x0A); /* ASL A */
-    emit8(M6502_TAY);
-    emit8(0xB9); /* LDA vm_tbl,Y */
+    cb_emit8(0x00);
+    cb_emit8(0x0A); /* ASL A */
+    cb_emit8(M6502_TAY);
+    cb_emit8(0xB9); /* LDA vm_tbl,Y */
     tbl_lo_pc = cb_pc();
-    emit16(0x0000);
-    emit8_8(M6502_STA_ZP, tmp_lo);
-    emit8(0xB9); /* LDA vm_tbl+1,Y */
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8(0xB9); /* LDA vm_tbl+1,Y */
     tbl_hi_pc = cb_pc();
-    emit16(0x0000);
-    emit8_8(M6502_STA_ZP, tmp_hi);
-    emit8_16(0x6C, (u16)tmp_lo); /* JMP (tmp_lo) */
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8_16(0x6C, (u16)tmp_lo); /* JMP (tmp_lo) */
 
     /* vm_restore_ip */
     vm_restore_ip_addr = cb_cur_addr();
-    emit8(M6502_PLA);
-    emit8_8(M6502_STA_ZP, ip_hi);
-    emit8(M6502_PLA);
-    emit8_8(M6502_STA_ZP, ip_lo);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8(M6502_PLA);
+    cb_emit8_8(M6502_STA_ZP, ip_hi);
+    cb_emit8(M6502_PLA);
+    cb_emit8_8(M6502_STA_ZP, ip_lo);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* vm_call_tmp */
     vm_call_tmp_addr = cb_cur_addr();
-    emit8_16(0x6C, (u16)tmp_lo);
+    cb_emit8_16(0x6C, (u16)tmp_lo);
 
     /* push_imm7: A has 0x80..0xFF -> push (A & 0x7F) */
-    patch8(bmi_imm7_pc, (u8)(cb_pc() - (bmi_imm7_pc + 1)));
-    emit8_8(M6502_AND_IMM, 0x7F);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_patch8(bmi_imm7_pc, (u8)(cb_pc() - (bmi_imm7_pc + 1)));
+    cb_emit8_8(M6502_AND_IMM, 0x7F);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
     m6502_sta_stk(0);
-    emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
     m6502_sta_stk(1);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* Jump table */
     vm_tbl_pc = cb_pc();
     vm_tbl_addr = cb_cur_addr();
     for (i = 0; i <= BC_I322W; i++)
-        emit16(0x0000);
-    patch16(tbl_lo_pc, vm_tbl_addr);
-    patch16(tbl_hi_pc, (u16)(vm_tbl_addr + 1));
+        cb_emit16(0x0000);
+    cb_patch16(tbl_lo_pc, vm_tbl_addr);
+    cb_patch16(tbl_hi_pc, (u16)(vm_tbl_addr + 1));
 
     /* BC_RET */
     handlers[BC_RET] = cb_cur_addr();
-    emit8(M6502_RTS);
+    cb_emit8(M6502_RTS);
 
     /* BC_ENTER (u8 frame_bytes) */
     handlers[BC_ENTER] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_lo);
-    emit8(M6502_LDA_ABS);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000);
-    emit8(M6502_PHA);
-    emit8(M6502_SEC);
-    emit8_8(M6502_SBC_ZP, tmp_lo);
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_PHA);
+    cb_emit8(M6502_SEC);
+    cb_emit8_8(M6502_SBC_ZP, tmp_lo);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit16(0x0000);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_LEAVE */
     handlers[BC_LEAVE] = cb_cur_addr();
-    emit8(M6502_PLA);
-    emit8(M6502_STA_ABS);
+    cb_emit8(M6502_PLA);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit16(0x0000);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_ENTER_BIG (u16 big_bytes) */
     handlers[BC_ENTER_BIG] = cb_cur_addr();
     ensure_big_alloc();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_hi);
-    emit8(M6502_LDA_ABS);
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8_8(M6502_BNE, 10);
-    emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top & 0xFF));
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_BNE, 10);
+    cb_emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top & 0xFF));
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top >> 8));
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_LDA_IMM, (u8)(m6502_ram_top >> 8));
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8(M6502_LDA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8(M6502_PHA);
-    emit8(M6502_LDA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_PHA);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8(M6502_PHA);
-    emit8(M6502_SEC);
-    emit8(M6502_LDA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_PHA);
+    cb_emit8(M6502_SEC);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8_8(M6502_SBC_ZP, tmp_lo);
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_SBC_ZP, tmp_lo);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8(M6502_LDA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8_8(M6502_SBC_ZP, tmp_hi);
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8_8(M6502_SBC_ZP, tmp_hi);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit16(0x0000);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_LEAVE_BIG */
     handlers[BC_LEAVE_BIG] = cb_cur_addr();
-    emit8(M6502_PLA);
-    emit8(M6502_STA_ABS);
+    cb_emit8(M6502_PLA);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8(M6502_PLA);
-    emit8(M6502_STA_ABS);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_PLA);
+    cb_emit8(M6502_STA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit16(0x0000);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_LOCAL_ADDR_BIG (u16 off) */
     handlers[BC_LOCAL_ADDR_BIG] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_hi);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_CLC);
-    emit8(M6502_LDA_ABS);
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_CLC);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), bfp_data_off);
-    emit16(0x0000);
-    emit8_8(0x65, tmp_lo); /* ADC tmp_lo */
+    cb_emit16(0x0000);
+    cb_emit8_8(0x65, tmp_lo); /* ADC tmp_lo */
     m6502_sta_stk(0);
-    emit8(M6502_LDA_ABS);
+    cb_emit8(M6502_LDA_ABS);
     cb_add_data_reloc(cb_pc(), (u16)(bfp_data_off + 1));
-    emit16(0x0000);
-    emit8_8(0x65, tmp_hi); /* ADC tmp_hi */
+    cb_emit16(0x0000);
+    cb_emit8_8(0x65, tmp_hi); /* ADC tmp_hi */
     m6502_sta_stk(1);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_PUSH_0_32 */
     handlers[BC_PUSH_0_32] = cb_cur_addr();
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
     m6502_sta_stk(0);
     m6502_sta_stk(1);
     m6502_sta_stk(2);
     m6502_sta_stk(3);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_PUSH_I8 */
     handlers[BC_PUSH_I8] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
     m6502_sta_stk(0);
-    emit8_8(M6502_ORA_IMM, 0x00); /* set N from A after DEX */
-    emit8_8(M6502_BPL, 0x04);
-    emit8_8(M6502_LDA_IMM, 0xFF);
-    emit8_8(M6502_BMI, 0x02);
-    emit8_8(M6502_LDA_IMM, 0x00);
+    cb_emit8_8(M6502_ORA_IMM, 0x00); /* set N from A after DEX */
+    cb_emit8_8(M6502_BPL, 0x04);
+    cb_emit8_8(M6502_LDA_IMM, 0xFF);
+    cb_emit8_8(M6502_BMI, 0x02);
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
     m6502_sta_stk(1);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_PUSH_I16 */
     handlers[BC_PUSH_I16] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
     m6502_sta_stk(0);
     emit_vm_read_ip_a(ip_lo, ip_hi);
     m6502_sta_stk(1);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_PUSH_I32 (also handles floats) */
     handlers[BC_PUSH_I32] = cb_cur_addr();
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
     {
         u8 b;
         for (b = 0; b < 4; b++) {
@@ -2915,37 +2915,37 @@ static void ensure_6502_vm(void) {
             m6502_sta_stk(b);
         }
     }
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_INC */
     handlers[BC_INC] = cb_cur_addr();
     emit_stack_op(0xFE, 0); /* INC stk+0,X (or zp,X) */
-    emit8_8(M6502_BNE, (stack_zp_base != 0) ? 2 : 3);
+    cb_emit8_8(M6502_BNE, (stack_zp_base != 0) ? 2 : 3);
     emit_stack_op(0xFE, 1); /* INC stk+1,X */
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_DEC */
     handlers[BC_DEC] = cb_cur_addr();
     m6502_lda_stk(0);
-    emit8_8(M6502_BNE, (stack_zp_base != 0) ? 2 : 3);
+    cb_emit8_8(M6502_BNE, (stack_zp_base != 0) ? 2 : 3);
     emit_stack_op(0xDE, 1); /* DEC stk+1,X */
     emit_stack_op(0xDE, 0); /* DEC stk+0,X */
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_ADD_IMM8 */
     handlers[BC_ADD_IMM8] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_LDY_IMM, 0x00);
-    emit8_8(M6502_ORA_IMM, 0x00);
-    emit8_8(M6502_BPL, 0x02);
-    emit8_8(M6502_LDY_IMM, 0xFF);
-    emit8(M6502_CLC);
+    cb_emit8_8(M6502_LDY_IMM, 0x00);
+    cb_emit8_8(M6502_ORA_IMM, 0x00);
+    cb_emit8_8(M6502_BPL, 0x02);
+    cb_emit8_8(M6502_LDY_IMM, 0xFF);
+    cb_emit8(M6502_CLC);
     emit_stack_op(0x7D, 0); /* ADC stk+0,X */
     m6502_sta_stk(0);
-    emit8(M6502_TYA);
+    cb_emit8(M6502_TYA);
     emit_stack_op(0x7D, 1); /* ADC stk+1,X */
     m6502_sta_stk(1);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_STATIC_GET2 / GET4 / SET2 / SET4 */
     {
@@ -2958,27 +2958,27 @@ static void ensure_6502_vm(void) {
                 u8 b;
                 handlers[bc] = cb_cur_addr();
                 emit_vm_read_ip_a(ip_lo, ip_hi);
-                emit8_8(M6502_STA_ZP, tmp_lo);
+                cb_emit8_8(M6502_STA_ZP, tmp_lo);
                 emit_vm_read_ip_a(ip_lo, ip_hi);
-                emit8_8(M6502_STA_ZP, tmp_hi);
+                cb_emit8_8(M6502_STA_ZP, tmp_hi);
                 if (!is_set) {
                     for (b = 0; b < n; b++)
-                        emit8(M6502_DEX);
+                        cb_emit8(M6502_DEX);
                     for (b = 0; b < n; b++) {
-                        emit8_8(M6502_LDY_IMM, b);
-                        emit8_8(M6502_LDA_INDY, tmp_lo);
+                        cb_emit8_8(M6502_LDY_IMM, b);
+                        cb_emit8_8(M6502_LDA_INDY, tmp_lo);
                         m6502_sta_stk(b);
                     }
                 } else {
                     for (b = 0; b < n; b++) {
                         m6502_lda_stk(b);
-                        emit8_8(M6502_LDY_IMM, b);
-                        emit8_8(M6502_STA_INDY, tmp_lo);
+                        cb_emit8_8(M6502_LDY_IMM, b);
+                        cb_emit8_8(M6502_STA_INDY, tmp_lo);
                     }
                     for (b = 0; b < n; b++)
-                        emit8(M6502_INX);
+                        cb_emit8(M6502_INX);
                 }
-                emit8_16(M6502_JMP, vm_next_addr);
+                cb_emit8_16(M6502_JMP, vm_next_addr);
             }
         }
     }
@@ -2994,14 +2994,14 @@ static void ensure_6502_vm(void) {
                 u8 b;
                 handlers[bc] = cb_cur_addr();
                 emit_vm_read_ip_a(ip_lo, ip_hi);
-                emit8(M6502_CLC);
-                emit8(M6502_ADC_ABS);
+                cb_emit8(M6502_CLC);
+                cb_emit8(M6502_ADC_ABS);
                 cb_add_data_reloc(cb_pc(), lfp_data_off);
-                emit16(0x0000);
-                emit8(M6502_TAY);
+                cb_emit16(0x0000);
+                cb_emit8(M6502_TAY);
                 if (!is_set) {
                     for (b = 0; b < n; b++)
-                        emit8(M6502_DEX);
+                        cb_emit8(M6502_DEX);
                     for (b = 0; b < n; b++) {
                         m6502_lda_local(b);
                         m6502_sta_stk(b);
@@ -3012,9 +3012,9 @@ static void ensure_6502_vm(void) {
                         m6502_sta_local(b);
                     }
                     for (b = 0; b < n; b++)
-                        emit8(M6502_INX);
+                        cb_emit8(M6502_INX);
                 }
-                emit8_16(M6502_JMP, vm_next_addr);
+                cb_emit8_16(M6502_JMP, vm_next_addr);
             }
         }
     }
@@ -3022,105 +3022,105 @@ static void ensure_6502_vm(void) {
     /* BC_LOCAL_ADDR (u8 off) */
     handlers[BC_LOCAL_ADDR] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8(M6502_CLC);
-    emit8(M6502_ADC_ABS);
+    cb_emit8(M6502_CLC);
+    cb_emit8(M6502_ADC_ABS);
     cb_add_data_reloc(cb_pc(), lfp_data_off);
-    emit16(0x0000);
-    emit8(M6502_DEX);
-    emit8(M6502_DEX);
-    emit8(M6502_CLC);
-    emit8(M6502_ADC_IMM);
+    cb_emit16(0x0000);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_DEX);
+    cb_emit8(M6502_CLC);
+    cb_emit8(M6502_ADC_IMM);
     {
         u16 lo_pos = cb_pc();
         u16 hi_pos;
-        emit8(0x00);
+        cb_emit8(0x00);
         m6502_sta_stk(0);
-        emit8(M6502_LDA_IMM);
+        cb_emit8(M6502_LDA_IMM);
         hi_pos = cb_pc();
-        emit8(0x00);
-        emit8_8(M6502_ADC_IMM, 0x00);
+        cb_emit8(0x00);
+        cb_emit8_8(M6502_ADC_IMM, 0x00);
         m6502_sta_stk(1);
         cb_add_data_reloc_split(lo_pos, hi_pos, locals_data_off);
     }
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_JMP (u16 target) */
     handlers[BC_JMP] = cb_cur_addr();
-    emit8_8(M6502_LDY_IMM, 0x00);
-    emit8_8(M6502_LDA_INDY, ip_lo);
-    emit8(M6502_PHA);
-    emit8(M6502_INY);
-    emit8_8(M6502_LDA_INDY, ip_lo);
-    emit8_8(M6502_STA_ZP, ip_hi);
-    emit8(M6502_PLA);
-    emit8_8(M6502_STA_ZP, ip_lo);
-    emit8_16(M6502_JMP, vm_next_addr);
+    cb_emit8_8(M6502_LDY_IMM, 0x00);
+    cb_emit8_8(M6502_LDA_INDY, ip_lo);
+    cb_emit8(M6502_PHA);
+    cb_emit8(M6502_INY);
+    cb_emit8_8(M6502_LDA_INDY, ip_lo);
+    cb_emit8_8(M6502_STA_ZP, ip_hi);
+    cb_emit8(M6502_PLA);
+    cb_emit8_8(M6502_STA_ZP, ip_lo);
+    cb_emit8_16(M6502_JMP, vm_next_addr);
 
     /* BC_JZ (u16 target) */
     handlers[BC_JZ] = cb_cur_addr();
     m6502_lda_stk(0);
     m6502_ora_stk(1);
-    emit8(M6502_PHP);
-    emit8(M6502_INX);
-    emit8(M6502_INX);
-    emit8(M6502_PLP);
-    emit8_8(M6502_BEQ, (u8)(handlers[BC_JMP] ? 0 : 0));
+    cb_emit8(M6502_PHP);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_PLP);
+    cb_emit8_8(M6502_BEQ, (u8)(handlers[BC_JMP] ? 0 : 0));
     {
         u16 beq_pc = (u16)(cb_pc() - 1);
         u16 skip_len;
         /* Not zero: ip += 2 */
-        emit8(M6502_CLC);
-        emit8_8(M6502_LDA_ZP, ip_lo);
-        emit8_8(M6502_ADC_IMM, 0x02);
-        emit8_8(M6502_STA_ZP, ip_lo);
-        emit8_8(M6502_BCC, 0x02);
-        emit8_8(M6502_INC_ZP, ip_hi);
-        emit8_16(M6502_JMP, vm_next_addr);
+        cb_emit8(M6502_CLC);
+        cb_emit8_8(M6502_LDA_ZP, ip_lo);
+        cb_emit8_8(M6502_ADC_IMM, 0x02);
+        cb_emit8_8(M6502_STA_ZP, ip_lo);
+        cb_emit8_8(M6502_BCC, 0x02);
+        cb_emit8_8(M6502_INC_ZP, ip_hi);
+        cb_emit8_16(M6502_JMP, vm_next_addr);
         skip_len = (u16)(cb_pc() - (beq_pc + 1));
-        patch8(beq_pc, (u8)skip_len);
-        emit8_16(M6502_JMP, handlers[BC_JMP]);
+        cb_patch8(beq_pc, (u8)skip_len);
+        cb_emit8_16(M6502_JMP, handlers[BC_JMP]);
     }
 
     /* BC_JTAB (u16[] targets) */
     handlers[BC_JTAB] = cb_cur_addr();
     m6502_lda_stk(0);
-    emit8(0x0A); /* ASL A */
-    emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8(0x0A); /* ASL A */
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
     m6502_lda_stk(1);
-    emit8(0x2A); /* ROL A */
-    emit8_8(M6502_STA_ZP, tmp_hi);
-    emit8(M6502_INX);
-    emit8(M6502_INX);
-    emit8(M6502_CLC);
-    emit8_8(M6502_LDA_ZP, ip_lo);
-    emit8_8(0x65, tmp_lo); /* ADC tmp_lo */
-    emit8_8(M6502_STA_ZP, ip_lo);
-    emit8_8(M6502_LDA_ZP, ip_hi);
-    emit8_8(0x65, tmp_hi); /* ADC tmp_hi */
-    emit8_8(M6502_STA_ZP, ip_hi);
-    emit8_16(M6502_JMP, handlers[BC_JMP]);
+    cb_emit8(0x2A); /* ROL A */
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_CLC);
+    cb_emit8_8(M6502_LDA_ZP, ip_lo);
+    cb_emit8_8(0x65, tmp_lo); /* ADC tmp_lo */
+    cb_emit8_8(M6502_STA_ZP, ip_lo);
+    cb_emit8_8(M6502_LDA_ZP, ip_hi);
+    cb_emit8_8(0x65, tmp_hi); /* ADC tmp_hi */
+    cb_emit8_8(M6502_STA_ZP, ip_hi);
+    cb_emit8_16(M6502_JMP, handlers[BC_JMP]);
 
     /* BC_CALL (u16 target) */
     handlers[BC_CALL] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
     emit_vm_read_ip_a(ip_lo, ip_hi);
-    emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
     emit_vm_save_ip(ip_lo, ip_hi);
-    emit8_16(M6502_JSR, vm_call_tmp_addr);
-    emit8_16(M6502_JMP, vm_restore_ip_addr);
+    cb_emit8_16(M6502_JSR, vm_call_tmp_addr);
+    cb_emit8_16(M6502_JMP, vm_restore_ip_addr);
 
     /* BC_ICALL */
     handlers[BC_ICALL] = cb_cur_addr();
     m6502_lda_stk(0);
-    emit8_8(M6502_STA_ZP, tmp_lo);
+    cb_emit8_8(M6502_STA_ZP, tmp_lo);
     m6502_lda_stk(1);
-    emit8_8(M6502_STA_ZP, tmp_hi);
-    emit8(M6502_INX);
-    emit8(M6502_INX);
+    cb_emit8_8(M6502_STA_ZP, tmp_hi);
+    cb_emit8(M6502_INX);
+    cb_emit8(M6502_INX);
     emit_vm_save_ip(ip_lo, ip_hi);
-    emit8_16(M6502_JSR, vm_call_tmp_addr);
-    emit8_16(M6502_JMP, vm_restore_ip_addr);
+    cb_emit8_16(M6502_JSR, vm_call_tmp_addr);
+    cb_emit8_16(M6502_JMP, vm_restore_ip_addr);
 
     /* Stack ops */
 #define VM_STK(bc, op, t1, t2, save)                                                               \
@@ -3129,7 +3129,7 @@ static void ensure_6502_vm(void) {
         if (save)                                                                                  \
             emit_vm_save_ip(ip_lo, ip_hi);                                                         \
         m6502_stack_op(op, t1, t2);                                                                \
-        emit8_16(M6502_JMP, (save) ? vm_restore_ip_addr : vm_next_addr);                           \
+        cb_emit8_16(M6502_JMP, (save) ? vm_restore_ip_addr : vm_next_addr);                           \
     } while (0)
 
     VM_STK(BC_DUP2, OP_DUP, TY_W, TY_NONE, 0);
@@ -3149,7 +3149,7 @@ static void ensure_6502_vm(void) {
         if (save)                                                                                  \
             emit_vm_save_ip(ip_lo, ip_hi);                                                         \
         m6502_op(ir);                                                                              \
-        emit8_16(M6502_JMP, (save) ? vm_restore_ip_addr : vm_next_addr);                           \
+        cb_emit8_16(M6502_JMP, (save) ? vm_restore_ip_addr : vm_next_addr);                           \
     } while (0)
 
     VM_OP(BC_ADD, OP_ADD, 0);
@@ -3225,9 +3225,9 @@ static void ensure_6502_vm(void) {
 #undef VM_OP
 
     for (i = 0; i <= BC_I322W; i++) {
-        patch16((u16)(vm_tbl_pc + i * 2), handlers[i] ? handlers[i] : handlers[BC_RET]);
+        cb_patch16((u16)(vm_tbl_pc + i * 2), handlers[i] ? handlers[i] : handlers[BC_RET]);
     }
-    patch16(skip_vm, cb_cur_addr());
+    cb_patch16(skip_vm, cb_cur_addr());
     m6502_compact = 1;
 }
 

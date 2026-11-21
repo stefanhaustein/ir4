@@ -28,34 +28,34 @@ static void bc_local_op(LocalOp op, size_t slot, StackType type, size_t stack_by
     (void)stack_bytes;
     if (op == LOCAL_ADD) {
         bc_local_op(LOCAL_GET, slot, type, stack_bytes);
-        emit8(BC_ADD);
+        cb_emit8(BC_ADD);
         bc_local_op(LOCAL_SET, slot, type, stack_bytes);
         return;
     }
     if (bc_local_is_static.data[slot]) {
         if (op == LOCAL_ADDR) {
-            emit8(BC_PUSH_DATA);
+            cb_emit8(BC_PUSH_DATA);
             cb_add_data_reloc(cb_pc(), off);
-            emit16(0);
+            cb_emit16(0);
         } else if (op == LOCAL_GET) {
-            emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
+            cb_emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
             cb_add_data_reloc(cb_pc(), off);
-            emit16(0);
+            cb_emit16(0);
         } else {
-            emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
+            cb_emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
             cb_add_data_reloc(cb_pc(), off);
-            emit16(0);
+            cb_emit16(0);
         }
     } else {
         if (op == LOCAL_ADDR) {
-            emit8(BC_LOCAL_ADDR);
-            emit16(off);
+            cb_emit8(BC_LOCAL_ADDR);
+            cb_emit16(off);
         } else if (op == LOCAL_GET) {
-            emit8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2);
-            emit16(off);
+            cb_emit8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2);
+            cb_emit16(off);
         } else {
-            emit8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2);
-            emit16(off);
+            cb_emit8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2);
+            cb_emit16(off);
         }
     }
 }
@@ -84,8 +84,8 @@ static void bc_fn_begin(const char *name, size_t param_cnt, const LocalVar *loca
     }
 
     if (is_recursive && bc_frame_bytes > 0) {
-        emit8(BC_ENTER);
-        emit16((u16)bc_frame_bytes);
+        cb_emit8(BC_ENTER);
+        cb_emit16((u16)bc_frame_bytes);
     }
 
     for (i = param_cnt; i > 0; i--) {
@@ -99,47 +99,47 @@ static void bc_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_l
     (void)locals;
     (void)total_locals;
     if (bc_is_rec && bc_frame_bytes > 0) {
-        emit8(BC_LEAVE);
-        emit16((u16)bc_frame_bytes);
+        cb_emit8(BC_LEAVE);
+        cb_emit16((u16)bc_frame_bytes);
     }
-    emit8(BC_RET);
+    cb_emit8(BC_RET);
 }
 
 static void bc_call(size_t target_addr) {
-    emit8(BC_CALL);
-    emit16((u16)target_addr);
+    cb_emit8(BC_CALL);
+    cb_emit16((u16)target_addr);
 }
 
 static void bc_call_extern(const FuncSig *sig) {
     size_t i;
     for (i = 0; i < extern_names.len; i++) {
         if (strcmp(extern_names.data[i], sig->name) == 0) {
-            emit8(BC_CALL_EXTERN);
-            emit16((u16)i);
+            cb_emit8(BC_CALL_EXTERN);
+            cb_emit16((u16)i);
             return;
         }
     }
     VEC_PUSH(extern_names, sig->name);
-    emit8(BC_CALL_EXTERN);
-    emit16((u16)(extern_names.len - 1));
+    cb_emit8(BC_CALL_EXTERN);
+    cb_emit16((u16)(extern_names.len - 1));
 }
 
 static void bc_push_w(i32 val) {
     i16 v = (i16)val;
     if (v >= 0 && v <= 127) {
-        emit8((u8)(BC_PUSH_IMM7_BASE | v));
+        cb_emit8((u8)(BC_PUSH_IMM7_BASE | v));
     } else if (v >= -128 && v < 0) {
-        emit8(BC_PUSH_I8);
-        emit8((u8)(v & 0xFF));
+        cb_emit8(BC_PUSH_I8);
+        cb_emit8((u8)(v & 0xFF));
     } else {
-        emit8(BC_PUSH_I16);
-        emit16((u16)v);
+        cb_emit8(BC_PUSH_I16);
+        cb_emit16((u16)v);
     }
 }
 
 static void bc_push_a(u32 val) {
-    emit8(BC_PUSH_I16);
-    emit16((u16)val);
+    cb_emit8(BC_PUSH_I16);
+    cb_emit16((u16)val);
 }
 
 static void bc_push_f(double val) {
@@ -147,26 +147,26 @@ static void bc_push_f(double val) {
     u32 bits;
     memcpy(&bits, &f, 4);
     if (bits == 0) {
-        emit8(BC_PUSH_0_32);
+        cb_emit8(BC_PUSH_0_32);
         return;
     }
-    emit8(BC_PUSH_F);
-    emit32(bits);
+    cb_emit8(BC_PUSH_F);
+    cb_emit32(bits);
 }
 
 static void bc_push_i32(i32 val) {
     if (val == 0) {
-        emit8(BC_PUSH_0_32);
+        cb_emit8(BC_PUSH_0_32);
         return;
     }
-    emit8(BC_PUSH_I32);
-    emit32((u32)val);
+    cb_emit8(BC_PUSH_I32);
+    cb_emit32((u32)val);
 }
 
 static void bc_push_data(size_t data_offset) {
-    emit8(BC_PUSH_DATA);
+    cb_emit8(BC_PUSH_DATA);
     cb_add_data_reloc(cb_pc(), data_offset);
-    emit16(0);
+    cb_emit16(0);
 }
 
 static void bc_stack_op(StackOp op, StackType t1, StackType t2) {
@@ -174,20 +174,20 @@ static void bc_stack_op(StackOp op, StackType t1, StackType t2) {
     u8 s2 = type_size(t2);
     switch (op) {
     case OP_DUP:
-        emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
+        cb_emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
         break;
     case OP_DROP:
-        emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
+        cb_emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
         break;
     case OP_SWAP:
         if (s1 == 2 && s2 == 2)
-            emit8(BC_SWAP22);
+            cb_emit8(BC_SWAP22);
         else if (s1 == 4 && s2 == 2)
-            emit8(BC_SWAP24);
+            cb_emit8(BC_SWAP24);
         else if (s1 == 2 && s2 == 4)
-            emit8(BC_SWAP42);
+            cb_emit8(BC_SWAP42);
         else
-            emit8(BC_SWAP44);
+            cb_emit8(BC_SWAP44);
         break;
     }
 }
@@ -196,254 +196,254 @@ static void bc_op(IrOp op) {
     switch (op) {
     case OP_ADD:
     case OP_AADD:
-        emit8(BC_ADD);
+        cb_emit8(BC_ADD);
         break;
     case OP_SUB:
     case OP_ASUB:
     case OP_ADIFF:
-        emit8(BC_SUB);
+        cb_emit8(BC_SUB);
         break;
     case OP_MUL:
-        emit8(BC_MUL);
+        cb_emit8(BC_MUL);
         break;
     case OP_DIV:
-        emit8(BC_DIV);
+        cb_emit8(BC_DIV);
         break;
     case OP_MOD:
-        emit8(BC_MOD);
+        cb_emit8(BC_MOD);
         break;
     case OP_UDIV:
-        emit8(BC_UDIV);
+        cb_emit8(BC_UDIV);
         break;
     case OP_UMOD:
-        emit8(BC_UMOD);
+        cb_emit8(BC_UMOD);
         break;
     case OP_AND:
-        emit8(BC_AND);
+        cb_emit8(BC_AND);
         break;
     case OP_OR:
-        emit8(BC_OR);
+        cb_emit8(BC_OR);
         break;
     case OP_XOR:
-        emit8(BC_XOR);
+        cb_emit8(BC_XOR);
         break;
     case OP_INVERT:
-        emit8(BC_INVERT);
+        cb_emit8(BC_INVERT);
         break;
     case OP_LSHIFT:
-        emit8(BC_LSHIFT);
+        cb_emit8(BC_LSHIFT);
         break;
     case OP_ARSHIFT:
-        emit8(BC_ARSHIFT);
+        cb_emit8(BC_ARSHIFT);
         break;
     case OP_RSHIFT:
-        emit8(BC_RSHIFT);
+        cb_emit8(BC_RSHIFT);
         break;
 
     case OP_FADD:
-        emit8(BC_FADD);
+        cb_emit8(BC_FADD);
         break;
     case OP_FSUB:
-        emit8(BC_FSUB);
+        cb_emit8(BC_FSUB);
         break;
     case OP_FMUL:
-        emit8(BC_FMUL);
+        cb_emit8(BC_FMUL);
         break;
     case OP_FDIV:
-        emit8(BC_FDIV);
+        cb_emit8(BC_FDIV);
         break;
     case OP_FNEG:
-        emit8(BC_FNEG);
+        cb_emit8(BC_FNEG);
         break;
 
     case OP_ADD32:
-        emit8(BC_ADD32);
+        cb_emit8(BC_ADD32);
         break;
     case OP_SUB32:
-        emit8(BC_SUB32);
+        cb_emit8(BC_SUB32);
         break;
     case OP_MUL32:
-        emit8(BC_MUL32);
+        cb_emit8(BC_MUL32);
         break;
     case OP_DIV32:
-        emit8(BC_DIV32);
+        cb_emit8(BC_DIV32);
         break;
     case OP_MOD32:
-        emit8(BC_MOD32);
+        cb_emit8(BC_MOD32);
         break;
     case OP_UDIV32:
-        emit8(BC_UDIV32);
+        cb_emit8(BC_UDIV32);
         break;
     case OP_UMOD32:
-        emit8(BC_UMOD32);
+        cb_emit8(BC_UMOD32);
         break;
     case OP_AND32:
-        emit8(BC_AND32);
+        cb_emit8(BC_AND32);
         break;
     case OP_OR32:
-        emit8(BC_OR32);
+        cb_emit8(BC_OR32);
         break;
     case OP_XOR32:
-        emit8(BC_XOR32);
+        cb_emit8(BC_XOR32);
         break;
     case OP_INV32:
-        emit8(BC_INV32);
+        cb_emit8(BC_INV32);
         break;
     case OP_SHL32:
-        emit8(BC_SHL32);
+        cb_emit8(BC_SHL32);
         break;
     case OP_ASHR32:
-        emit8(BC_ASHR32);
+        cb_emit8(BC_ASHR32);
         break;
     case OP_RSHR32:
-        emit8(BC_RSHR32);
+        cb_emit8(BC_RSHR32);
         break;
 
     case OP_EQ:
     case OP_AEQ:
-        emit8(BC_EQ);
+        cb_emit8(BC_EQ);
         break;
     case OP_NE:
     case OP_ANE:
-        emit8(BC_NE);
+        cb_emit8(BC_NE);
         break;
     case OP_LT:
-        emit8(BC_LT);
+        cb_emit8(BC_LT);
         break;
     case OP_GT:
-        emit8(BC_GT);
+        cb_emit8(BC_GT);
         break;
     case OP_LE:
-        emit8(BC_LE);
+        cb_emit8(BC_LE);
         break;
     case OP_GE:
-        emit8(BC_GE);
+        cb_emit8(BC_GE);
         break;
     case OP_ULT:
     case OP_ALT:
-        emit8(BC_ULT);
+        cb_emit8(BC_ULT);
         break;
     case OP_UGT:
     case OP_AGT:
-        emit8(BC_UGT);
+        cb_emit8(BC_UGT);
         break;
     case OP_ULE:
-        emit8(BC_ULE);
+        cb_emit8(BC_ULE);
         break;
     case OP_UGE:
-        emit8(BC_UGE);
+        cb_emit8(BC_UGE);
         break;
 
     case OP_FEQ:
-        emit8(BC_FEQ);
+        cb_emit8(BC_FEQ);
         break;
     case OP_FNE:
-        emit8(BC_FNE);
+        cb_emit8(BC_FNE);
         break;
     case OP_FLT:
-        emit8(BC_FLT);
+        cb_emit8(BC_FLT);
         break;
     case OP_FGT:
-        emit8(BC_FGT);
+        cb_emit8(BC_FGT);
         break;
 
     case OP_EQ32:
-        emit8(BC_EQ32);
+        cb_emit8(BC_EQ32);
         break;
     case OP_NE32:
-        emit8(BC_NE32);
+        cb_emit8(BC_NE32);
         break;
     case OP_LT32:
-        emit8(BC_LT32);
+        cb_emit8(BC_LT32);
         break;
     case OP_GT32:
-        emit8(BC_GT32);
+        cb_emit8(BC_GT32);
         break;
     case OP_LE32:
-        emit8(BC_LE32);
+        cb_emit8(BC_LE32);
         break;
     case OP_GE32:
-        emit8(BC_GE32);
+        cb_emit8(BC_GE32);
         break;
     case OP_ULT32:
-        emit8(BC_ULT32);
+        cb_emit8(BC_ULT32);
         break;
     case OP_UGT32:
-        emit8(BC_UGT32);
+        cb_emit8(BC_UGT32);
         break;
     case OP_ULE32:
-        emit8(BC_ULE32);
+        cb_emit8(BC_ULE32);
         break;
     case OP_UGE32:
-        emit8(BC_UGE32);
+        cb_emit8(BC_UGE32);
         break;
 
     case OP_I8FETCH:
-        emit8(BC_I8FETCH);
+        cb_emit8(BC_I8FETCH);
         break;
     case OP_U8FETCH:
-        emit8(BC_U8FETCH);
+        cb_emit8(BC_U8FETCH);
         break;
     case OP_I8STORE:
-        emit8(BC_I8STORE);
+        cb_emit8(BC_I8STORE);
         break;
     case OP_SI8STORE:
-        emit8(BC_SWAP22);
-        emit8(BC_I8STORE);
+        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_I8STORE);
         break;
     case OP_I16FETCH:
     case OP_U16FETCH:
     case OP_FETCH:
     case OP_AFETCH:
-        emit8(BC_FETCH16);
+        cb_emit8(BC_FETCH16);
         break;
     case OP_I16STORE:
     case OP_STORE:
     case OP_ASTORE:
-        emit8(BC_STORE16);
+        cb_emit8(BC_STORE16);
         break;
     case OP_SI16STORE:
     case OP_SSTORE:
     case OP_SASTORE:
-        emit8(BC_SWAP22);
-        emit8(BC_STORE16);
+        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_STORE16);
         break;
     case OP_FFETCH:
     case OP_I32FETCH:
-        emit8(BC_FETCH32);
+        cb_emit8(BC_FETCH32);
         break;
     case OP_FSTORE:
     case OP_I32STORE:
-        emit8(BC_STORE32);
+        cb_emit8(BC_STORE32);
         break;
     case OP_SFSTORE:
-        emit8(BC_SWAP24);
-        emit8(BC_STORE32);
+        cb_emit8(BC_SWAP24);
+        cb_emit8(BC_STORE32);
         break;
     case OP_BCOPY:
-        emit8(BC_BCOPY);
+        cb_emit8(BC_BCOPY);
         break;
 
     case OP_SEXT:
-        emit8(BC_SEXT);
+        cb_emit8(BC_SEXT);
         break;
     case OP_W2A:
     case OP_A2W:
         break;
     case OP_W2F:
-        emit8(BC_W2F);
+        cb_emit8(BC_W2F);
         break;
     case OP_F2W:
-        emit8(BC_F2W);
+        cb_emit8(BC_F2W);
         break;
     case OP_W2I32:
-        emit8(BC_W2I32);
+        cb_emit8(BC_W2I32);
         break;
     case OP_U2I32:
-        emit8(BC_U2I32);
+        cb_emit8(BC_U2I32);
         break;
     case OP_I322W:
-        emit8(BC_I322W);
+        cb_emit8(BC_I322W);
         break;
     }
 }
@@ -453,16 +453,16 @@ static int bc_add_imm(i32 imm) {
     if (d == 0)
         return 1;
     if (d == 1) {
-        emit8(BC_INC);
+        cb_emit8(BC_INC);
         return 1;
     }
     if (d == -1) {
-        emit8(BC_DEC);
+        cb_emit8(BC_DEC);
         return 1;
     }
     if (d >= -128 && d <= 127) {
-        emit8(BC_ADD_IMM8);
-        emit8((u8)(d & 0xFF));
+        cb_emit8(BC_ADD_IMM8);
+        cb_emit8((u8)(d & 0xFF));
         return 1;
     }
     return 0;
@@ -502,52 +502,52 @@ static int bc_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
 
 static size_t bc_emit_br_fwd(BranchCond cond) {
     size_t pos;
-    emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
+    cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
     pos = cb_pc();
-    emit16(0);
+    cb_emit16(0);
     return pos;
 }
 
 static void bc_emit_br_back(BranchCond cond, size_t target_addr) {
-    emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
-    emit16((u16)target_addr);
+    cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
+    cb_emit16((u16)target_addr);
 }
 
-static void bc_patch_fwd(size_t patch_offset) { patch16(patch_offset, (u16)cb_cur_addr()); }
+static void bc_patch_fwd(size_t patch_offset) { cb_patch16(patch_offset, (u16)cb_cur_addr()); }
 
 static size_t bc_emit_jtab(size_t count) {
     size_t tbl_off, k;
-    emit8(BC_JTAB);
+    cb_emit8(BC_JTAB);
     tbl_off = cb_pc();
     for (k = 0; k < count; k++)
-        emit16(0);
+        cb_emit16(0);
     return tbl_off;
 }
 
 static void bc_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     (void)count;
-    patch16(patch_offset + idx * 2, (u16)target_addr);
+    cb_patch16(patch_offset + idx * 2, (u16)target_addr);
 }
 
 static void bc_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
-    patch16(call_pc + 1, (u16)target_addr);
+    cb_patch16(call_pc + 1, (u16)target_addr);
 }
 
 static size_t bc_push_fn(size_t target_addr) {
     size_t pos;
-    emit8(BC_PUSH_FN);
+    cb_emit8(BC_PUSH_FN);
     pos = cb_pc();
-    emit16((u16)target_addr);
+    cb_emit16((u16)target_addr);
     return pos;
 }
 
 static void bc_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     (void)patch_addr;
-    patch16(patch_pc, (u16)target_addr);
+    cb_patch16(patch_pc, (u16)target_addr);
 }
 
-static void bc_icall(void) { emit8(BC_ICALL); }
+static void bc_icall(void) { cb_emit8(BC_ICALL); }
 
 static size_t bc_stack_data_off(void) { return 0; }
 

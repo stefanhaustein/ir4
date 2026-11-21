@@ -71,38 +71,38 @@ size_t cb_cur_addr(void) {
 
 const u8 *cb_data(void) { return code_buf.data; }
 
-void emit8(u8 b) { VEC_PUSH(code_buf, b); }
+void cb_emit8(u8 b) { VEC_PUSH(code_buf, b); }
 
-void emit16(u16 w) {
-    emit8((u8)(w & 0xFF));        /* Little-endian low byte */
-    emit8((u8)((w >> 8) & 0xFF)); /* Little-endian high byte */
+void cb_emit16(u16 w) {
+    cb_emit8((u8)(w & 0xFF));        /* Little-endian low byte */
+    cb_emit8((u8)((w >> 8) & 0xFF)); /* Little-endian high byte */
 }
 
-void emit24(u32 w) {
-    emit8((u8)(w & 0xFFU));
-    emit8((u8)((w >> 8) & 0xFFU));
-    emit8((u8)((w >> 16) & 0xFFU));
+void cb_emit24(u32 w) {
+    cb_emit8((u8)(w & 0xFFU));
+    cb_emit8((u8)((w >> 8) & 0xFFU));
+    cb_emit8((u8)((w >> 16) & 0xFFU));
 }
 
-void emit32(u32 w) {
-    emit16((u16)(w & 0xFFFFU));
-    emit16((u16)((w >> 16) & 0xFFFFU));
+void cb_emit32(u32 w) {
+    cb_emit16((u16)(w & 0xFFFFU));
+    cb_emit16((u16)((w >> 16) & 0xFFFFU));
 }
 
-void emit8_8(u8 a, u8 b) {
-    emit8(a);
-    emit8(b);
+void cb_emit8_8(u8 a, u8 b) {
+    cb_emit8(a);
+    cb_emit8(b);
 }
 
-void emit8_16(u8 a, u16 w) {
-    emit8(a);
-    emit16(w);
+void cb_emit8_16(u8 a, u16 w) {
+    cb_emit8(a);
+    cb_emit16(w);
 }
 
-void emit8_8_8(u8 a, u8 b, u8 c) {
-    emit8(a);
-    emit8(b);
-    emit8(c);
+void cb_emit8_8_8(u8 a, u8 b, u8 c) {
+    cb_emit8(a);
+    cb_emit8(b);
+    cb_emit8(c);
 }
 
 void cb_rewind(size_t n) {
@@ -115,14 +115,14 @@ void cb_rewind(size_t n) {
     }
 }
 
-void patch8(size_t patch_offset, u8 val) {
+void cb_patch8(size_t patch_offset, u8 val) {
     if (patch_offset >= code_buf.len) {
         ir4_die("patch offset out of bounds");
     }
     code_buf.data[patch_offset] = val;
 }
 
-void patch16(size_t patch_offset, u16 target_addr) {
+void cb_patch16(size_t patch_offset, u16 target_addr) {
     if (patch_offset + 1 >= code_buf.len) {
         ir4_die("patch offset out of bounds");
     }
@@ -130,7 +130,7 @@ void patch16(size_t patch_offset, u16 target_addr) {
     code_buf.data[patch_offset + 1] = (u8)((target_addr >> 8) & 0xFF);
 }
 
-void patch24(size_t patch_offset, u32 target_addr) {
+void cb_patch24(size_t patch_offset, u32 target_addr) {
     if (patch_offset + 2 >= code_buf.len) {
         ir4_die("patch offset out of bounds");
     }
@@ -139,17 +139,17 @@ void patch24(size_t patch_offset, u32 target_addr) {
     code_buf.data[patch_offset + 2] = (u8)((target_addr >> 16) & 0xFFU);
 }
 
-void patch32(size_t patch_offset, u32 val) {
-    patch16(patch_offset, (u16)(val & 0xFFFFU));
-    patch16(patch_offset + 2, (u16)((val >> 16) & 0xFFFFU));
+void cb_patch32(size_t patch_offset, u32 val) {
+    cb_patch16(patch_offset, (u16)(val & 0xFFFFU));
+    cb_patch16(patch_offset + 2, (u16)((val >> 16) & 0xFFFFU));
 }
 
-void put_le16(u8 *p, u16 v) {
+void cb_put_le16(u8 *p, u16 v) {
     p[0] = (u8)(v & 0xFFU);
     p[1] = (u8)((v >> 8) & 0xFFU);
 }
 
-void put_le32(u8 *p, u32 v) {
+void cb_put_le32(u8 *p, u32 v) {
     p[0] = (u8)(v & 0xFFUL);
     p[1] = (u8)((v >> 8) & 0xFFUL);
     p[2] = (u8)((v >> 16) & 0xFFUL);
@@ -268,9 +268,9 @@ void cb_patch_data_relocs(size_t data_base) {
             code_buf.data[relocs.data[i].off1] = (u8)(addr & 0xFF);
             code_buf.data[relocs.data[i].off2] = (u8)((addr >> 8) & 0xFF);
         } else if (relocs.data[i].width == 3) {
-            patch24(relocs.data[i].off1, (u32)addr);
+            cb_patch24(relocs.data[i].off1, (u32)addr);
         } else {
-            patch16(relocs.data[i].off1, (u16)addr);
+            cb_patch16(relocs.data[i].off1, (u16)addr);
         }
     }
     cb_patch_data_init_relocs_base(0, (u32)data_base);
