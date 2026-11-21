@@ -13,7 +13,7 @@ IR4th compiles via direct 2-pass machine-code generation (with dead-code elimina
 
 ### 1.2 Lexical Categories
 * **Type Tokens (`TYPE`):** Any token starting with a leading colon (`:`) is strictly a type specifier (`:i`, `:i32`, `:a`, `:f`).
-* **Keywords:** Reserved syntax and control-flow tokens (`fn`, `default`, `hot`, `const`, `fwd`, `init`, `code`, `inline`, `end`, `require`, `extern`, `var`, `:bytes`, `data`, `:i8`, `:i16`, `:i32`, `align`, `->`, `+->`, `&`, `__heap_start`, `return`, `if`, `else`, `then`, `begin`, `while`, `repeat`, `::`, `jmp`, `jz`, `(`, `)`).
+* **Keywords:** Reserved syntax and control-flow tokens (`fn`, `default`, `hot`, `const`, `fwd`, `init`, `code`, `inline`, `end`, `require`, `extern`, `var`, `:bytes`, `data`, `:i8`, `:i16`, `:i32`, `align`, `->`, `+->`, `&`, `__heap_start`, `return`, `if`, `else`, `then`, `begin`, `while`, `repeat`, `::`, `jmp`, `jz`, `jtab`, `(`, `)`).
 * **Numeric Literals:** Decimal (`0`, `42`, `-10`), hexadecimal (`0xFF`, `$4000`), or floating-point (`3.14`, `-0.5`).
 * **Identifiers (`IDENT`):** Any non-numeric token without a leading colon that is not a keyword.
 
@@ -248,6 +248,7 @@ Fixed-width memory operations (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) wide
 * **Conditional Branches (`<cond :i> if ... else ... then`):** Pops a `:i` flag. Both branches must leave the type stack with identical depth and types. If `else` is omitted, the true branch must leave the stack completely even (unchanged).
 * **Pre-Tested Loops (`begin <cond :i> while ... repeat`):** `while` pops a `:i` flag. The combined condition and loop body must leave the type stack completely even at `repeat`.
 * **Labels & Branches (`:: <name>`, `jmp <name>`, `<cond :i> jz <name>`):** Function-local labels and forward/backward branches. The type stack must be empty at `::`, at `jmp`, and after popping `:i` at `jz`; `::` cannot appear inside an open `if` or `begin` block.
+* **Jump Tables (`<idx :i> jtab <l0> <l1> ... <ln> end`):** Pops `:i` index `idx` and jumps to function-local label `l[idx]`. The remaining type stack must be empty (matching `jmp` and `::`). Bounds checking is the caller's responsibility; out-of-range indices are unchecked. At least one label is required.
 * **Calls & Early Return (`<word_name>`, `( <inputs> -> <outputs> )`, `return`):** Direct calls (`<word_name>`) validate the caller stack against callee inputs and push outputs. Indirect calls (`<args...> <fn :a> ( <inputs> -> <outputs> )`, where `<inputs>` and `<outputs>` are nameless type tokens) pop the `:a` target address and declared input types, call the address, and push the declared output types. `return` verifies the stack matches the word's declared output types after `->`.
 
 For complete runnable programs, see [examples/](examples/) and [tests/](tests/).

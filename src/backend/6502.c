@@ -375,11 +375,12 @@ static void m6502_call(size_t target_addr) {
     emit8_16(m6502_compact ? BC_CALL : M6502_JSR, (u16)target_addr);
 }
 
-static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
-                           size_t total_locals) {
+static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+                           const LocalVar *locals, size_t total_locals) {
     u16 tbank = m6502_call_target_bank;
     m6502_call_target_bank = 0;
     (void)sig;
+    (void)callee;
     (void)locals;
     (void)total_locals;
     if (m6502_compact)
@@ -2071,6 +2072,49 @@ static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
     emit8_16(M6502_JMP, target_addr);
 }
 
+static size_t m6502_emit_jtab(size_t count) {
+    size_t lo_pc, hi_pc, tbl_off, k;
+    u16 tbl_addr;
+    if (m6502_compact) {
+        emit8(BC_JTAB);
+        tbl_off = cb_pc();
+        for (k = 0; k < count; k++)
+            emit16(0);
+        return tbl_off;
+    }
+    if (count > 256)
+        ir4_die("'jtab' supports at most 256 entries on 6502");
+    be_6502_peep_fence();
+    m6502_lda_stk(0);
+    emit8(M6502_TAY);
+    m6502_pop2();
+    emit8(0xB9); /* LDA lo_tbl,Y */
+    lo_pc = cb_pc();
+    emit16(0);
+    emit8_8(M6502_STA_ZP, zp_scratch);
+    emit8(0xB9); /* LDA hi_tbl,Y */
+    hi_pc = cb_pc();
+    emit16(0);
+    emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
+    emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
+    tbl_addr = cb_cur_addr();
+    patch16(lo_pc, tbl_addr);
+    patch16(hi_pc, (u16)(tbl_addr + count));
+    tbl_off = cb_pc();
+    for (k = 0; k < count * 2; k++)
+        emit8(0);
+    return tbl_off;
+}
+
+static void m6502_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    if (m6502_compact) {
+        patch16(patch_offset + idx * 2, (u16)target_addr);
+        return;
+    }
+    patch8(patch_offset + idx, (u8)(target_addr & 0xFF));
+    patch8(patch_offset + count + idx, (u8)(target_addr >> 8));
+}
+
 static void m6502_patch_fwd(size_t patch_offset) {
     m6502_cmp_end_pc = 0;
     patch16(patch_offset, (u16)cb_cur_addr());
@@ -3037,6 +3081,25 @@ static void ensure_6502_vm(void) {
         emit8_16(M6502_JMP, handlers[BC_JMP]);
     }
 
+    /* BC_JTAB (u16[] targets) */
+    handlers[BC_JTAB] = cb_cur_addr();
+    m6502_lda_stk(0);
+    emit8(0x0A); /* ASL A */
+    emit8_8(M6502_STA_ZP, tmp_lo);
+    m6502_lda_stk(1);
+    emit8(0x2A); /* ROL A */
+    emit8_8(M6502_STA_ZP, tmp_hi);
+    emit8(M6502_INX);
+    emit8(M6502_INX);
+    emit8(M6502_CLC);
+    emit8_8(M6502_LDA_ZP, ip_lo);
+    emit8_8(0x65, tmp_lo); /* ADC tmp_lo */
+    emit8_8(M6502_STA_ZP, ip_lo);
+    emit8_8(M6502_LDA_ZP, ip_hi);
+    emit8_8(0x65, tmp_hi); /* ADC tmp_hi */
+    emit8_8(M6502_STA_ZP, ip_hi);
+    emit8_16(M6502_JMP, handlers[BC_JMP]);
+
     /* BC_CALL (u16 target) */
     handlers[BC_CALL] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
@@ -3199,6 +3262,8 @@ const Backend be_6502 = {"6502",
                          NULL,
                          NULL,
                          m6502_patch_fwd,
+                         m6502_emit_jtab,
+                         m6502_patch_jtab,
                          m6502_patch_call,
                          m6502_push_fn,
                          m6502_patch_fn,

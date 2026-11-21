@@ -98,29 +98,29 @@ test-z80: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4 
 	./$(TARGET) -t cpm -o build/ext.com    tests/ext.ir4
 	./$(TARGET) -t cpm -o build/fnptr.com  tests/fnptr.ir4
 	@if command -v tnylpo >/dev/null 2>&1; then \
-		out=$$(cd $(BUILD) && tnylpo fib.com | tr -d '\r\n'); \
-		echo "tnylpo fib.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo core.com | tr -d '\r\n'); \
-		echo "tnylpo core.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo muldiv.com | tr -d '\r\n'); \
-		echo "tnylpo muldiv.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo mem.com | tr -d '\r\n'); \
-		echo "tnylpo mem.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo float.com | tr -d '\r\n'); \
-		echo "tnylpo float.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo req.com | tr -d '\r\n'); \
-		echo "tnylpo req.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo data.com | tr -d '\r\n'); \
-		echo "tnylpo data.com -> $$out"; \
-		test "$$out" = "0"; \
-		out=$$(cd $(BUILD) && tnylpo ext.com | tr -d '\r\n'); \
-		echo "tnylpo ext.com -> $$out"; \
+		out=$$(cd $(BUILD) && tnylpo fib.com | tr -d '\r\n') && \
+		echo "tnylpo fib.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo core.com | tr -d '\r\n') && \
+		echo "tnylpo core.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo muldiv.com | tr -d '\r\n') && \
+		echo "tnylpo muldiv.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo mem.com | tr -d '\r\n') && \
+		echo "tnylpo mem.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo float.com | tr -d '\r\n') && \
+		echo "tnylpo float.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo req.com | tr -d '\r\n') && \
+		echo "tnylpo req.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo data.com | tr -d '\r\n') && \
+		echo "tnylpo data.com -> $$out" && \
+		test "$$out" = "0" && \
+		out=$$(cd $(BUILD) && tnylpo ext.com | tr -d '\r\n') && \
+		echo "tnylpo ext.com -> $$out" && \
 		test "$$out" = "OK0"; \
 	else \
 		echo "tnylpo not found; skipping Z80 execution"; \

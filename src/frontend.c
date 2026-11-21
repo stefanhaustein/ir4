@@ -37,6 +37,7 @@ typedef enum {
     IR_ICALL,
     IR_BR_FWD,
     IR_BR_BACK,
+    IR_JTAB,
     IR_INLINE
 } IrKind;
 
@@ -64,6 +65,10 @@ typedef struct {
             BranchCond cond;
             size_t target;
         } br;
+        struct {
+            size_t start;
+            size_t count;
+        } jtab;
         size_t inl_idx;
     } u;
 } IrInstr;
@@ -101,8 +106,10 @@ typedef struct {
 VEC_OF(IrVec, IrInstr);
 VEC_OF(WordVec, WordIR *);
 VEC_OF(CodeRelocVec, CodeReloc);
+VEC_OF(SizeVec, size_t);
 
 static IrVec ir_buf;
+static SizeVec jtab_targets;
 static size_t fold_fence = 0;
 static WordVec words;
 static ByteVec raw_code_buf;
@@ -1797,6 +1804,7 @@ static void compile_body(WordIR *w) {
     i32 num_val;
     LabelVec labels;
     LabelRefVec label_refs;
+    size_t jtab_start = jtab_targets.len;
 
     labels.data = NULL;
     labels.len = 0;
@@ -1823,6 +1831,12 @@ static void compile_body(WordIR *w) {
                     ir4_die("undefined label");
                 ir_buf.data[w->ir_start + label_refs.data[r].ir_idx].u.br.target =
                     labels.data[lidx].target_ir;
+            }
+            for (r = jtab_start; r < jtab_targets.len; r++) {
+                size_t lidx = jtab_targets.data[r];
+                if (!labels.data[lidx].defined)
+                    ir4_die("undefined label");
+                jtab_targets.data[r] = labels.data[lidx].target_ir;
             }
             free(labels.data);
             free(label_refs.data);
@@ -2200,6 +2214,34 @@ static void compile_body(WordIR *w) {
             }
             continue;
         }
+        if (strcmp(tok, "jtab") == 0) {
+            size_t start = jtab_targets.len;
+            size_t count = 0;
+            tpop_expect(TY_W);
+            if (!unreachable && tstack.len != 0)
+                ir4_die("stack must be empty after index at 'jtab'");
+            for (;;) {
+                tok = next_tok();
+                if (!tok)
+                    ir4_die("unexpected EOF in 'jtab' (missing 'end')");
+                if (strcmp(tok, "end") == 0)
+                    break;
+                if (!unreachable) {
+                    size_t lidx = find_or_add_label(&labels, tok);
+                    VEC_PUSH(jtab_targets, lidx);
+                }
+                count++;
+            }
+            if (count == 0)
+                ir4_die("empty 'jtab'");
+            if (!unreachable) {
+                ins = emit_ir(IR_JTAB, w);
+                ins->u.jtab.start = start;
+                ins->u.jtab.count = count;
+                unreachable = 1;
+            }
+            continue;
+        }
 
         if (strcmp(tok, "inline") == 0) {
             InlineBlock ib;
@@ -2388,7 +2430,6 @@ typedef struct {
 } FwdCall;
 
 VEC_OF(FwdCallVec, FwdCall);
-VEC_OF(SizeVec, size_t);
 VEC_OF(PendingBrVec, PendingBr);
 
 static FwdCallVec fwd_calls;
@@ -2426,20 +2467,39 @@ static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
         const IrInstr *bi = &ir_buf.data[w->ir_start + j];
         if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
             return 1;
+        if (bi->kind == IR_JTAB) {
+            size_t k;
+            for (k = 0; k < bi->u.jtab.count; k++) {
+                if (jtab_targets.data[bi->u.jtab.start + k] == ir_idx)
+                    return 1;
+            }
+        }
     }
     return 0;
 }
+
+typedef struct {
+    size_t patch_offset;
+    size_t idx;
+    size_t count;
+    size_t target_ir;
+} PendingJtab;
+VEC_OF(PendingJtabVec, PendingJtab);
 
 static void emit_word(size_t fidx) {
     static SizeVec ir_addr;
     FuncSig *sig = funcs.data[fidx];
     WordIR *w = words.data[fidx];
     PendingBrVec pending;
+    PendingJtabVec pending_jtab;
     size_t i, p;
 
     pending.data = NULL;
     pending.len = 0;
     pending.cap = 0;
+    pending_jtab.data = NULL;
+    pending_jtab.len = 0;
+    pending_jtab.cap = 0;
 
     if (w->is_code) {
         sig->addr = be->cur_addr();
@@ -2459,6 +2519,12 @@ static void emit_word(size_t fidx) {
         for (p = 0; p < pending.len; p++) {
             if (pending.data[p].target_ir == i) {
                 be->patch_fwd(pending.data[p].patch_offset);
+            }
+        }
+        for (p = 0; p < pending_jtab.len; p++) {
+            if (pending_jtab.data[p].target_ir == i) {
+                be->patch_jtab(pending_jtab.data[p].patch_offset, pending_jtab.data[p].idx,
+                               pending_jtab.data[p].count, be->cur_addr());
             }
         }
         if (i == w->ir_len)
@@ -2641,8 +2707,8 @@ static void emit_word(size_t fidx) {
                         be_6502_set_call_bank(funcs.data[target]->bank);
                     }
 #endif
-                    if (be->tail_call(funcs.data[target]->addr, sig, w->locals.data,
-                                      w->locals.len)) {
+                    if (be->tail_call(funcs.data[target]->addr, sig, funcs.data[target],
+                                      w->locals.data, w->locals.len)) {
                         i++;
                         break;
                     }
@@ -2694,6 +2760,25 @@ static void emit_word(size_t fidx) {
             case IR_BR_BACK:
                 be->emit_br_back(ins->u.br.cond, ir_addr.data[ins->u.br.target]);
                 break;
+            case IR_JTAB: {
+                size_t tbl_off, k;
+                if (!be->emit_jtab || !be->patch_jtab)
+                    ir4_die("'jtab' is not supported on this backend");
+                tbl_off = be->emit_jtab(ins->u.jtab.count);
+                for (k = 0; k < ins->u.jtab.count; k++) {
+                    size_t tir = jtab_targets.data[ins->u.jtab.start + k];
+                    if (tir <= i) {
+                        be->patch_jtab(tbl_off, k, ins->u.jtab.count, ir_addr.data[tir]);
+                    } else {
+                        PendingJtab *pj = VEC_ADD(pending_jtab);
+                        pj->patch_offset = tbl_off;
+                        pj->idx = k;
+                        pj->count = ins->u.jtab.count;
+                        pj->target_ir = tir;
+                    }
+                }
+                break;
+            }
             case IR_INLINE: {
                 const InlineBlock *ib = &inline_blocks.data[ins->u.inl_idx];
                 if (strcmp(be->name, "bc") == 0)
@@ -2707,6 +2792,7 @@ static void emit_word(size_t fidx) {
         }
     }
     free(pending.data);
+    free(pending_jtab.data);
 }
 
 static void flush_vals_word(i32 val) {
@@ -2974,6 +3060,7 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
     words.len = 0;
     buffers.len = 0;
     consts.len = 0;
+    jtab_targets.len = 0;
     add_builtin_const("true", -1);
     add_builtin_const("false", 0);
     ir_buf.len = 0;

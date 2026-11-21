@@ -1747,6 +1747,31 @@ static int ez_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
     return ez_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
 }
 
+static size_t ez_emit_jtab(size_t count) {
+    size_t tbl_addr_pc, tbl_off, k;
+    ez_pop_hl();
+    emit8(EZ80_PUSH_HL);
+    emit8(EZ80_POP_DE);
+    emit8(EZ80_ADD_HL_HL);
+    emit8(EZ80_ADD_HL_DE);
+    emit8(EZ80_LD_DE_N24);
+    tbl_addr_pc = cb_pc();
+    emit24(0);
+    emit8(EZ80_ADD_HL_DE);
+    emit8_8(EZ80_ED, EZ80_ED_LD_HL_MHL);
+    emit8(EZ80_JP_MHL);
+    patch24(tbl_addr_pc, (u32)cb_cur_addr());
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        emit24(0);
+    return tbl_off;
+}
+
+static void ez_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    patch24(patch_offset + idx * 3, (u32)target_addr);
+}
+
 static void ez_patch_fwd(size_t patch_offset) { patch24(patch_offset, (u32)cb_cur_addr()); }
 
 static void ez_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
@@ -1811,6 +1836,8 @@ const Backend be_ez80 = {"ez80",
                          ez_cmp_br_fwd,
                          ez_cmp_br_back,
                          ez_patch_fwd,
+                         ez_emit_jtab,
+                         ez_patch_jtab,
                          ez_patch_call,
                          ez_push_fn,
                          ez_patch_fn,

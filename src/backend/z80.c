@@ -273,10 +273,11 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_
 
 static void z80_call(size_t target_addr) { emit8_16(Z80_CALL, (u16)target_addr); }
 
-static int z80_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
-                         size_t total_locals) {
+static int z80_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+                         const LocalVar *locals, size_t total_locals) {
     (void)locals;
-    if (sig->in_types.len != 0 || (sig->is_recursive && total_locals > 0))
+    if (sig->in_types.len != 0 || callee->in_types.len != 0 ||
+        (sig->is_recursive && total_locals > 0))
         return 0;
     z80_peep_barrier();
     emit8_16(Z80_JP, (u16)target_addr);
@@ -1702,6 +1703,30 @@ static int z80_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
     return z80_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
 }
 
+static size_t z80_emit_jtab(size_t count) {
+    size_t tbl_off, k;
+    u16 tbl_addr;
+    z80_pop(Z80_POP_HL);
+    emit8(Z80_ADD_HL_HL);
+    tbl_addr = (u16)(cb_cur_addr() + 9);
+    emit8_16(Z80_LD_DE_NN, tbl_addr);
+    emit8(Z80_ADD_HL_DE);
+    emit8(0x5E); /* LD E, (HL) */
+    emit8(Z80_INC_HL);
+    emit8(0x56); /* LD D, (HL) */
+    emit8(Z80_EX_DE_HL);
+    emit8(Z80_JP_HL);
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        emit16(0x0000);
+    return tbl_off;
+}
+
+static void z80_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    patch16(patch_offset + idx * 2, (u16)target_addr);
+}
+
 static void z80_patch_fwd(size_t patch_offset) {
     z80_peep_barrier();
     patch16(patch_offset, cb_cur_addr());
@@ -1895,6 +1920,8 @@ const Backend be_z80 = {"z80",
                         z80_cmp_br_fwd,
                         z80_cmp_br_back,
                         z80_patch_fwd,
+                        z80_emit_jtab,
+                        z80_patch_jtab,
                         z80_patch_call,
                         z80_push_fn,
                         z80_patch_fn,

@@ -47,6 +47,7 @@ typedef enum {
 
     BC_JMP,         /* u16 target_addr */
     BC_JZ,          /* u16 target_addr */
+    BC_JTAB,        /* u16[] targets */
     BC_CALL,        /* u16 target_addr */
     BC_ICALL,
     BC_CALL_EXTERN, /* u16 extern_id */

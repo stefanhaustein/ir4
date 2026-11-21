@@ -267,6 +267,12 @@ static void bc_run_vm(size_t main_idx) {
         case BC_JMP:
             pc = rd16(mem, pc);
             break;
+        case BC_JTAB: {
+            u16 idx = rd16(mem, sp);
+            sp = (u16)(sp + 2);
+            pc = rd16(mem, (u16)(pc + idx * 2));
+            break;
+        }
         case BC_JZ: {
             u16 target = rd16(mem, pc);
             u16 cond = rd16(mem, sp);

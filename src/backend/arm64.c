@@ -797,6 +797,24 @@ static int a64_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
     return a64_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
 }
 
+static size_t a64_emit_jtab(size_t count) {
+    size_t tbl_off, k;
+    pop_x0();
+    emit32(0x10000081UL); /* ADR X1, +16 */
+    emit32(0xB8A07820UL); /* LDRSW X0, [X1, X0, LSL #2] */
+    emit32(0x8B000020UL); /* ADD X0, X1, X0 */
+    emit32(0xD61F0000UL); /* BR X0 */
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        emit32(0);
+    return tbl_off;
+}
+
+static void a64_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    patch32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
+}
+
 static void a64_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
     u8 top = cb_data()[patch_offset + 3];
@@ -934,6 +952,8 @@ const Backend be_arm64 = {"arm64",
                           a64_cmp_br_fwd,
                           a64_cmp_br_back,
                           a64_patch_fwd,
+                          a64_emit_jtab,
+                          a64_patch_jtab,
                           a64_patch_call,
                           a64_push_fn,
                           a64_patch_fn,

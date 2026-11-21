@@ -515,6 +515,20 @@ static void bc_emit_br_back(BranchCond cond, size_t target_addr) {
 
 static void bc_patch_fwd(size_t patch_offset) { patch16(patch_offset, (u16)cb_cur_addr()); }
 
+static size_t bc_emit_jtab(size_t count) {
+    size_t tbl_off, k;
+    emit8(BC_JTAB);
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        emit16(0);
+    return tbl_off;
+}
+
+static void bc_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    patch16(patch_offset + idx * 2, (u16)target_addr);
+}
+
 static void bc_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
     patch16(call_pc + 1, (u16)target_addr);
@@ -568,6 +582,8 @@ const Backend be_bc = {"bc",
                        NULL,
                        NULL,
                        bc_patch_fwd,
+                       bc_emit_jtab,
+                       bc_patch_jtab,
                        bc_patch_call,
                        bc_push_fn,
                        bc_patch_fn,

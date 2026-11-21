@@ -223,6 +223,22 @@ const CORE_C1 10
 const CORE_C2 32
 const CORE_C3 0x0100
 
+fn test_jtab ( x :i -> :i )
+  var res :i
+  0 -> res
+  x jtab jt_0 jt_1 jt_1 jt_2 end
+  :: jt_0
+    10 -> res
+    jmp jt_done
+  :: jt_1
+    20 -> res
+    \ intentional fallthrough
+  :: jt_2
+    res 5 + -> res
+  :: jt_done
+  res
+end
+
 fn main ( -> :i )
   test_stack
   dup 0 <> if return then drop
@@ -259,4 +275,12 @@ fn main ( -> :i )
   true -1 52 assert_eq
   dup 0 <> if return then drop
   false 0 53 assert_eq
+  dup 0 <> if return then drop
+  0 test_jtab 10 54 assert_eq
+  dup 0 <> if return then drop
+  1 test_jtab 25 55 assert_eq
+  dup 0 <> if return then drop
+  2 test_jtab 25 56 assert_eq
+  dup 0 <> if return then drop
+  3 test_jtab 5 57 assert_eq
 end

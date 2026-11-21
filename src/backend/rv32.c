@@ -200,10 +200,11 @@ static void rv_call(size_t target_addr) {
     emit32(enc_j(diff, RV_RA));
 }
 
-static int rv_tail_call(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
-                        size_t total_locals) {
+static int rv_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+                        const LocalVar *locals, size_t total_locals) {
     i32 diff;
     (void)sig;
+    (void)callee;
     (void)locals;
     (void)total_locals;
     rv_addi(RV_SP, RV_FP, 0);
@@ -865,6 +866,27 @@ static int rv_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
     return rv_cmp_br_emit(op, has_imm, imm, 0, target_addr, NULL);
 }
 
+static size_t rv_emit_jtab(size_t count) {
+    size_t tbl_off, k;
+    pop_reg(RV_T0);
+    emit32(enc_i(2, RV_T0, 1, RV_T0, 0x13UL));          /* SLLI t0, t0, 2 */
+    emit32(0x00000317UL);                                /* AUIPC t1, 0 */
+    emit32(enc_i(24, RV_T1, 0, RV_T1, 0x13UL));          /* ADDI t1, t1, 24 */
+    emit32(enc_r(0x00, RV_T0, RV_T1, 0, RV_T2, 0x33UL)); /* ADD t2, t1, t0 */
+    rv_lw(RV_T0, 0, RV_T2);                              /* LW t0, 0(t2) */
+    emit32(enc_r(0x00, RV_T0, RV_T1, 0, RV_T0, 0x33UL)); /* ADD t0, t1, t0 */
+    emit32(enc_i(0, RV_T0, 0, RV_ZERO, 0x67UL));         /* JALR x0, 0(t0) */
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        emit32(0);
+    return tbl_off;
+}
+
+static void rv_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    patch32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
+}
+
 static void rv_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
     patch32(patch_offset, enc_j(diff, RV_ZERO));
@@ -1015,6 +1037,8 @@ const Backend be_rv32 = {"rv32",
                          rv_cmp_br_fwd,
                          rv_cmp_br_back,
                          rv_patch_fwd,
+                         rv_emit_jtab,
+                         rv_patch_jtab,
                          rv_patch_call,
                          rv_push_fn,
                          rv_patch_fn,

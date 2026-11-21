@@ -235,8 +235,8 @@ typedef struct {
                      size_t total_locals, Bool is_recursive);
     void (*fn_end)(const FuncSig *sig, const LocalVar *locals, size_t total_locals);
     void (*call)(size_t target_addr);
-    int (*tail_call)(size_t target_addr, const FuncSig *sig, const LocalVar *locals,
-                     size_t total_locals);
+    int (*tail_call)(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+                     const LocalVar *locals, size_t total_locals);
     void (*call_extern)(const FuncSig *sig);
 
     void (*push_w)(i32 val);
@@ -262,6 +262,8 @@ typedef struct {
     int (*cmp_br_fwd)(IrOp op, int has_imm, i32 imm, size_t *patch_offset);
     int (*cmp_br_back)(IrOp op, int has_imm, i32 imm, size_t target_addr);
     void (*patch_fwd)(size_t patch_offset);
+    size_t (*emit_jtab)(size_t count);
+    void (*patch_jtab)(size_t patch_offset, size_t idx, size_t count, size_t target_addr);
     void (*patch_call)(size_t call_pc, size_t call_addr, size_t target_addr);
     size_t (*push_fn)(size_t target_addr);
     void (*patch_fn)(size_t patch_pc, size_t patch_addr, size_t target_addr);

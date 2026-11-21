@@ -6,7 +6,7 @@ IR4(th) programs are compiled via a 2-pass direct machine-code compiler (with re
 
 IR4(th) is aimed at language builders as a compiler backend target rather than a language for writing applications directly. While it is expressive enough for hand-written tests and demos, high-level features such as structs, arrays, or records are intentionally out of scope and left to frontend languages.
 
-See [spec.md](spec.md) for the full language specification.
+See [spec.md](spec.md) for the full language specification and the [Lowering Guide](docs/lowering.md) for patterns targeting IR4(th) from a compiler frontend.
 
 This project is based on [hi5](https://github.com/stefanhaustein/hi5), an earlier IR stack language prototype implemented in KMP with Z80 support.
 
