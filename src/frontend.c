@@ -2364,6 +2364,11 @@ static void emit_word(size_t fidx) {
                             i++;
                             break;
                         }
+                    } else if (aop == OP_AND || aop == OP_OR || aop == OP_XOR) {
+                        if (be->bit_imm && be->bit_imm(aop, imm)) {
+                            i++;
+                            break;
+                        }
                     }
                 }
                 be->push_w(ins->u.w);

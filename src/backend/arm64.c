@@ -434,6 +434,25 @@ static void a64_int_cmp(IrOp op, int is32) {
     push_x0();
 }
 
+static int a64_bit_imm(IrOp op, i32 imm) {
+    u32 alu;
+    if (imm < 0 || imm > 65535)
+        return 0;
+    if (op == OP_AND)
+        alu = 0x8A010000UL;
+    else if (op == OP_OR)
+        alu = 0xAA010000UL;
+    else if (op == OP_XOR)
+        alu = 0xCA010000UL;
+    else
+        return 0;
+    emit32(0xF94003E0UL);                        /* LDR X0, [SP] */
+    emit32(0xD2800001UL | ((u32)imm << 5));      /* MOVZ X1, #imm */
+    emit32(alu);                                 /* AND/ORR/EOR X0, X0, X1 */
+    emit32(0xF90003E0UL);                        /* STR X0, [SP] */
+    return 1;
+}
+
 static int a64_mem_imm(IrOp op, i32 off) {
     u32 sz, unscaled_op, scaled_op;
     int is_store = 0;
@@ -905,6 +924,7 @@ const Backend be_arm64 = {"arm64",
                           a64_add_imm,
                           a64_cmp_imm,
                           a64_shift_imm,
+                          a64_bit_imm,
                           a64_mem_imm,
                           NULL,
                           NULL,

@@ -411,6 +411,24 @@ static void rv_int_cmp(IrOp op) {
     push_reg(RV_T0);
 }
 
+static int rv_bit_imm(IrOp op, i32 imm) {
+    u32 f3;
+    if (imm < -2048 || imm > 2047)
+        return 0;
+    if (op == OP_AND)
+        f3 = 7;
+    else if (op == OP_OR)
+        f3 = 6;
+    else if (op == OP_XOR)
+        f3 = 4;
+    else
+        return 0;
+    rv_lw(RV_T0, 0, RV_DSP);
+    emit32(enc_i(imm, RV_T0, f3, RV_T0, 0x13UL)); /* ANDI/ORI/XORI t0, t0, imm */
+    rv_sw(RV_T0, 0, RV_DSP);
+    return 1;
+}
+
 static int rv_mem_imm(IrOp op, i32 off) {
     u32 funct3;
     int is_store = 0;
@@ -972,6 +990,7 @@ const Backend be_rv32 = {"rv32",
                          rv_add_imm,
                          rv_cmp_imm,
                          rv_shift_imm,
+                         rv_bit_imm,
                          rv_mem_imm,
                          NULL,
                          NULL,

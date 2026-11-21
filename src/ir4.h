@@ -250,6 +250,7 @@ typedef struct {
     int (*add_imm)(i32 imm);
     int (*cmp_imm)(IrOp op, i32 imm);
     int (*shift_imm)(IrOp op, u8 count);
+    int (*bit_imm)(IrOp op, i32 imm);
     int (*mem_imm)(IrOp op, i32 off);
     int (*data_mem)(IrOp op, size_t data_offset);
     int (*local_mem)(size_t slot, i32 off, IrOp op, size_t stack_bytes);

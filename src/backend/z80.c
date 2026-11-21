@@ -1774,6 +1774,59 @@ static int z80_shift_imm(IrOp op, u8 count) {
     return 1;
 }
 
+static int z80_bit_imm(IrOp op, i32 imm) {
+    u16 v = (u16)imm;
+    u8 lo = (u8)(v & 0xFF);
+    u8 hi = (u8)(v >> 8);
+    if (op != OP_AND && op != OP_OR && op != OP_XOR)
+        return 0;
+    z80_pop(Z80_POP_HL);
+    if (op == OP_AND) {
+        if (lo == 0)
+            emit8_8(0x2E, 0x00); /* LD L, 0 */
+        else if (lo != 0xFF) {
+            emit8(Z80_LD_A_L);
+            emit8_8(0xE6, lo); /* AND lo */
+            emit8(Z80_LD_L_A);
+        }
+        if (hi == 0)
+            emit8_8(Z80_LD_H_N, 0x00); /* LD H, 0 */
+        else if (hi != 0xFF) {
+            emit8(Z80_LD_A_H);
+            emit8_8(0xE6, hi); /* AND hi */
+            emit8(Z80_LD_H_A);
+        }
+    } else if (op == OP_OR) {
+        if (lo == 0xFF)
+            emit8_8(0x2E, 0xFF); /* LD L, 0xFF */
+        else if (lo != 0) {
+            emit8(Z80_LD_A_L);
+            emit8_8(0xF6, lo); /* OR lo */
+            emit8(Z80_LD_L_A);
+        }
+        if (hi == 0xFF)
+            emit8_8(Z80_LD_H_N, 0xFF); /* LD H, 0xFF */
+        else if (hi != 0) {
+            emit8(Z80_LD_A_H);
+            emit8_8(0xF6, hi); /* OR hi */
+            emit8(Z80_LD_H_A);
+        }
+    } else {
+        if (lo != 0) {
+            emit8(Z80_LD_A_L);
+            emit8_8(0xEE, lo); /* XOR lo */
+            emit8(Z80_LD_L_A);
+        }
+        if (hi != 0) {
+            emit8(Z80_LD_A_H);
+            emit8_8(0xEE, hi); /* XOR hi */
+            emit8(Z80_LD_H_A);
+        }
+    }
+    z80_push(Z80_PUSH_HL);
+    return 1;
+}
+
 static void z80_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
     patch16(call_pc + 1, (u16)target_addr);
@@ -1822,6 +1875,7 @@ const Backend be_z80 = {"z80",
                         z80_add_imm,
                         NULL,
                         z80_shift_imm,
+                        z80_bit_imm,
                         z80_mem_imm,
                         z80_data_mem,
                         z80_local_mem,

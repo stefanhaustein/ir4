@@ -1277,6 +1277,66 @@ static int m6502_data_mem(IrOp op, size_t data_offset) {
     }
 }
 
+static int m6502_bit_imm(IrOp op, i32 imm) {
+    u16 v = (u16)(i16)imm;
+    u8 lo = (u8)(v & 0xFF);
+    u8 hi = (u8)(v >> 8);
+    if (m6502_compact)
+        return 0;
+    if (op == OP_AND) {
+        if (lo == 0) {
+            emit8_8(M6502_LDA_IMM, 0);
+            m6502_sta_stk(0);
+        } else if (lo != 0xFF) {
+            m6502_lda_stk(0);
+            emit8_8(M6502_AND_IMM, lo);
+            m6502_sta_stk(0);
+        }
+        if (hi == 0) {
+            emit8_8(M6502_LDA_IMM, 0);
+            m6502_sta_stk(1);
+        } else if (hi != 0xFF) {
+            m6502_lda_stk(1);
+            emit8_8(M6502_AND_IMM, hi);
+            m6502_sta_stk(1);
+        }
+        return 1;
+    }
+    if (op == OP_OR) {
+        if (lo == 0xFF) {
+            emit8_8(M6502_LDA_IMM, 0xFF);
+            m6502_sta_stk(0);
+        } else if (lo != 0) {
+            m6502_lda_stk(0);
+            emit8_8(M6502_ORA_IMM, lo);
+            m6502_sta_stk(0);
+        }
+        if (hi == 0xFF) {
+            emit8_8(M6502_LDA_IMM, 0xFF);
+            m6502_sta_stk(1);
+        } else if (hi != 0) {
+            m6502_lda_stk(1);
+            emit8_8(M6502_ORA_IMM, hi);
+            m6502_sta_stk(1);
+        }
+        return 1;
+    }
+    if (op == OP_XOR) {
+        if (lo != 0) {
+            m6502_lda_stk(0);
+            emit8_8(M6502_EOR_IMM, lo);
+            m6502_sta_stk(0);
+        }
+        if (hi != 0) {
+            m6502_lda_stk(1);
+            emit8_8(M6502_EOR_IMM, hi);
+            m6502_sta_stk(1);
+        }
+        return 1;
+    }
+    return 0;
+}
+
 static int m6502_mem_imm(IrOp op, i32 off) {
     i32 sz;
     int swapped = (op >= OP_SI8STORE && op <= OP_SFSTORE);
@@ -3111,6 +3171,7 @@ const Backend be_6502 = {"6502",
                          m6502_add_imm,
                          m6502_cmp_imm,
                          m6502_shift_imm,
+                         m6502_bit_imm,
                          m6502_mem_imm,
                          m6502_data_mem,
                          m6502_local_mem,

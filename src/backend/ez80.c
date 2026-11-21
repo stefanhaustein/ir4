@@ -1529,6 +1529,40 @@ static int ez_shift_imm(IrOp op, u8 count) {
     return 0;
 }
 
+static int ez_bit_imm(IrOp op, i32 imm) {
+    u32 v = (u32)imm & 0xFFFFFFUL;
+    if (op != OP_AND && op != OP_OR && op != OP_XOR)
+        return 0;
+    if (v > 0xFF)
+        return 0;
+    ez_pop_hl();
+    if (op == OP_AND) {
+        if (v == 0) {
+            emit8_24(EZ80_LD_HL_N24, 0);
+        } else {
+            emit8(EZ80_LD_A_L);
+            if (v != 0xFF)
+                emit8_8(0xE6, (u8)v); /* AND imm */
+            emit8_24(EZ80_LD_HL_N24, 0);
+            emit8(EZ80_LD_L_A);
+        }
+    } else if (op == OP_OR) {
+        if (v != 0) {
+            emit8(EZ80_LD_A_L);
+            emit8_8(0xF6, (u8)v); /* OR imm */
+            emit8(EZ80_LD_L_A);
+        }
+    } else {
+        if (v != 0) {
+            emit8(EZ80_LD_A_L);
+            emit8_8(0xEE, (u8)v); /* XOR imm */
+            emit8(EZ80_LD_L_A);
+        }
+    }
+    ez_push_hl();
+    return 1;
+}
+
 static int ez_mem_imm(IrOp op, i32 off) {
     (void)op;
     (void)off;
@@ -1767,6 +1801,7 @@ const Backend be_ez80 = {"ez80",
                          ez_add_imm,
                          ez_cmp_imm,
                          ez_shift_imm,
+                         ez_bit_imm,
                          ez_mem_imm,
                          ez_data_mem,
                          ez_local_mem,
