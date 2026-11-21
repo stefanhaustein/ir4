@@ -1,6 +1,6 @@
-# IR4th Lowering Guide
+# IR4(th) Lowering Guide
 
-Practical patterns for compiler and language frontends targeting IR4th. For exact syntax and semantics, see [spec.md](spec.md).
+Practical patterns for compiler and language frontends targeting IR4(th). For exact syntax and semantics, see [spec.md](spec.md).
 
 ## 1. Types & Portability
 
@@ -12,7 +12,7 @@ Practical patterns for compiler and language frontends targeting IR4th. For exac
 
 ## 2. Structs, Arrays & Buffers
 
-IR4th does not have built-in `struct` or array types. Lower them to raw byte allocations (`:bytes`) and constant byte offsets:
+IR4(th) does not have built-in `struct` or array types. Lower them to raw byte allocations (`:bytes`) and constant byte offsets:
 
 - **Global / static structs & arrays:** `var player :bytes 16` or `data ... end`. Accessing `player 4 a+ i16@` folds the offset at compile time into a direct static load on Z80/6502.
 - **Local / stack-allocated structs & arrays:** `var tmp :bytes 16` inside `fn ... end`. Accessing `tmp 4 a+ i16@` fuses into a direct frame-relative load/store (`local_mem`).

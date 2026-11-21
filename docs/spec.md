@@ -1,8 +1,8 @@
-# IR4th Language Specification
+# IR4(th) Language Specification
 
-**IR4th** (*Typed Forth as an Intermediate Representation*) is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as the Z80 and 6502) and constrained embedded systems.
+**IR4(th)** (*Typed Forth as an Intermediate Representation*) is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as the Z80 and 6502) and constrained embedded systems.
 
-IR4th compiles via direct 2-pass machine-code generation (with dead-code elimination) to native Z80, eZ80, 6502, RISC-V (RV32), and ARM64 binaries, as well as portable bytecode for the built-in VM.
+IR4(th) compiles via direct 2-pass machine-code generation (with dead-code elimination) to native Z80, eZ80, 6502, RISC-V (RV32), and ARM64 binaries, as well as portable bytecode for the built-in VM.
 
 ## 1. Lexical Structure
 

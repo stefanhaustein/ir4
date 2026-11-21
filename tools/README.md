@@ -1,6 +1,6 @@
-# IR4th Runtime & Assembly Tooling
+# IR4(th) Runtime & Assembly Tooling
 
-This directory contains generators that convert assembly (and C soft-float) sources into IR4th libraries (`code ... end` in `lib/`) and relocatable runtime headers (`src/`).
+This directory contains generators that convert assembly (and C soft-float) sources into IR4(th) libraries (`code ... end` in `lib/`) and relocatable runtime headers (`src/`).
 
 ## `asm2ir4.py` — Assembly to `.ir4` `code` Libraries
 

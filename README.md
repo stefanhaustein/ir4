@@ -79,7 +79,7 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
   - sim65 (-t sim65) — cc65 simulator
   - [x16](docs/target/x16.md) (-t x16, -t x16-cart) — Commander X16 PRG and banked CRT cartridges
 - **ARM64** (-t arm64) — AArch64 machine code, with `--run` JIT on macOS Apple Silicon
-- **Bytecode VM** (-t bc) — IR4th bytecode, with `--run` in the built-in stack VM
+- **Bytecode VM** (-t bc) — IR4(th) bytecode, with `--run` in the built-in stack VM
 - **eZ80** (-t ez80)
   - [agon](docs/target/agon.md) (-t agon) — Agon Light / Console8 24-bit ADL MOS executables
 - **RISC-V RV32IM** (-t rv32)
