@@ -118,6 +118,9 @@ def main():
             b0 = asm_fn(src, 0x4000, 0x8000, tmpdir)
             b1 = asm_fn(src, 0x4400, 0x8800, tmpdir)
         toks = encode_slice(b0, b1)
+        ret_tok = "0x60 :i8" if args.cpu == "6502" else "0xC9 :i8"
+        if toks and toks[-1] == ret_tok:
+            toks.pop()
         total_bytes += len(b0)
         out_lines.append(f"code {sig}")
         for off in range(0, len(toks), 8):

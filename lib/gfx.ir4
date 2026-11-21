@@ -98,6 +98,9 @@ default fn gfxcolor ( c :i )
   c 7 and -> __gfx_col
 end
 
+\ Set hardware border/overscan color *c* (value returned by gfxrgb; no-op if unsupported)
+default fn gfxborder ( c :i ) end
+
 fn __gfx_emit_cell ( cx :i cy :i val :i )
   cx cy gotoxy
   val 4 u>> fgcolor

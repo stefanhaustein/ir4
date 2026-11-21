@@ -15,6 +15,10 @@ Platform overrides implement the `default fn` entries below.
 
 ## Functions
 
+- **gfxborder** ( c :i )
+
+  Set hardware border/overscan color *c* (value returned by gfxrgb; no-op if unsupported)
+
 - **gfxcharh** ( -> :i )
 
   Character cell height in pixels (default: 2 in ANSI half-block mode)

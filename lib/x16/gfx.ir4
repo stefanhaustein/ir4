@@ -90,6 +90,11 @@ fn gfxrgb ( r :i g :i b :i -> :i )
   16 +
 end
 
+fn gfxborder ( c :i )
+  0 0x9F25 i>a i8!
+  c 0x9F2C i>a i8!
+end
+
 hot fn gfxcolor ( c :i )
   c 255 and -> __x16_col
 end

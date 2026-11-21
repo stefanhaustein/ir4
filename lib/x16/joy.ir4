@@ -29,7 +29,7 @@ code __x16_keyhdl ( )
   \ done (48..53):
   0x68 :i8 0xA8 :i8           \ PLA; TAY
   0x68 :i8 0xAA :i8           \ PLA; TAX
-  0x68 :i8 0x60 :i8           \ PLA; RTS
+  0x68 :i8                    \ PLA (RTS implied)
   \ bit_tbl (54..61):
   1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8
   \ keys_buf (62..77): 16 zero bytes
@@ -64,7 +64,6 @@ code __x16_joy_get ( port :i -> :i )
   0xA5 :i8 0x03 :i8         \ LDA $03 (byte1)
   0x49 :i8 0xFF :i8         \ EOR #$FF (invert byte1)
   0x9D :i8 1 :as            \ STA 1,X
-  0x60 :i8                  \ RTS
 end
 
 fn joycount ( -> :i ) 5 end

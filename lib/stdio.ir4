@@ -118,6 +118,29 @@ fn typeh ( n :i )
   n w typeh_w
 end
 
+\ Print *n* as *w* zero-padded binary digits
+fn typeb_w ( n :i w :i )
+  begin
+    w 0 >
+  while
+    -1 +-> w
+    n w u>> 1 and 48 + xemit
+  repeat
+end
+
+\ Print *n* as minimal binary
+fn typeb ( n :i )
+  n -> var t :i
+  1 -> var w :i
+  begin
+    t 1 u>
+  while
+    t 1 u>> -> t
+    1 +-> w
+  repeat
+  n w typeb_w
+end
+
 \ Clear screen and home cursor (ANSI default)
 default fn cls ( )
   27 emit 91 emit 50 emit 74 emit

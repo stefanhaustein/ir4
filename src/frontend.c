@@ -487,6 +487,17 @@ static int parse_int(const char *s, i32 *val) {
         p++;
         if (*p == '\0')
             return 0;
+    } else if ((p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) ||
+               ((p[0] == '-' || p[0] == '+') && p[1] == '0' &&
+                (p[2] == 'b' || p[2] == 'B'))) {
+        int neg = (p[0] == '-');
+        p += (p[0] == '-' || p[0] == '+') ? 3 : 2;
+        if (*p == '\0')
+            return 0;
+        *val = (i32)strtol(p, &endp, 2);
+        if (neg)
+            *val = -*val;
+        return (*endp == '\0');
     } else {
         if (*p == '-' || *p == '+')
             p++;
@@ -2376,20 +2387,12 @@ static Bool can_reach_func(size_t cur, size_t target, Bool *visited) {
 static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     FuncSig *sig = funcs.data[fidx];
     WordIR *cw = words.data[fidx];
-    u8 ret_op;
-    size_t len;
-    if (!cw->is_code || !sig->is_hot || cw->ir_len <= 1)
+    if (!cw->is_code || !sig->is_hot || cw->ir_len == 0 || cw->ir_len > HOT_CODE_INLINE_MAX)
         return 0;
-    if (strcmp(be->name, "6502") == 0)
-        ret_op = 0x60;
-    else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
-        ret_op = 0xC9;
-    else
+    if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "z80") != 0 &&
+        strcmp(be->name, "ez80") != 0)
         return 0;
-    len = cw->ir_len - 1;
-    if (len > HOT_CODE_INLINE_MAX || raw_code_buf.data[cw->ir_start + len] != ret_op)
-        return 0;
-    *out_len = len;
+    *out_len = cw->ir_len;
     return 1;
 }
 
@@ -2505,6 +2508,12 @@ static void emit_word(size_t fidx) {
         sig->addr = be->cur_addr();
         sig->has_addr = 1;
         emit_raw_code_block(w->ir_start, w->ir_len, w->reloc_start, w->reloc_cnt);
+        if (strcmp(be->name, "6502") == 0)
+            emit8(0x60); /* RTS */
+        else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
+            emit8(0xC9); /* RET */
+        else
+            ir4_die("'code' is not supported on this backend");
         return;
     }
 

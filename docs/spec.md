@@ -14,22 +14,22 @@ IR4th compiles via direct 2-pass machine-code generation (with dead-code elimina
 ### 1.2 Lexical Categories
 * **Type Tokens (`TYPE`):** Any token starting with a leading colon (`:`) is strictly a type specifier (`:i`, `:i32`, `:a`, `:f`).
 * **Keywords:** Reserved syntax and control-flow tokens (`fn`, `default`, `hot`, `const`, `fwd`, `init`, `code`, `inline`, `end`, `require`, `extern`, `var`, `:bytes`, `data`, `:i8`, `:i16`, `:i32`, `align`, `->`, `+->`, `&`, `__heap_start`, `return`, `if`, `else`, `then`, `begin`, `while`, `repeat`, `::`, `jmp`, `jz`, `jtab`, `(`, `)`).
-* **Numeric Literals:** Decimal (`0`, `42`, `-10`), hexadecimal (`0xFF`, `$4000`), or floating-point (`3.14`, `-0.5`).
+* **Numeric Literals:** Decimal (`0`, `42`, `-10`), hexadecimal (`0xFF`, `$4000`), binary (`0b10110000`), or floating-point (`3.14`, `-0.5`).
 * **Identifiers (`IDENT`):** Any non-numeric token without a leading colon that is not a keyword.
 
-## 2. Type System (v0.3)
+## 2. Type System 
 
-IR4th v0.3 defines **four stack types** on a **single unified stack** with **explicitly typed operators** (no operator overloading). Nothing smaller than a native machine word `:i` exists on the stack; byte- and 16-bit memory accesses (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) implicitly widen to and truncate from `:i`.
+IR4(th) defines **four stack types** on a **single unified stack** with **explicitly typed operators** (no operator overloading). Nothing smaller than a native machine word `:i` exists on the stack; byte- and 16-bit memory accesses (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) implicitly widen to and truncate from `:i`.
 
 | Type Token | Name | Width & Semantics | Z80 / 6502 | eZ80 (ADL) | ARM32 / RISC-V32 | ARM64 / x86-64 / VM |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`:i`** | Native Word | Target-native signed integer (`isize`) | 2 bytes (`i16`) | 3 bytes (`i24`) | 4 bytes (`i32`) | 8 bytes (`i64`) |
+| **`:i`** | Native Word | Target-native signed integer (`size_i` bytes) | 2 bytes (`i16`) | 3 bytes (`i24`) | 4 bytes (`i32`) | 8 bytes (`i64`) |
 | **`:i32`** | 32-bit Integer | Fixed-width 32-bit integer | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`, 8-byte slot) |
-| **`:a`** | Address | Target-width memory pointer (`usize`) | 2 bytes (`u16`) | 3 bytes (`u24`) | 4 bytes (`u32`) | 8 bytes (`u64`) |
-| **`:f`** | Float | Target-native floating-point | **6 bytes** (Z80) / **4 bytes** (6502) | **4 bytes** (IEEE-754 `binary32`) | **4 bytes** (IEEE-754 `binary32`) | **8 bytes** (IEEE-754 `binary64`) |
+| **`:a`** | Address | Target-width memory pointer (`size_a` bytes) | 2 bytes (`u16`) | 3 bytes (`u24`) | 4 bytes (`u32`) | 8 bytes (`u64`) |
+| **`:f`** | Float | Target-native floating-point (`size_f` bytes) | **6 bytes** (Z80) / **4 bytes** (6502) | **4 bytes** (IEEE-754 `binary32`) | **4 bytes** (IEEE-754 `binary32`) | **8 bytes** (IEEE-754 `binary64`) |
 
 ### 2.1 Literal Typing Rules
-* **Bare Integer Literals** (`0`, `1`, `-42`, `0x10`, `$FF`) implicitly default to **`:i`**.
+* **Bare Integer Literals** (`0`, `1`, `-42`, `0x10`, `$FF`, `0b1010`) implicitly default to **`:i`**.
 * **Bare Floating-Point Literals** (`3.14`, `-0.5`, `1e-3` — containing `.` or `e`/`E`) implicitly default to **`:f`**.
 * **Built-in Boolean Constants:** `true` (`-1`) and `false` (`0`) are predefined `:i` constants.
 * **Literal Cast Folding:** Applying `i>i32`, `i>u32`, or `i>a` directly to an integer literal (e.g., `100000 i>i32`, `0x0400 i>a`) folds to a single `:i32` or `:a` push at compile time.
@@ -60,7 +60,7 @@ end
 * **Initialization Blocks (`init ... end`):**
   * One or more top-level `init ... end` blocks may be defined across the program and `require`d modules. Each behaves as an anonymous void function (`( )`) and runs once in source order before `main`.
 * **Machine-Code Words (`code ... end`):**
-  * `code <name> ( <inputs> -> <outputs> ) <bytes> end` defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), and `:as` (16-bit address relative to the 6502 data stack buffer), following the target's `call` / `return` convention.
+  * `code <name> ( <inputs> -> <outputs> ) <bytes> end` defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), and `:as` (16-bit address relative to the 6502 data stack buffer), following the target's `call` / `return` convention. On 6502 and Z80/eZ80, `end` implicitly emits `RTS` (`0x60`) / `RET` (`0xC9`) when the word is emitted out-of-line, and omits it when `hot code` is inlined into a caller.
 * **Inline Machine Code (`inline ... end`):**
   * Inside a `fn` or `init` body, `inline <bytes> end` emits raw machine code bytes directly in place using the same `:i8`, `:i16`, `:i32`, `:ar` (relative to the start of the `inline` block), and `:as` tokens as `code`. It is assumed to be stack-neutral (`( -> )`) with respect to the static data stack, acts as an optimization/peephole fence, keeps the enclosing function native, and is not supported on the bytecode target (`-t bc`).
 

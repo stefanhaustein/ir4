@@ -19,15 +19,17 @@ data s_rpar   "):" 0 :i8 end
 data s_hash   "  #" 0 :i8 end
 data s_colon  ": " 0 :i8 end
 data s_mid    "b (" 0 :i8 end
-data s_tick   "Tick:  " 0 :i8 end
+data s_tick   "Tick: " 0 :i8 end
 data s_hexp   " ($" 0 :i8 end
 data s_pad4   ")    " 0 :i8 end
-data s_inkey  "Inkey: $" 0 :i8 end
+data s_inkey  "Inkey:  $" 0 :i8 end
+data s_xinkey "XInkey: $" 0 :i8 end
 data s_cnt    " cnt=" 0 :i8 end
 data s_sp4    "    " 0 :i8 end
-data s_jkbd   "Joy Kbd: $" 0 :i8 end
+data s_jkbd   "Joy Kbd: " 0 :i8 end
 data s_jhw    "Joy #" 0 :i8 end
-data s_jcol   " : $" 0 :i8 end
+data s_jcol   " : " 0 :i8 end
+data s_jhdr   "         4321RLDU" 0 :i8 end
 data s_chdr   "   0123456789ABCDEF 0123456789ABCDEF" 0 :i8 end
 data s_chdr_n "0123456789ABCDEF0123456789ABCDEF" 0 :i8 end
 data s_emit   ":emit " 0 :i8 end
@@ -48,7 +50,7 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i )
   narrow 0 = if 32 emit then
   66 print_key s_colk type0 6 fgcolor bg 2 typeh_w 7 fgcolor 32 emit
   narrow 0 = if 32 emit then
-  67 print_key
+  88 print_key
   6 fgcolor
   use_x if s_xemit else s_emit then type0
   7 fgcolor
@@ -85,19 +87,19 @@ fn draw_static ( use_x :i fg :i bg :i -> :i )
 
   4 use_x fg bg draw_charset
 
-  0 9 gotoxy
+  0 10 gotoxy
   s_sfx type0 sfxcount typei
   s_joy type0 joycount typei
 
-  0 10 gotoxy
+  0 11 gotoxy
   s_spr type0 sprcount typei s_slots type0
   sprmaxw typei 120 emit sprmaxh typei 32 emit
   sprdepth typei s_bpp type0
 
   gfxmodes -> var nmodes :i -> var mptr :a
-  0 11 gotoxy
+  0 13 gotoxy
   s_modes type0 nmodes typei s_rpar type0
-  12 -> var row :i
+  14 -> var row :i
   0 -> var i :i
   begin i nmodes < i 4 < and while
     0 row gotoxy
@@ -129,11 +131,11 @@ fn main ( )
   0 -> var use_x :i
   7 -> var fg :i
   0 -> var bg :i
-  use_x fg bg draw_static -> var row :i
+  use_x fg bg draw_static -> var r_joy :i
 
-  row -> var r_tick :i
-  row 1 + -> var r_key :i
-  row 2 + -> var r_joy :i
+  0 r_joy gotoxy
+  7 fgcolor
+  s_jhdr type0
 
   0 -> var last_k :i
   0 -> var prev_k :i
@@ -143,17 +145,16 @@ fn main ( )
 
   begin 1 while
     gfxticks -> var t :i
-    7 fgcolor
-    0 r_tick gotoxy
-    s_tick type0 6 fgcolor t typei s_hexp type0 t 4 typeh_w s_pad4 type0 7 fgcolor
+    16 10 gotoxy
+    7 fgcolor s_tick type0 6 fgcolor t typei 7 fgcolor
 
-    xinkey -> var k :i
+    use_x if xinkey else inkey then -> var k :i
     k 0 <> k prev_k <> and if
       k 113 = k 81 = or if
-        0 r_joy jc 1 + + gotoxy
+        0 r_joy jc 2 + + gotoxy
         return
       then
-      k 99 = k 67 = or if
+      k 120 = k 88 = or if
         1 use_x xor -> use_x
         4 use_x fg bg draw_charset
       then
@@ -169,15 +170,16 @@ fn main ( )
       1 +-> key_cnt
     then
     k -> prev_k
-    0 r_key gotoxy
-    s_inkey type0 6 fgcolor last_k 2 typeh_w 32 emit 40 emit
+    0 9 gotoxy
+    use_x if s_xinkey else s_inkey then type0
+    6 fgcolor last_k 2 typeh_w 32 emit 40 emit
     last_k 32 >= last_k 126 <= and if last_k xemit else 46 emit then
-    41 emit s_cnt type0 key_cnt typei s_sp4 type0 7 fgcolor
+    41 emit s_cnt type0 key_cnt typei 7 fgcolor
     13 emit
 
     -1 -> var p :i
     begin p jc < while
-      0 r_joy p 1 + + gotoxy
+      0 r_joy p 2 + + gotoxy
       p -1 = if
         s_jkbd type0
       else
@@ -185,8 +187,7 @@ fn main ( )
       then
       p joystate -> var j :i
       6 fgcolor
-      j 2 typeh_w 32 emit
-      j print_joy_bits
+      j 8 typeb_w s_hexp type0 j 2 typeh_w 41 emit
       7 fgcolor
       1 +-> p
     repeat

@@ -28,16 +28,16 @@ var __c64_bg :i
 
 \ Map RAM underneath KERNAL ROM ($E000-$FFFF) with IRQs disabled
 hot code __c64_ram_on ( )
-  0x78 :i8 0xA9 :i8 0x35 :i8 0x85 :i8 0x01 :i8 0x60 :i8
+  0x78 :i8 0xA9 :i8 0x35 :i8 0x85 :i8 0x01 :i8
 end
 
 hot code __c64_ram_off ( )
-  0xA9 :i8 0x36 :i8 0x85 :i8 0x01 :i8 0x58 :i8 0x60 :i8
+  0xA9 :i8 0x36 :i8 0x85 :i8 0x01 :i8 0x58 :i8
 end
 
 \ Map Character ROM at $D000-$DFFF with IRQs disabled
 hot code __c64_char_on ( )
-  0x78 :i8 0xA9 :i8 0x32 :i8 0x85 :i8 0x01 :i8 0x60 :i8
+  0x78 :i8 0xA9 :i8 0x32 :i8 0x85 :i8 0x01 :i8
 end
 
 fn gfxmodes ( -> :a :i )
@@ -87,6 +87,10 @@ end
 
 hot fn gfxcolor ( c :i )
   c 15 and -> __c64_col
+end
+
+fn gfxborder ( c :i )
+  c 15 and 0xD020 i>a i8!
 end
 
 fn gfxclear ( )

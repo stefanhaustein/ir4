@@ -4,9 +4,10 @@ Practical patterns for compiler and language frontends targeting IR4th. For exac
 
 ## 1. Types & Portability
 
-- **`:i` (native word):** 16-bit on Z80/6502, 24-bit on eZ80, 32-bit on RV32, 64-bit on ARM64. Use `:i` for loop counters, small integers, booleans (`true` = `-1`, `false` = `0`), and `jtab` indices.
+- **`:i` (native word):** 16-bit on Z80/6502, 24-bit on eZ80, 32-bit on RV32, 64-bit on ARM64 (`size_i` bytes). Use `:i` for loop counters, small integers, booleans (`true` = `-1`, `false` = `0`), and `jtab` indices.
 - **`:i32` (fixed 32-bit):** Use when language semantics require 32-bit wraparound or range across 8/16-bit targets.
-- **`:a` (address):** Use for all pointers. Pointer arithmetic uses `a+`, `a-`, and `adiff`.
+- **`:a` (address):** Target pointer (`size_a` bytes). Pointer arithmetic uses `a+`, `a-`, and `adiff`.
+- **`:f` (float):** Target float (`size_f` bytes).
 - **Literal folding:** Casting an integer literal with `i>a`, `i>i32`, or `u>i32` folds at compile time with zero runtime cost.
 
 ## 2. Structs, Arrays & Buffers
@@ -60,8 +61,8 @@ Lower `switch` based on case density:
 - **Sparse cases:** Lower to a chain of `dup <const> = if drop ... jmp sw_done then` (or binary search), which uses `cmp_br_fwd` directly.
 - **Dispatch / vtables across functions:** Store `& fn_name` entries in a `data ... end` block, scale the index by `size_a` (pointer width in bytes), load with `a@`, and invoke via typed indirect call `( <inputs> -> <outputs> )`.
 
-## 6. Constants & Platform Abstraction
+## 6. Platform Abstraction
 
 - Emit `const NAME VALUE` for compile-time `:i` or `:f` constants; they participate in constant folding and immediate instruction fusion (`add_imm`, `bit_imm`, `cmp_imm`, `shift_imm`).
-- Use built-in `size_i`, `size_a`, `size_f` for type widths and `target_<name>` (`true`/`false`) for target/platform checks.
+- Use built-in `target_<name>` (`true`/`false`) for target/platform checks.
 - Use `default const` and `default fn` in portable libraries so target-specific `require` overrides can specialize them cleanly.

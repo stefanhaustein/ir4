@@ -44,6 +44,8 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **termwidth** ( -> :i ) — Return terminal width in columns (default: 80)
 - **type** ( s :a len :i ) — Print *len* bytes starting at *s*
 - **type0** ( s :a ) — Print NUL-terminated string at *s*
+- **typeb** ( n :i ) — Print *n* as minimal binary
+- **typeb_w** ( n :i w :i ) — Print *n* as *w* zero-padded binary digits
 - **typeh** ( n :i ) — Print *n* as minimal uppercase hex
 - **typeh_w** ( n :i w :i ) — Print *n* as *w* zero-padded uppercase hex digits
 - **typei** ( n :i ) — Print *n* as signed decimal
