@@ -207,6 +207,7 @@ begin
   IntToStrSimple := s;
 end;
 
+{ Reinterpret IEEE-754 Single bits as a 32-bit signed integer. }
 function FloatToBits(f: Single): LongInt;
 var
   fb: TFloatBits;
@@ -280,6 +281,7 @@ begin
   buf[off + 3] := Byte((v shr 24) and $FF);
 end;
 
+{ Zero-initialized allocation in dataBuf; updates dataLen (BSS) without advancing dataInitSize. }
 function AllocData(sz: Cardinal; align: Cardinal): Cardinal;
 var
   aligned, newLen, i: Cardinal;
@@ -385,6 +387,7 @@ begin
   Emit32(EncS(off, rs2, rs1, 2));
 end;
 
+{ Load a 32-bit constant into rd using ADDI when 12-bit signed, else LUI+ADDI. }
 procedure RvLi(rd: Cardinal; val: Cardinal);
 var
   sval: LongInt;
@@ -403,6 +406,7 @@ begin
   end;
 end;
 
+{ Push/pop 32-bit integer or float values on the dedicated data stack (s1). }
 procedure PushReg(r: Cardinal);
 begin
   RvAddi(RV_DSP, RV_DSP, -4);
@@ -492,6 +496,7 @@ begin
   IsSpaceChar := (c = 32) or (c = 9) or (c = 10) or (c = 13) or (c = 11) or (c = 12);
 end;
 
+{ Advance past whitespace and '\' line comments; pops finished required files on EOF. }
 function SkipWsAndComments: Integer;
 var
   c, c2, curIdx: Integer;
@@ -661,6 +666,7 @@ begin
   ResolveRelPath := JoinPath(dir, rel);
 end;
 
+{ Resolve 'require' candidates (virt -> rv32 -> generic) and push least-specific first onto the LIFO stack. }
 procedure PushRequire(const name: TPathStr);
 var
   cands: array[0..3] of TPathStr;
@@ -756,6 +762,7 @@ begin
   ReadRequirePath := ReadQuoted(srcStack[srcDepth - 1], 'unterminated filename in ''require''');
 end;
 
+{ Parse decimal, 0x/$ hex, or 0b binary integer literals. }
 function ParseInt(const s: string; var outVal: LongInt): Boolean;
 var
   p, code: Integer;
@@ -979,6 +986,7 @@ begin
   PushReg(RV_T0);
 end;
 
+{ Emit LUI+ADDI placeholder for s2-relative __heap_start; patched by PatchForwardRefs. }
 procedure EmitPushHeapStart;
 begin
   if heapRelocCount >= MAX_HRELOCS then Die('too many __heap_start references');
@@ -990,6 +998,7 @@ begin
   PushReg(RV_T0);
 end;
 
+{ Emit SLT/SLTU comparison returning IR4(th) boolean (-1 or 0). }
 procedure EmitCmp(f3: Cardinal; swapOps, invert: Boolean);
 begin
   if swapOps then begin
@@ -1005,6 +1014,7 @@ begin
   PushReg(RV_T0);
 end;
 
+{ Emit equality/inequality comparison via SUB + SLTIU/SLTU returning -1 or 0. }
 procedure EmitEqNe(isNe: Boolean);
 begin
   PopReg(RV_T1);
@@ -1032,6 +1042,7 @@ begin
   PushReg(RV_T0);
 end;
 
+{ Load or store a local variable relative to fp, using t1 as scratch for large offsets. }
 procedure EmitLocalMem(isStore: Boolean; reg: Cardinal; off: LongInt);
 begin
   if (off >= -2048) and (off <= 2047) then begin
@@ -1190,6 +1201,7 @@ const
     (name: 'i32!'; ty: tyI32; f3: 2)
   );
 
+{ Match and emit RV32 code for built-in stack, ALU, comparison, FP, and memory words. }
 function HandleBuiltin(const tok: TShortName): Boolean;
 var
   i: Integer;
@@ -1344,6 +1356,7 @@ end;
 
 { --- Signatures, Locals, Control Flow & Word Body --- }
 
+{ Parse '( inputs -> outputs )' signature; optionally records named input parameters as locals. }
 procedure ParseSigBody(var sig: TFuncSig; recordLocals: Boolean);
 var
   tok, prevName: TShortName;
@@ -1485,6 +1498,7 @@ begin
   RvSw(RV_T0, 0, RV_T1);
 end;
 
+{ Handle '&' (address-of) and '+->' (add-assign) for locals, globals, and function pointers. }
 function HandleVarOp(const tok: TShortName): Boolean;
 var
   ident: TShortName;
@@ -1570,6 +1584,7 @@ begin
     HandleVarOp := False;
 end;
 
+{ Handle structured control flow (if/else/then, begin/while/repeat, return) and labels (::/jmp/jz/jtab). }
 function HandleControlFlow(const tok: TShortName; var unreachable: Boolean): Boolean;
 var
   bi, lidx, cnt, k: Integer;
@@ -1747,8 +1762,10 @@ begin
     HandleControlFlow := False;
 end;
 
+{ Parse raw machine-code bytes (:i8, :i16, :i32, :ar) until 'end'. }
 procedure ParseRawCodeBody; forward;
 
+{ Compile a function body in one pass; patches prologue frame size and label branches at 'end'. }
 procedure CompileWordBody(paramCnt: Integer);
 var
   tok: TShortName;
@@ -1964,6 +1981,7 @@ end;
 
 { --- Top-Level Directives --- }
 
+{ Parse raw machine-code bytes (:i8, :i16, :i32, :ar) until 'end'. }
 procedure ParseRawCodeBody;
 var
   tok: TShortName;
@@ -2016,6 +2034,7 @@ begin
   Die('unexpected EOF in raw code (missing ''end'')');
 end;
 
+{ Compile a 'code ... end' machine-code word and append RV32 RET (JALR x0, 0(ra)). }
 procedure CompileCode;
 var
   name, tok: TShortName;
@@ -2073,6 +2092,7 @@ begin
   Emit32($00008067); { RET (JALR x0, 0(ra)) }
 end;
 
+{ Compile a 'fn ... end' definition, resolving 'fwd', 'default', and require-rank overrides. }
 procedure CompileWord(isDefault: Boolean);
 var
   name, tok: TShortName;
@@ -2209,6 +2229,7 @@ begin
   end;
 end;
 
+{ Compile a 'data ... end' block with strings, typed literals, 'align', and '&' relocations. }
 procedure CompileData;
 var
   name, tok, s: TShortName;
@@ -2414,6 +2435,7 @@ end;
 
 { --- ELF32 virt Stub & Output --- }
 
+{ Patch forward function calls, '& fn' AUIPC+ADDI pairs, and __heap_start references. }
 procedure PatchForwardRefs(heapOff: Cardinal);
 var
   i: Integer;
@@ -2440,6 +2462,7 @@ begin
   end;
 end;
 
+{ Emit the QEMU virt startup stub (enable FPU, init sp/s1/s2, run inits+main, print/exit) and ELF32 file. }
 procedure WriteVirtELF(const outPath: TPathStr);
 var
   mainIdx, i: Integer;
