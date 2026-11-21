@@ -1808,6 +1808,388 @@ static int parse_local_var(int allow_bytes) {
     return (int)slot;
 }
 
+static int handle_var_op(const char *tok, WordIR *w) {
+    IrInstr *ins;
+    int idx;
+
+    if (strcmp(tok, "&") == 0) {
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected identifier after '&'");
+        idx = find_local(tok);
+        if (idx >= 0) {
+            LocalVar *lv = &locals.data[idx];
+            if (lv->size > 0)
+                ir4_die("':bytes' local is already an address");
+            ins = emit_ir(IR_LOCAL_OP, w);
+            ins->u.loc.op = LOCAL_ADDR;
+            ins->u.loc.slot = lv->slot;
+            ins->u.loc.type = lv->type;
+            ins->u.loc.stack_bytes = tstack_bytes();
+            tpush(TY_A);
+            return 1;
+        }
+        idx = find_buffer(tok);
+        if (idx >= 0) {
+            BufferSym *bs = buffers.data[idx];
+            if (bs->type == TY_NONE)
+                ir4_die("':bytes' or 'data' symbol is already an address");
+            ins = emit_ir(IR_PUSH_DATA, w);
+            ins->u.offset = bs->offset;
+            tpush(TY_A);
+            return 1;
+        }
+        idx = ir4_find_func(tok);
+        if (idx >= 0) {
+            if (funcs.data[idx]->is_extern)
+                ir4_die("cannot take address of 'extern' function");
+            ins = emit_ir(IR_PUSH_FN, w);
+            ins->u.func_idx = (size_t)idx;
+            tpush(TY_A);
+            return 1;
+        }
+        ir4_die("unknown variable or function in '&'");
+    }
+
+    if (strcmp(tok, "+->") == 0) {
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected identifier after '+->'");
+        idx = find_local(tok);
+        if (idx >= 0) {
+            LocalVar *lv = &locals.data[idx];
+            StackType dt = (lv->type == TY_A) ? TY_W : lv->type;
+            if (lv->size > 0)
+                ir4_die("cannot '+->' to ':bytes' local");
+            tpop_expect(dt);
+            if (lv->type == TY_W || lv->type == TY_A) {
+                ins = emit_ir(IR_LOCAL_OP, w);
+                ins->u.loc.op = LOCAL_ADD;
+                ins->u.loc.slot = lv->slot;
+                ins->u.loc.type = lv->type;
+                ins->u.loc.stack_bytes = tstack_bytes();
+            } else {
+                ins = emit_ir(IR_LOCAL_OP, w);
+                ins->u.loc.op = LOCAL_GET;
+                ins->u.loc.slot = lv->slot;
+                ins->u.loc.type = lv->type;
+                ins->u.loc.stack_bytes = tstack_bytes() + 4;
+                ins = emit_ir(IR_ALU_OP, w);
+                ins->u.op = (lv->type == TY_F) ? OP_FADD : OP_ADD32;
+                ins = emit_ir(IR_LOCAL_OP, w);
+                ins->u.loc.op = LOCAL_SET;
+                ins->u.loc.slot = lv->slot;
+                ins->u.loc.type = lv->type;
+                ins->u.loc.stack_bytes = tstack_bytes();
+            }
+            return 1;
+        }
+        idx = find_buffer(tok);
+        if (idx < 0)
+            ir4_die("unknown variable in '+->'");
+        {
+            BufferSym *bs = buffers.data[idx];
+            StackType dt;
+            if (bs->type == TY_NONE)
+                ir4_die("cannot '+->' to ':bytes' or 'data' symbol");
+            dt = (bs->type == TY_A) ? TY_W : bs->type;
+            tpop_expect(dt);
+            ins = emit_ir(IR_PUSH_DATA, w);
+            ins->u.offset = bs->offset;
+            ins = emit_ir(IR_STACK_OP, w);
+            ins->u.stk.op = OP_SWAP;
+            ins->u.stk.t1 = dt;
+            ins->u.stk.t2 = TY_A;
+            ins = emit_ir(IR_PUSH_DATA, w);
+            ins->u.offset = bs->offset;
+            ins = emit_ir(IR_ALU_OP, w);
+            ins->u.op = (bs->type == TY_F) ? OP_FETCH :
+                        (bs->type == TY_I32) ? OP_FETCH :
+                        (bs->type == TY_A) ? OP_AFETCH : OP_FETCH;
+            if (bs->type == TY_A) {
+                ins = emit_ir(IR_STACK_OP, w);
+                ins->u.stk.op = OP_SWAP;
+                ins->u.stk.t1 = TY_W;
+                ins->u.stk.t2 = TY_A;
+            }
+            ins = emit_ir(IR_ALU_OP, w);
+            ins->u.op = (bs->type == TY_F) ? OP_FADD :
+                        (bs->type == TY_I32) ? OP_ADD32 :
+                        (bs->type == TY_A) ? OP_AADD : OP_ADD;
+            ins = emit_ir(IR_STACK_OP, w);
+            ins->u.stk.op = OP_SWAP;
+            ins->u.stk.t1 = TY_A;
+            ins->u.stk.t2 = bs->type;
+            ins = emit_ir(IR_ALU_OP, w);
+            ins->u.op = global_store_op(bs->type);
+        }
+        return 1;
+    }
+
+    if (strcmp(tok, "->") == 0) {
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected identifier after '->'");
+        idx = (strcmp(tok, "var") == 0) ? parse_local_var(0) : find_local(tok);
+        if (idx >= 0) {
+            LocalVar *lv = &locals.data[idx];
+            if (lv->size > 0)
+                ir4_die("cannot assign to ':bytes' local");
+            tpop_expect(lv->type);
+            if ((lv->type == TY_W || lv->type == TY_A) && w->ir_len >= fold_fence + 3) {
+                IrInstr *p0 = &ir_buf.data[w->ir_start + w->ir_len - 3];
+                IrInstr *p1 = p0 + 1;
+                IrInstr *p2 = p0 + 2;
+                if (p0->kind == IR_LOCAL_OP && p0->u.loc.op == LOCAL_GET &&
+                    p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
+                    p2->kind == IR_ALU_OP &&
+                    (p2->u.op == OP_ADD || p2->u.op == OP_SUB ||
+                     p2->u.op == OP_AADD || p2->u.op == OP_ASUB)) {
+                    i32 delta = (p2->u.op == OP_SUB || p2->u.op == OP_ASUB)
+                                    ? (i32)(0 - (u32)p1->u.w)
+                                    : p1->u.w;
+                    p0->kind = IR_PUSH_W;
+                    p0->u.w = delta;
+                    p1->kind = IR_LOCAL_OP;
+                    p1->u.loc.op = LOCAL_ADD;
+                    p1->u.loc.slot = lv->slot;
+                    p1->u.loc.type = lv->type;
+                    p1->u.loc.stack_bytes = tstack_bytes();
+                    w->ir_len--;
+                    ir_buf.len--;
+                    return 1;
+                }
+            }
+            ins = emit_ir(IR_LOCAL_OP, w);
+            ins->u.loc.op = LOCAL_SET;
+            ins->u.loc.slot = lv->slot;
+            ins->u.loc.type = lv->type;
+            ins->u.loc.stack_bytes = tstack_bytes();
+            return 1;
+        }
+        idx = find_buffer(tok);
+        if (idx < 0)
+            ir4_die("unknown variable in '->'");
+        {
+            BufferSym *bs = buffers.data[idx];
+            if (bs->type == TY_NONE)
+                ir4_die("cannot assign to ':bytes' or 'data' symbol");
+            tpop_expect(bs->type);
+            ins = emit_ir(IR_PUSH_DATA, w);
+            ins->u.offset = bs->offset;
+            ins = emit_ir(IR_ALU_OP, w);
+            ins->u.op = global_store_op(bs->type);
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
+static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
+                               LabelVec *labels, LabelRefVec *label_refs) {
+    IrInstr *ins;
+
+    if (strcmp(tok, "return") == 0) {
+        if (!*unreachable) {
+            check_return_stack();
+            emit_ir(IR_FN_END, w);
+            *unreachable = 1;
+        }
+        return 1;
+    }
+    if (strcmp(tok, "if") == 0) {
+        BlockInfo *b;
+        tpop_expect(TY_W);
+        b = NEW(BlockInfo);
+        VEC_PUSH(blocks, b);
+        b->kind = BLOCK_IF;
+        b->has_else = 0;
+        b->saved_unreach = *unreachable;
+        b->if_unreach = 0;
+        stack_copy(&b->saved_stack, &tstack);
+        b->patch_else = w->ir_len;
+        ins = emit_ir(IR_BR_FWD, w);
+        ins->u.br.cond = BR_JZ;
+        return 1;
+    }
+    if (strcmp(tok, "else") == 0) {
+        BlockInfo *b;
+        if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_IF)
+            ir4_die("'else' without 'if'");
+        b = blocks.data[blocks.len - 1];
+        b->has_else = 1;
+        b->if_unreach = *unreachable;
+        stack_copy(&b->else_stack, &tstack);
+        stack_copy(&tstack, &b->saved_stack);
+        *unreachable = b->saved_unreach;
+        b->patch_end = w->ir_len;
+        ins = emit_ir(IR_BR_FWD, w);
+        ins->u.br.cond = BR_JMP;
+        ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
+        fold_fence = w->ir_len;
+        return 1;
+    }
+    if (strcmp(tok, "then") == 0) {
+        BlockInfo *b;
+        if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_IF)
+            ir4_die("'then' without 'if'");
+        b = blocks.data[--blocks.len];
+        if (!b->has_else) {
+            if (!*unreachable && !stack_eq(&tstack, &b->saved_stack))
+                ir4_die("unbalanced stack in 'if ... then'");
+            stack_copy(&tstack, &b->saved_stack);
+            *unreachable = b->saved_unreach;
+            ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
+        } else {
+            if (!b->if_unreach && !*unreachable) {
+                if (!stack_eq(&tstack, &b->else_stack))
+                    ir4_die("branch stack mismatch between 'if' and 'else'");
+            } else if (!b->if_unreach && *unreachable) {
+                stack_copy(&tstack, &b->else_stack);
+                *unreachable = 0;
+            }
+            ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
+        }
+        free_block(b);
+        fold_fence = w->ir_len;
+        return 1;
+    }
+    if (strcmp(tok, "begin") == 0) {
+        BlockInfo *b = NEW(BlockInfo);
+        VEC_PUSH(blocks, b);
+        b->kind = BLOCK_BEGIN;
+        b->loop_addr = w->ir_len;
+        fold_fence = w->ir_len;
+        stack_copy(&b->saved_stack, &tstack);
+        return 1;
+    }
+    if (strcmp(tok, "while") == 0) {
+        BlockInfo *b;
+        if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_BEGIN)
+            ir4_die("'while' without 'begin'");
+        b = blocks.data[blocks.len - 1];
+        tpop_expect(TY_W);
+        b->patch_end = w->ir_len;
+        ins = emit_ir(IR_BR_FWD, w);
+        ins->u.br.cond = BR_JZ;
+        return 1;
+    }
+    if (strcmp(tok, "repeat") == 0) {
+        BlockInfo *b;
+        if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_BEGIN)
+            ir4_die("'repeat' without 'begin'");
+        b = blocks.data[--blocks.len];
+        if (!stack_eq(&tstack, &b->saved_stack))
+            ir4_die("loop body must leave stack even at 'repeat'");
+        ins = emit_ir(IR_BR_BACK, w);
+        ins->u.br.cond = BR_JMP;
+        ins->u.br.target = b->loop_addr;
+        ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
+        free_block(b);
+        fold_fence = w->ir_len;
+        return 1;
+    }
+    if (strcmp(tok, "::") == 0) {
+        size_t lidx;
+        if (blocks.len != 0)
+            ir4_die("'::' inside control block");
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected label name after '::'");
+        if (!*unreachable && tstack.len != 0)
+            ir4_die("stack must be empty at '::'");
+        tstack.len = 0;
+        *unreachable = 0;
+        lidx = find_or_add_label(labels, tok);
+        if (labels->data[lidx].defined)
+            ir4_die("duplicate label");
+        labels->data[lidx].defined = 1;
+        labels->data[lidx].target_ir = w->ir_len;
+        fold_fence = w->ir_len;
+        return 1;
+    }
+    if (strcmp(tok, "jmp") == 0) {
+        size_t lidx;
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected label name after 'jmp'");
+        if (!*unreachable && tstack.len != 0)
+            ir4_die("stack must be empty at 'jmp'");
+        lidx = find_or_add_label(labels, tok);
+        if (!*unreachable) {
+            emit_label_br(w, labels, label_refs, lidx, BR_JMP);
+            *unreachable = 1;
+        }
+        return 1;
+    }
+    if (strcmp(tok, "jz") == 0) {
+        size_t lidx;
+        tok = next_tok();
+        if (!tok)
+            ir4_die("expected label name after 'jz'");
+        tpop_expect(TY_W);
+        if (!*unreachable && tstack.len != 0)
+            ir4_die("stack must be empty after condition at 'jz'");
+        lidx = find_or_add_label(labels, tok);
+        if (!*unreachable) {
+            emit_label_br(w, labels, label_refs, lidx, BR_JZ);
+        }
+        return 1;
+    }
+    if (strcmp(tok, "jtab") == 0) {
+        size_t start = jtab_targets.len;
+        size_t count = 0;
+        tpop_expect(TY_W);
+        if (!*unreachable && tstack.len != 0)
+            ir4_die("stack must be empty after index at 'jtab'");
+        for (;;) {
+            tok = next_tok();
+            if (!tok)
+                ir4_die("unexpected EOF in 'jtab' (missing 'end')");
+            if (strcmp(tok, "end") == 0)
+                break;
+            if (!*unreachable) {
+                size_t lidx = find_or_add_label(labels, tok);
+                VEC_PUSH(jtab_targets, lidx);
+            }
+            count++;
+        }
+        if (count == 0)
+            ir4_die("empty 'jtab'");
+        if (!*unreachable) {
+            ins = emit_ir(IR_JTAB, w);
+            ins->u.jtab.start = start;
+            ins->u.jtab.count = count;
+            *unreachable = 1;
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
+static void resolve_word_labels(WordIR *w, LabelVec *labels, LabelRefVec *label_refs,
+                                size_t jtab_start) {
+    size_t r;
+
+    for (r = 0; r < label_refs->len; r++) {
+        size_t lidx = label_refs->data[r].label_idx;
+        if (!labels->data[lidx].defined)
+            ir4_die("undefined label");
+        ir_buf.data[w->ir_start + label_refs->data[r].ir_idx].u.br.target =
+            labels->data[lidx].target_ir;
+    }
+    for (r = jtab_start; r < jtab_targets.len; r++) {
+        size_t lidx = jtab_targets.data[r];
+        if (!labels->data[lidx].defined)
+            ir4_die("undefined label");
+        jtab_targets.data[r] = labels->data[lidx].target_ir;
+    }
+    free(labels->data);
+    free(label_refs->data);
+}
+
 static void compile_body(WordIR *w) {
     const char *tok;
     IrInstr *ins;
@@ -1828,29 +2210,13 @@ static void compile_body(WordIR *w) {
     w->ir_len = 0;
     fold_fence = 0;
 
-    /* Parse, type-check, and record IR for word body (Pass 1) */
     while ((tok = next_tok()) != NULL) {
         int idx;
 
         if (strcmp(tok, "end") == 0) {
-            size_t r;
             if (blocks.len != 0)
                 ir4_die("unclosed control block at 'end'");
-            for (r = 0; r < label_refs.len; r++) {
-                size_t lidx = label_refs.data[r].label_idx;
-                if (!labels.data[lidx].defined)
-                    ir4_die("undefined label");
-                ir_buf.data[w->ir_start + label_refs.data[r].ir_idx].u.br.target =
-                    labels.data[lidx].target_ir;
-            }
-            for (r = jtab_start; r < jtab_targets.len; r++) {
-                size_t lidx = jtab_targets.data[r];
-                if (!labels.data[lidx].defined)
-                    ir4_die("undefined label");
-                jtab_targets.data[r] = labels.data[lidx].target_ir;
-            }
-            free(labels.data);
-            free(label_refs.data);
+            resolve_word_labels(w, &labels, &label_refs, jtab_start);
             if (!unreachable) {
                 check_return_stack();
                 emit_ir(IR_FN_END, w);
@@ -1868,14 +2234,8 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        if (strcmp(tok, "return") == 0) {
-            if (!unreachable) {
-                check_return_stack();
-                emit_ir(IR_FN_END, w);
-                unreachable = 1;
-            }
+        if (handle_control_flow(tok, w, &unreachable, &labels, &label_refs))
             continue;
-        }
 
         /* Bare integer literal defaults to :i, bare float literal defaults to :f */
         if (parse_int(tok, &num_val)) {
@@ -1894,45 +2254,8 @@ static void compile_body(WordIR *w) {
             }
         }
 
-        /* Address of local or typed global: & <ident> */
-        if (strcmp(tok, "&") == 0) {
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected identifier after '&'");
-            idx = find_local(tok);
-            if (idx >= 0) {
-                LocalVar *lv = &locals.data[idx];
-                if (lv->size > 0)
-                    ir4_die("':bytes' local is already an address");
-                ins = emit_ir(IR_LOCAL_OP, w);
-                ins->u.loc.op = LOCAL_ADDR;
-                ins->u.loc.slot = lv->slot;
-                ins->u.loc.type = lv->type;
-                ins->u.loc.stack_bytes = tstack_bytes();
-                tpush(TY_A);
-                continue;
-            }
-            idx = find_buffer(tok);
-            if (idx >= 0) {
-                BufferSym *bs = buffers.data[idx];
-                if (bs->type == TY_NONE)
-                    ir4_die("':bytes' or 'data' symbol is already an address");
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-                tpush(TY_A);
-                continue;
-            }
-            idx = ir4_find_func(tok);
-            if (idx >= 0) {
-                if (funcs.data[idx]->is_extern)
-                    ir4_die("cannot take address of 'extern' function");
-                ins = emit_ir(IR_PUSH_FN, w);
-                ins->u.func_idx = (size_t)idx;
-                tpush(TY_A);
-                continue;
-            }
-            ir4_die("unknown variable or function in '&'");
-        }
+        if (handle_var_op(tok, w))
+            continue;
 
         if (strcmp(tok, "(") == 0) {
             FuncSig icall_sig;
@@ -1948,309 +2271,6 @@ static void compile_body(WordIR *w) {
             }
             free_sig_vecs(&icall_sig);
             emit_ir(IR_ICALL, w);
-            continue;
-        }
-
-        /* Local or typed global add-assign: +-> <ident> */
-        if (strcmp(tok, "+->") == 0) {
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected identifier after '+->'");
-            idx = find_local(tok);
-            if (idx >= 0) {
-                LocalVar *lv = &locals.data[idx];
-                StackType dt = (lv->type == TY_A) ? TY_W : lv->type;
-                if (lv->size > 0)
-                    ir4_die("cannot '+->' to ':bytes' local");
-                tpop_expect(dt);
-                if (lv->type == TY_W || lv->type == TY_A) {
-                    ins = emit_ir(IR_LOCAL_OP, w);
-                    ins->u.loc.op = LOCAL_ADD;
-                    ins->u.loc.slot = lv->slot;
-                    ins->u.loc.type = lv->type;
-                    ins->u.loc.stack_bytes = tstack_bytes();
-                } else {
-                    ins = emit_ir(IR_LOCAL_OP, w);
-                    ins->u.loc.op = LOCAL_GET;
-                    ins->u.loc.slot = lv->slot;
-                    ins->u.loc.type = lv->type;
-                    ins->u.loc.stack_bytes = tstack_bytes() + 4;
-                    ins = emit_ir(IR_ALU_OP, w);
-                    ins->u.op = (lv->type == TY_F) ? OP_FADD : OP_ADD32;
-                    ins = emit_ir(IR_LOCAL_OP, w);
-                    ins->u.loc.op = LOCAL_SET;
-                    ins->u.loc.slot = lv->slot;
-                    ins->u.loc.type = lv->type;
-                    ins->u.loc.stack_bytes = tstack_bytes();
-                }
-                continue;
-            }
-            idx = find_buffer(tok);
-            if (idx < 0)
-                ir4_die("unknown variable in '+->'");
-            {
-                BufferSym *bs = buffers.data[idx];
-                StackType dt;
-                if (bs->type == TY_NONE)
-                    ir4_die("cannot '+->' to ':bytes' or 'data' symbol");
-                dt = (bs->type == TY_A) ? TY_W : bs->type;
-                tpop_expect(dt);
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-                ins = emit_ir(IR_STACK_OP, w);
-                ins->u.stk.op = OP_SWAP;
-                ins->u.stk.t1 = dt;
-                ins->u.stk.t2 = TY_A;
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-                ins = emit_ir(IR_ALU_OP, w);
-                ins->u.op = (bs->type == TY_F) ? OP_FETCH :
-                            (bs->type == TY_I32) ? OP_FETCH :
-                            (bs->type == TY_A) ? OP_AFETCH : OP_FETCH;
-                if (bs->type == TY_A) {
-                    ins = emit_ir(IR_STACK_OP, w);
-                    ins->u.stk.op = OP_SWAP;
-                    ins->u.stk.t1 = TY_W;
-                    ins->u.stk.t2 = TY_A;
-                }
-                ins = emit_ir(IR_ALU_OP, w);
-                ins->u.op = (bs->type == TY_F) ? OP_FADD :
-                            (bs->type == TY_I32) ? OP_ADD32 :
-                            (bs->type == TY_A) ? OP_AADD : OP_ADD;
-                ins = emit_ir(IR_STACK_OP, w);
-                ins->u.stk.op = OP_SWAP;
-                ins->u.stk.t1 = TY_A;
-                ins->u.stk.t2 = bs->type;
-                ins = emit_ir(IR_ALU_OP, w);
-                ins->u.op = global_store_op(bs->type);
-            }
-            continue;
-        }
-
-        /* Local or typed global assignment: -> <ident> */
-        if (strcmp(tok, "->") == 0) {
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected identifier after '->'");
-            idx = (strcmp(tok, "var") == 0) ? parse_local_var(0) : find_local(tok);
-            if (idx >= 0) {
-                LocalVar *lv = &locals.data[idx];
-                if (lv->size > 0)
-                    ir4_die("cannot assign to ':bytes' local");
-                tpop_expect(lv->type);
-                if ((lv->type == TY_W || lv->type == TY_A) && w->ir_len >= fold_fence + 3) {
-                    IrInstr *p0 = &ir_buf.data[w->ir_start + w->ir_len - 3];
-                    IrInstr *p1 = p0 + 1;
-                    IrInstr *p2 = p0 + 2;
-                    if (p0->kind == IR_LOCAL_OP && p0->u.loc.op == LOCAL_GET &&
-                        p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
-                        p2->kind == IR_ALU_OP &&
-                        (p2->u.op == OP_ADD || p2->u.op == OP_SUB ||
-                         p2->u.op == OP_AADD || p2->u.op == OP_ASUB)) {
-                        i32 delta = (p2->u.op == OP_SUB || p2->u.op == OP_ASUB)
-                                        ? (i32)(0 - (u32)p1->u.w)
-                                        : p1->u.w;
-                        p0->kind = IR_PUSH_W;
-                        p0->u.w = delta;
-                        p1->kind = IR_LOCAL_OP;
-                        p1->u.loc.op = LOCAL_ADD;
-                        p1->u.loc.slot = lv->slot;
-                        p1->u.loc.type = lv->type;
-                        p1->u.loc.stack_bytes = tstack_bytes();
-                        w->ir_len--;
-                        ir_buf.len--;
-                        continue;
-                    }
-                }
-                ins = emit_ir(IR_LOCAL_OP, w);
-                ins->u.loc.op = LOCAL_SET;
-                ins->u.loc.slot = lv->slot;
-                ins->u.loc.type = lv->type;
-                ins->u.loc.stack_bytes = tstack_bytes();
-                continue;
-            }
-            idx = find_buffer(tok);
-            if (idx < 0)
-                ir4_die("unknown variable in '->'");
-            {
-                BufferSym *bs = buffers.data[idx];
-                if (bs->type == TY_NONE)
-                    ir4_die("cannot assign to ':bytes' or 'data' symbol");
-                tpop_expect(bs->type);
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-                ins = emit_ir(IR_ALU_OP, w);
-                ins->u.op = global_store_op(bs->type);
-            }
-            continue;
-        }
-
-        /* Control flow */
-        if (strcmp(tok, "if") == 0) {
-            BlockInfo *b;
-            tpop_expect(TY_W);
-            b = NEW(BlockInfo);
-            VEC_PUSH(blocks, b);
-            b->kind = BLOCK_IF;
-            b->has_else = 0;
-            b->saved_unreach = unreachable;
-            b->if_unreach = 0;
-            stack_copy(&b->saved_stack, &tstack);
-            b->patch_else = w->ir_len;
-            ins = emit_ir(IR_BR_FWD, w);
-            ins->u.br.cond = BR_JZ;
-            continue;
-        }
-        if (strcmp(tok, "else") == 0) {
-            BlockInfo *b;
-            if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_IF)
-                ir4_die("'else' without 'if'");
-            b = blocks.data[blocks.len - 1];
-            b->has_else = 1;
-            b->if_unreach = unreachable;
-            stack_copy(&b->else_stack, &tstack);
-            stack_copy(&tstack, &b->saved_stack);
-            unreachable = b->saved_unreach;
-            b->patch_end = w->ir_len;
-            ins = emit_ir(IR_BR_FWD, w);
-            ins->u.br.cond = BR_JMP;
-            ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
-            fold_fence = w->ir_len;
-            continue;
-        }
-        if (strcmp(tok, "then") == 0) {
-            BlockInfo *b;
-            if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_IF)
-                ir4_die("'then' without 'if'");
-            b = blocks.data[--blocks.len];
-            if (!b->has_else) {
-                if (!unreachable && !stack_eq(&tstack, &b->saved_stack))
-                    ir4_die("unbalanced stack in 'if ... then'");
-                stack_copy(&tstack, &b->saved_stack);
-                unreachable = b->saved_unreach;
-                ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
-            } else {
-                if (!b->if_unreach && !unreachable) {
-                    if (!stack_eq(&tstack, &b->else_stack))
-                        ir4_die("branch stack mismatch between 'if' and 'else'");
-                } else if (!b->if_unreach && unreachable) {
-                    stack_copy(&tstack, &b->else_stack);
-                    unreachable = 0;
-                }
-                ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
-            }
-            free_block(b);
-            fold_fence = w->ir_len;
-            continue;
-        }
-        if (strcmp(tok, "begin") == 0) {
-            BlockInfo *b = NEW(BlockInfo);
-            VEC_PUSH(blocks, b);
-            b->kind = BLOCK_BEGIN;
-            b->loop_addr = w->ir_len;
-            fold_fence = w->ir_len;
-            stack_copy(&b->saved_stack, &tstack);
-            continue;
-        }
-        if (strcmp(tok, "while") == 0) {
-            BlockInfo *b;
-            if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_BEGIN)
-                ir4_die("'while' without 'begin'");
-            b = blocks.data[blocks.len - 1];
-            tpop_expect(TY_W);
-            b->patch_end = w->ir_len;
-            ins = emit_ir(IR_BR_FWD, w);
-            ins->u.br.cond = BR_JZ;
-            continue;
-        }
-        if (strcmp(tok, "repeat") == 0) {
-            BlockInfo *b;
-            if (blocks.len == 0 || blocks.data[blocks.len - 1]->kind != BLOCK_BEGIN)
-                ir4_die("'repeat' without 'begin'");
-            b = blocks.data[--blocks.len];
-            if (!stack_eq(&tstack, &b->saved_stack))
-                ir4_die("loop body must leave stack even at 'repeat'");
-            ins = emit_ir(IR_BR_BACK, w);
-            ins->u.br.cond = BR_JMP;
-            ins->u.br.target = b->loop_addr;
-            ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
-            free_block(b);
-            fold_fence = w->ir_len;
-            continue;
-        }
-        if (strcmp(tok, "::") == 0) {
-            size_t lidx;
-            if (blocks.len != 0)
-                ir4_die("'::' inside control block");
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected label name after '::'");
-            if (!unreachable && tstack.len != 0)
-                ir4_die("stack must be empty at '::'");
-            tstack.len = 0;
-            unreachable = 0;
-            lidx = find_or_add_label(&labels, tok);
-            if (labels.data[lidx].defined)
-                ir4_die("duplicate label");
-            labels.data[lidx].defined = 1;
-            labels.data[lidx].target_ir = w->ir_len;
-            fold_fence = w->ir_len;
-            continue;
-        }
-        if (strcmp(tok, "jmp") == 0) {
-            size_t lidx;
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected label name after 'jmp'");
-            if (!unreachable && tstack.len != 0)
-                ir4_die("stack must be empty at 'jmp'");
-            lidx = find_or_add_label(&labels, tok);
-            if (!unreachable) {
-                emit_label_br(w, &labels, &label_refs, lidx, BR_JMP);
-                unreachable = 1;
-            }
-            continue;
-        }
-        if (strcmp(tok, "jz") == 0) {
-            size_t lidx;
-            tok = next_tok();
-            if (!tok)
-                ir4_die("expected label name after 'jz'");
-            tpop_expect(TY_W);
-            if (!unreachable && tstack.len != 0)
-                ir4_die("stack must be empty after condition at 'jz'");
-            lidx = find_or_add_label(&labels, tok);
-            if (!unreachable) {
-                emit_label_br(w, &labels, &label_refs, lidx, BR_JZ);
-            }
-            continue;
-        }
-        if (strcmp(tok, "jtab") == 0) {
-            size_t start = jtab_targets.len;
-            size_t count = 0;
-            tpop_expect(TY_W);
-            if (!unreachable && tstack.len != 0)
-                ir4_die("stack must be empty after index at 'jtab'");
-            for (;;) {
-                tok = next_tok();
-                if (!tok)
-                    ir4_die("unexpected EOF in 'jtab' (missing 'end')");
-                if (strcmp(tok, "end") == 0)
-                    break;
-                if (!unreachable) {
-                    size_t lidx = find_or_add_label(&labels, tok);
-                    VEC_PUSH(jtab_targets, lidx);
-                }
-                count++;
-            }
-            if (count == 0)
-                ir4_die("empty 'jtab'");
-            if (!unreachable) {
-                ins = emit_ir(IR_JTAB, w);
-                ins->u.jtab.start = start;
-                ins->u.jtab.count = count;
-                unreachable = 1;
-            }
             continue;
         }
 
