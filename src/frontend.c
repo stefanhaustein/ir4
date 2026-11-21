@@ -1001,6 +1001,26 @@ static int handle_builtin(const char *tok, WordIR *w) {
                     ir_buf.len--;
                     return 1;
                 }
+                if (p1->kind == IR_PUSH_DATA && p2->kind == IR_PUSH_W &&
+                    (builtins[i].op == OP_AADD || builtins[i].op == OP_ASUB)) {
+                    i32 delta = (builtins[i].op == OP_ASUB) ? (i32)(0UL - (u32)p2->u.w) : p2->u.w;
+                    if (delta >= 0) {
+                        if ((u32)delta <= 0xFFFFUL) {
+                            p1->u.offset += (size_t)delta;
+                            w->ir_len--;
+                            ir_buf.len--;
+                            return 1;
+                        }
+                    } else {
+                        size_t mag = (size_t)(0UL - (u32)delta);
+                        if (mag <= p1->u.offset) {
+                            p1->u.offset -= mag;
+                            w->ir_len--;
+                            ir_buf.len--;
+                            return 1;
+                        }
+                    }
+                }
             }
             if (w->ir_len >= fold_fence + 1) {
                 IrOp rop = builtins[i].op;
