@@ -1,4 +1,4 @@
-/* be_arm64_jit.c - Apple Silicon macOS MAP_JIT Runner for IR4th (Strict C89) */
+/* jit.c - Apple Silicon macOS MAP_JIT Runner for IR4th (Strict C89) */
 #include "codebuf.h"
 #include "frontend.h"
 

@@ -1,4 +1,4 @@
-/* be_6502_sim.c - sim65 (cc65 6502 simulator) header & exit/print stub (Strict C89) */
+/* sim65.c - sim65 (cc65 6502 simulator) header & exit/print stub (Strict C89) */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/6502.h"

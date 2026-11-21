@@ -1,4 +1,4 @@
-/* be_6502_c64.c - Commodore 64 (.prg) BASIC SYS stub & KERNAL CHROUT epilogue (Strict C89) */
+/* c64.c - Commodore 64 (.prg) BASIC SYS stub & KERNAL CHROUT epilogue (Strict C89) */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/6502.h"
