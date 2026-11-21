@@ -1,4 +1,4 @@
-/* ir4.h - Core IR4 types, limits, and Backend/Platform interfaces (Strict C89)
+/* ir4.h - Core IR4 types, limits, and Backend/Platform interfaces
  *
  * Shared contract between the IR4th frontend, code buffer, backends, and
  * platform/output drivers. Each backend implements the Backend vtable; each
@@ -272,7 +272,7 @@ typedef struct {
     void (*peep_fence)(void);
 } Backend;
 
-/* Error reporting (implemented in frontend.c) */
+/* Error reporting (implemented in frontend/lexer.c) */
 void ir4_die(const char *msg);
 
 /* Platform / output-format hooks (startup stub, epilogue, file writer, runner). */

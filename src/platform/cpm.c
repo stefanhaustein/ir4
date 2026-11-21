@@ -1,4 +1,4 @@
-/* cpm.c - CP/M .COM startup & BDOS exit/print stub for Z80 (Strict C89) */
+/* cpm.c - CP/M .COM startup & BDOS exit/print stub for Z80 */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/z80.h"

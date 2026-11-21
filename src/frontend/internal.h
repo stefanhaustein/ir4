@@ -1,0 +1,146 @@
+/* internal.h - Internal declarations shared by frontend modules */
+#ifndef FRONTEND_INT_H
+#define FRONTEND_INT_H
+
+#include "frontend.h"
+#include "vec.h"
+
+VEC_OF(ByteVec, u8);
+VEC_OF(LocalVec, LocalVar);
+VEC_OF(SizeVec, size_t);
+VEC_OF(FuncVec, FuncSig *);
+
+typedef enum {
+    IR_FN_END,
+    IR_PUSH_W,
+    IR_PUSH_A,
+    IR_PUSH_F,
+    IR_PUSH_I32,
+    IR_PUSH_DATA,
+    IR_PUSH_HEAP_START,
+    IR_LOCAL_OP,
+    IR_STACK_OP,
+    IR_ALU_OP,
+    IR_CALL,
+    IR_CALL_EXTERN,
+    IR_PUSH_FN,
+    IR_ICALL,
+    IR_BR_FWD,
+    IR_BR_BACK,
+    IR_JTAB,
+    IR_INLINE
+} IrKind;
+
+typedef struct {
+    IrKind kind;
+    union {
+        i32 w;
+        u32 a;
+        double f;
+        size_t offset;
+        struct {
+            LocalOp op;
+            size_t slot;
+            StackType type;
+            size_t stack_bytes;
+        } loc;
+        struct {
+            StackOp op;
+            StackType t1;
+            StackType t2;
+        } stk;
+        IrOp op;
+        size_t func_idx;
+        struct {
+            BranchCond cond;
+            size_t target;
+        } br;
+        struct {
+            size_t start;
+            size_t count;
+        } jtab;
+        size_t inl_idx;
+    } u;
+} IrInstr;
+
+enum { CODE_REL_SELF = 1, CODE_REL_STACK = 2 };
+
+typedef struct {
+    size_t ir_off;
+    u16 addend;
+    u8 kind;
+} CodeReloc;
+
+typedef struct {
+    size_t raw_start;
+    size_t raw_len;
+    size_t reloc_start;
+    size_t reloc_cnt;
+} InlineBlock;
+
+typedef struct {
+    size_t ir_start;
+    size_t ir_len;
+    size_t reloc_start;
+    size_t reloc_cnt;
+    size_t param_cnt;
+    LocalVec locals;
+    Bool reachable;
+    Bool is_code;
+    Bool has_inline;
+} WordIR;
+
+VEC_OF(InlineVec, InlineBlock);
+VEC_OF(IrVec, IrInstr);
+VEC_OF(WordVec, WordIR *);
+VEC_OF(CodeRelocVec, CodeReloc);
+
+typedef struct {
+    FILE *fp;
+    const char *path;
+    u32 line_num;
+    u16 req_group;
+    u8 req_rank;
+    u8 buf[512];
+    size_t buf_pos;
+    size_t buf_len;
+    int pushback;
+} SrcFile;
+
+/* Shared compiler state (defined in frontend.c) */
+extern const Backend *be;
+extern const char *platform_name;
+extern FuncVec funcs;
+extern WordVec words;
+extern IrVec ir_buf;
+extern SizeVec jtab_targets;
+extern ByteVec raw_code_buf;
+extern CodeRelocVec code_relocs;
+extern InlineVec inline_blocks;
+extern SizeVec init_funcs;
+
+size_t alloc_func(FuncSig **sig_out, WordIR **w_out);
+IrInstr *emit_ir(IrKind kind, WordIR *w);
+
+/* Lexer & require loader (defined in lexer.c) */
+void lex_init(FILE *in, const char *path);
+SrcFile *lex_cur(void);
+int src_getc(SrcFile *sf);
+void src_ungetc(SrcFile *sf, int c);
+int skip_ws_and_comments(void);
+const char *next_tok(void);
+const char *next_tok_intern(void);
+const char *platform_parent(const char *plat);
+void push_require_ex(const char *name, int lib_only);
+const char *read_require_path(void);
+void push_require(const char *name);
+StackType parse_type_tok(const char *tok);
+int parse_int(const char *s, i32 *val);
+int parse_float(const char *s, double *val);
+
+/* DCE & Pass 2 emitter (defined in ir_emit.c) */
+void ir_emit_reset(void);
+void run_reachability_dce(void);
+void emit_program(void);
+
+#endif /* FRONTEND_INT_H */

@@ -1,4 +1,4 @@
-/* be_6502.c - 6502 Direct Binary Machine-Code Backend for IR4th (Strict C89)
+/* 6502.c - 6502 Direct Binary Machine-Code Backend for IR4th
  * Calling & Register Convention:
  *   - Data stack: 256-byte BSS buffer in normal RAM indexed by X (wraps in 0..255 via DEX/DEX)
  *   - Locals: 256-byte BSS software frame stack indexed by 1-byte BSS lfp (grows downward)

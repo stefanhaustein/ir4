@@ -1,4 +1,4 @@
-/* elf.c - ELF32 ET_EXEC (--virt) & ET_REL (--obj) writers for RV32 (Strict C89) */
+/* elf.c - ELF32 ET_EXEC (--virt) & ET_REL (--obj) writers for RV32 */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/rv32.h"

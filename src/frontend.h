@@ -1,4 +1,4 @@
-/* frontend.h - IR4th parser, type-checker, and compiler driver API (Strict C89)
+/* frontend.h - IR4th parser, type-checker, and compiler driver API
  *
  * Compiles an .ir4 source stream in two passes (parse/type-check into IR,
  * reachability-based dead-code elimination, and emission via Backend).

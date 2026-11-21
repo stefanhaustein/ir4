@@ -1,4 +1,4 @@
-/* codebuf.h - Shared code & data emission buffer API (Strict C89)
+/* codebuf.h - Shared code & data emission buffer API
  *
  * Manages the target machine-code buffer, initialized/BSS data segment,
  * data-offset relocations (patched once data placement is known), and

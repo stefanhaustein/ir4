@@ -1,4 +1,4 @@
-/* be_arm64.c - Simplified ARM64 (AArch64) Binary Backend for IR4th (Strict C89)
+/* arm64.c - Simplified ARM64 (AArch64) Binary Backend for IR4th
  * Uniform 64-bit cells (W: and A: are both 8 bytes; no 8-bit stack items).
  * Stack & Frame Convention:
  *   - Evaluation stack: Hardware SP using 16-byte aligned slots (1 cell per slot)

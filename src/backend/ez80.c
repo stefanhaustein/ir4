@@ -1,4 +1,4 @@
-/* be_ez80.c - eZ80 ADL (24-bit) Direct Binary Backend for IR4th (Strict C89)
+/* ez80.c - eZ80 ADL (24-bit) Direct Binary Backend for IR4th
  * Calling & Register Convention (ADL = 1):
  *   - Data stack: hardware SP (3 bytes per :i/:a slot, 6 bytes per :f/i32 slot)
  *   - Return stack: dedicated 24-bit BSS stack pointed to by BSS rsp_off

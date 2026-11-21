@@ -1,4 +1,4 @@
-/* be_bc_run.c - Portable C16-bit Bytecode VM Runner for IR4th (Strict C89) */
+/* bc.c - Portable C16-bit Bytecode VM Runner for IR4th */
 #include "backend/bc.h"
 #include "codebuf.h"
 #include "frontend.h"

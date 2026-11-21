@@ -1,4 +1,4 @@
-/* path.c - Path helpers and executable directory lookup (Strict C89) */
+/* path.c - Path helpers and executable directory lookup */
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #elif defined(__linux__)

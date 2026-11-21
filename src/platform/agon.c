@@ -1,4 +1,4 @@
-/* agon.c - Agon MOS (eZ80 ADL) executable stub for IR4th (Strict C89) */
+/* agon.c - Agon MOS (eZ80 ADL) executable stub for IR4th */
 #include "backend/ez80.h"
 #include "codebuf.h"
 #include "frontend.h"

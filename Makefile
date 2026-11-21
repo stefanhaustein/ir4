@@ -3,7 +3,7 @@ CFLAGS  = -std=c89 -Wall -Wextra -O2 -Isrc
 
 BUILD   = build
 TARGET  = $(BUILD)/ir4c
-SRCS    = src/ir4c.c src/frontend.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
+SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
           src/backend/z80.c src/backend/ez80.c src/backend/6502.c src/backend/arm64.c src/backend/rv32.c src/backend/bc.c \
           src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/c64.c src/platform/x16.c \
           src/platform/jit.c src/platform/elf.c src/platform/bc.c
@@ -23,7 +23,9 @@ $(BUILD)/%.o: src/%.c src/ir4.h
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/ir4c.o: src/codebuf.h src/frontend.h src/path.h src/backend/bc.h
-$(BUILD)/frontend.o: src/codebuf.h src/frontend.h src/path.h src/strpool.h src/vec.h
+$(BUILD)/frontend/frontend.o: src/codebuf.h src/frontend.h src/frontend/internal.h src/strpool.h src/vec.h
+$(BUILD)/frontend/lexer.o: src/frontend.h src/frontend/internal.h src/path.h src/strpool.h src/vec.h
+$(BUILD)/frontend/ir_emit.o: src/codebuf.h src/frontend.h src/frontend/internal.h src/strpool.h src/vec.h
 $(BUILD)/codebuf.o: src/codebuf.h src/strpool.h src/vec.h
 $(BUILD)/path.o: src/path.h src/strpool.h src/vec.h
 $(BUILD)/strpool.o: src/strpool.h src/vec.h
@@ -240,7 +242,7 @@ rt-6502:
 rt-rv32:
 	python3 tools/rv32/gen_rv32_fp.py --input tools/rv32/rv32_fp.c --output src/be_rv32_fp.h
 
-AGON_SRCS = src/ir4c.c src/frontend.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
+AGON_SRCS = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
             src/backend/ez80.c src/platform/agon.c
 
 agon: $(AGON_SRCS)
@@ -255,7 +257,7 @@ agon: $(AGON_SRCS)
 		echo "LDHAS_ARG_PROCESSING = 1"; \
 		echo "LDHAS_EXIT_HANDLER = 0"; \
 		echo "include $$(agondev-config --makefile)"; \
-		echo "CFLAGS += -I$(CURDIR)/src -DIR4_MINIMAL -DIR4_ENABLE_EZ80=1 -DIR4_ENABLE_AGON=1"; \
+		echo "CFLAGS += -I$(CURDIR)/src -I$(CURDIR)/src/frontend -DIR4_MINIMAL -DIR4_ENABLE_EZ80=1 -DIR4_ENABLE_AGON=1"; \
 	} > $(BUILD)/agon-build/Makefile; \
 	$(MAKE) -C $(BUILD)/agon-build; \
 	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin; \

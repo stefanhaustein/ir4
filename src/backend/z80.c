@@ -1,4 +1,4 @@
-/* be_z80.c - Z80 Direct Binary Machine-Code Backend for IR4th (Strict C89)
+/* z80.c - Z80 Direct Binary Machine-Code Backend for IR4th
  * Calling & Register Convention:
  *   - Data stack: Hardware SP (16-bit slots for W: and A:, 48-bit for F:)
  *   - Locals & params: SP-relative offsets (no IX frame pointer)

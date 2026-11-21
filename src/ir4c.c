@@ -1,4 +1,4 @@
-/* ir4c.c - CLI driver for IR4th (Strict C89) */
+/* ir4c.c - CLI driver for IR4th */
 #include "codebuf.h"
 #include "frontend.h"
 #include "path.h"

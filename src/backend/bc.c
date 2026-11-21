@@ -1,4 +1,4 @@
-/* be_bc.c - Compact 16-bit Bytecode Backend for IR4th (Strict C89) */
+/* bc.c - Compact 16-bit Bytecode Backend for IR4th */
 #include "backend/bc.h"
 #include "codebuf.h"
 #include "vec.h"

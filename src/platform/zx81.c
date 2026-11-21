@@ -1,4 +1,4 @@
-/* zx81.c - Sinclair ZX81 (.p snapshot) startup stub & writer for Z80 (Strict C89) */
+/* zx81.c - Sinclair ZX81 (.p snapshot) startup stub & writer for Z80 */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/z80.h"

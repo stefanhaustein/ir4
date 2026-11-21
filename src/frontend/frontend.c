@@ -1,10 +1,7 @@
-#include "frontend.h"
+/* frontend.c - Parser, type-checker, constant folder, and IR builder */
+#include "internal.h"
 #include "codebuf.h"
-#include "path.h"
 #include "strpool.h"
-#include "vec.h"
-
-VEC_OF(ByteVec, u8);
 
 typedef enum { BLOCK_IF = 1, BLOCK_BEGIN = 2 } BlockKind;
 
@@ -20,160 +17,32 @@ typedef struct {
     Bool if_unreach;
 } BlockInfo;
 
-typedef enum {
-    IR_FN_END,
-    IR_PUSH_W,
-    IR_PUSH_A,
-    IR_PUSH_F,
-    IR_PUSH_I32,
-    IR_PUSH_DATA,
-    IR_PUSH_HEAP_START,
-    IR_LOCAL_OP,
-    IR_STACK_OP,
-    IR_ALU_OP,
-    IR_CALL,
-    IR_CALL_EXTERN,
-    IR_PUSH_FN,
-    IR_ICALL,
-    IR_BR_FWD,
-    IR_BR_BACK,
-    IR_JTAB,
-    IR_INLINE
-} IrKind;
-
-typedef struct {
-    IrKind kind;
-    union {
-        i32 w;
-        u32 a;
-        double f;
-        size_t offset;
-        struct {
-            LocalOp op;
-            size_t slot;
-            StackType type;
-            size_t stack_bytes;
-        } loc;
-        struct {
-            StackOp op;
-            StackType t1;
-            StackType t2;
-        } stk;
-        IrOp op;
-        size_t func_idx;
-        struct {
-            BranchCond cond;
-            size_t target;
-        } br;
-        struct {
-            size_t start;
-            size_t count;
-        } jtab;
-        size_t inl_idx;
-    } u;
-} IrInstr;
-
-enum { CODE_REL_SELF = 1, CODE_REL_STACK = 2 };
-
-typedef struct {
-    size_t ir_off;
-    u16 addend;
-    u8 kind;
-} CodeReloc;
-
-typedef struct {
-    size_t raw_start;
-    size_t raw_len;
-    size_t reloc_start;
-    size_t reloc_cnt;
-} InlineBlock;
-
-VEC_OF(LocalVec, LocalVar);
-VEC_OF(InlineVec, InlineBlock);
-
-typedef struct {
-    size_t ir_start;
-    size_t ir_len;
-    size_t reloc_start;
-    size_t reloc_cnt;
-    size_t param_cnt;
-    LocalVec locals;
-    Bool reachable;
-    Bool is_code;
-    Bool has_inline;
-} WordIR;
-
-VEC_OF(IrVec, IrInstr);
-VEC_OF(WordVec, WordIR *);
-VEC_OF(CodeRelocVec, CodeReloc);
-VEC_OF(SizeVec, size_t);
-
-static IrVec ir_buf;
-static SizeVec jtab_targets;
-static size_t fold_fence = 0;
-static WordVec words;
-static ByteVec raw_code_buf;
-static CodeRelocVec code_relocs;
-static InlineVec inline_blocks;
-
-typedef struct {
-    FILE *fp;
-    const char *path;
-    u32 line_num;
-    u16 req_group;
-    u8 req_rank;
-    u8 buf[512];
-    size_t buf_pos;
-    size_t buf_len;
-    int pushback;
-} SrcFile;
-
-VEC_OF(SrcVec, SrcFile);
-
-static SrcVec src_stack;
-static u16 next_req_group = 1;
-static StrVec extra_lib_roots;
-
-void ir4_add_lib_root(const char *path) {
-    if (!path || path[0] == '\0')
-        return;
-    VEC_PUSH(extra_lib_roots, path);
-}
-static StrVec seen_files;
-static const Backend *be;
-static const char *platform_name = NULL;
-
-VEC_OF(FuncVec, FuncSig *);
-static FuncVec funcs;
-
 typedef struct {
     const char *name;
     size_t offset;
     StackType type; /* TY_NONE for :bytes / data buffers; TY_W/TY_A/TY_F for typed globals */
 } BufferSym;
 
-static StrBuf tok_sb;
-
 VEC_OF(BufVec, BufferSym *);
-static BufVec buffers;
-
-static LocalVec locals;
-static TypeVec cur_outs;
-
 VEC_OF(BlockVec, BlockInfo *);
 
+const Backend *be;
+const char *platform_name = NULL;
+FuncVec funcs;
+WordVec words;
+IrVec ir_buf;
+SizeVec jtab_targets;
+ByteVec raw_code_buf;
+CodeRelocVec code_relocs;
+InlineVec inline_blocks;
+SizeVec init_funcs;
+
+static size_t fold_fence = 0;
+static BufVec buffers;
+static LocalVec locals;
+static TypeVec cur_outs;
 static TypeVec tstack;
 static BlockVec blocks;
-
-void ir4_die(const char *msg) {
-    if (src_stack.len > 0) {
-        const SrcFile *cur = &src_stack.data[src_stack.len - 1];
-        fprintf(stderr, "ir4c error (%s:%lu): %s\n", cur->path, (unsigned long)cur->line_num, msg);
-    } else {
-        fprintf(stderr, "ir4c error: %s\n", msg);
-    }
-    exit(1);
-}
 
 static const char *type_name(StackType t) {
     if (t == TY_W)
@@ -185,349 +54,6 @@ static const char *type_name(StackType t) {
     if (t == TY_I32)
         return ":i32";
     return "?";
-}
-
-static StackType parse_type_tok(const char *tok) {
-    if (strcmp(tok, ":i") == 0)
-        return TY_W;
-    if (strcmp(tok, ":a") == 0)
-        return TY_A;
-    if (strcmp(tok, ":f") == 0)
-        return TY_F;
-    if (strcmp(tok, ":i32") == 0)
-        return TY_I32;
-    return TY_NONE;
-}
-
-static int src_getc(SrcFile *sf) {
-    if (sf->pushback >= 0) {
-        int c = sf->pushback;
-        sf->pushback = -1;
-        return c;
-    }
-    if (sf->buf_pos >= sf->buf_len) {
-        sf->buf_len = fread(sf->buf, 1, sizeof(sf->buf), sf->fp);
-        sf->buf_pos = 0;
-        if (sf->buf_len == 0)
-            return EOF;
-    }
-    return sf->buf[sf->buf_pos++];
-}
-
-static void src_ungetc(SrcFile *sf, int c) {
-    sf->pushback = c;
-}
-
-static int skip_ws_and_comments(void) {
-    for (;;) {
-        SrcFile *cur;
-        int c;
-        if (src_stack.len == 0)
-            return EOF;
-        cur = &src_stack.data[src_stack.len - 1];
-        c = src_getc(cur);
-        if (c == EOF) {
-            if (src_stack.len > 1) {
-                fclose(cur->fp);
-                src_stack.len--;
-                continue;
-            }
-            return EOF;
-        }
-        if (c == '\n') {
-            cur->line_num++;
-            continue;
-        }
-        if (isspace((unsigned char)c))
-            continue;
-        if (c == '\\') {
-            int c2 = src_getc(cur);
-            if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
-                if (c2 == '\n') {
-                    cur->line_num++;
-                } else if (c2 != EOF) {
-                    while ((c = src_getc(cur)) != EOF && c != '\n')
-                        ;
-                    if (c == '\n')
-                        cur->line_num++;
-                }
-                continue;
-            }
-            src_ungetc(cur, c2);
-        }
-        return c;
-    }
-}
-
-static const char *read_quoted_intern(SrcFile *sf, const char *err_unterm) {
-    int c = src_getc(sf);
-    sb_reset(&tok_sb);
-    while (c != EOF && c != '\n' && c != '"') {
-        sb_putc(&tok_sb, (char)c);
-        c = src_getc(sf);
-    }
-    if (c != '"')
-        ir4_die(err_unterm);
-    return sb_intern(&tok_sb);
-}
-
-static void parse_line_directive(SrcFile *cur, int last_c) {
-    int c = last_c;
-    u32 new_line = 0;
-    int has_digits = 0;
-
-    if (c == '\n' || c == EOF)
-        ir4_die("expected line number after '#line'");
-    while (c == ' ' || c == '\t')
-        c = src_getc(cur);
-    while (c >= '0' && c <= '9') {
-        new_line = new_line * 10 + (u32)(c - '0');
-        has_digits = 1;
-        c = src_getc(cur);
-    }
-    if (!has_digits || new_line == 0)
-        ir4_die("invalid line number in '#line'");
-    while (c == ' ' || c == '\t')
-        c = src_getc(cur);
-    if (c == '"') {
-        cur->path = read_quoted_intern(cur, "unterminated filename in '#line'");
-        c = src_getc(cur);
-    }
-    while (c != EOF && c != '\n')
-        c = src_getc(cur);
-    cur->line_num = new_line;
-}
-
-static const char *next_tok(void) {
-    for (;;) {
-        int c = skip_ws_and_comments();
-        if (c == EOF)
-            return NULL;
-
-        {
-            SrcFile *cur = &src_stack.data[src_stack.len - 1];
-            sb_reset(&tok_sb);
-            while (c != EOF && !isspace((unsigned char)c)) {
-                sb_putc(&tok_sb, (char)c);
-                c = src_getc(cur);
-            }
-            if (strcmp(tok_sb.data, "#line") == 0) {
-                parse_line_directive(cur, c);
-                continue;
-            }
-            if (c == '\n')
-                cur->line_num++;
-        }
-        return tok_sb.data;
-    }
-}
-
-static const char *next_tok_intern(void) { return next_tok() ? sb_intern(&tok_sb) : NULL; }
-
-static FILE *try_open_require(const char *path, int *already_seen) {
-    size_t i;
-    const char *p = intern_find(path);
-    *already_seen = 0;
-    if (p) {
-        for (i = 0; i < seen_files.len; i++) {
-            if (seen_files.data[i] == p) {
-                *already_seen = 1;
-                return NULL;
-            }
-        }
-    }
-    return fopen(path, "r");
-}
-
-static void push_src_file(FILE *fp, const char *path, u16 req_group, u8 req_rank) {
-    const char *ipath = intern_str(path);
-    SrcFile *sf = VEC_ADD(src_stack);
-    VEC_PUSH(seen_files, ipath);
-    sf->fp = fp;
-    sf->path = ipath;
-    sf->line_num = 1;
-    sf->req_group = req_group;
-    sf->req_rank = req_rank;
-    sf->buf_pos = 0;
-    sf->buf_len = 0;
-    sf->pushback = -1;
-}
-
-static const char *platform_parent(const char *plat) {
-    if (plat && strcmp(plat, "x16") == 0)
-        return "c64";
-    return NULL;
-}
-
-static void push_require_ex(const char *name, int lib_only) {
-    const char *cands[4];
-    int n_cands = 0;
-    int c;
-    FILE *found_fps[4];
-    const char *found_paths[4];
-    u8 found_ranks[4];
-    int found_cnt = 0;
-    int seen_cnt = 0;
-
-    if (name[0] != '/') {
-        if (platform_name != NULL && platform_name[0] != '\0') {
-            const char *par = platform_parent(platform_name);
-            cands[n_cands++] = path_join(platform_name, name);
-            if (par)
-                cands[n_cands++] = path_join(par, name);
-        }
-        cands[n_cands++] = path_join(be->name, name);
-    }
-    cands[n_cands++] = intern_str(name);
-
-    if (!lib_only && src_stack.data[src_stack.len - 1].req_group == 0) {
-        for (c = 0; c < n_cands; c++) {
-            const char *path = path_resolve(src_stack.data[src_stack.len - 1].path, cands[c]);
-            int seen = 0;
-            FILE *fp = try_open_require(path, &seen);
-            if (seen)
-                seen_cnt++;
-            else if (fp) {
-                found_fps[found_cnt] = fp;
-                found_paths[found_cnt] = path;
-                found_ranks[found_cnt] = (u8)c;
-                found_cnt++;
-            }
-        }
-    }
-
-    if (found_cnt == 0 && seen_cnt == 0 && name[0] != '/') {
-        StrVec roots;
-        const char *exe_dir = path_exe_dir();
-        size_t r;
-        roots.data = NULL;
-        roots.len = 0;
-        roots.cap = 0;
-        for (r = 0; r < extra_lib_roots.len; r++) {
-            VEC_PUSH(roots, extra_lib_roots.data[r]);
-        }
-        if (exe_dir != NULL) {
-            VEC_PUSH(roots, path_join(exe_dir, "../lib"));
-            VEC_PUSH(roots, path_join(exe_dir, "lib"));
-        }
-        VEC_PUSH(roots, "lib");
-        for (r = 0; r < roots.len && found_cnt == 0 && seen_cnt == 0; r++) {
-            for (c = 0; c < n_cands; c++) {
-                const char *path = path_join(roots.data[r], cands[c]);
-                int seen = 0;
-                FILE *fp = try_open_require(path, &seen);
-                if (seen)
-                    seen_cnt++;
-                else if (fp) {
-                    found_fps[found_cnt] = fp;
-                    found_paths[found_cnt] = path;
-                    found_ranks[found_cnt] = (u8)c;
-                    found_cnt++;
-                }
-            }
-        }
-        free(roots.data);
-    }
-
-    if (!lib_only && found_cnt == 0 && seen_cnt == 0 &&
-        src_stack.data[src_stack.len - 1].req_group != 0) {
-        for (c = 0; c < n_cands; c++) {
-            const char *path = path_resolve(src_stack.data[src_stack.len - 1].path, cands[c]);
-            int seen = 0;
-            FILE *fp = try_open_require(path, &seen);
-            if (seen)
-                seen_cnt++;
-            else if (fp) {
-                found_fps[found_cnt] = fp;
-                found_paths[found_cnt] = path;
-                found_ranks[found_cnt] = (u8)c;
-                found_cnt++;
-            }
-        }
-    }
-
-    if (found_cnt > 0) {
-        u16 grp = next_req_group++;
-        int i;
-        /* Push least-specific first so most-specific is parsed first on LIFO stack. */
-        for (i = found_cnt - 1; i >= 0; i--) {
-            push_src_file(found_fps[i], found_paths[i], grp, found_ranks[i]);
-        }
-        return;
-    }
-    if (seen_cnt > 0)
-        return;
-
-    {
-        const SrcFile *cur = &src_stack.data[src_stack.len - 1];
-        fprintf(stderr, "ir4c error (%s:%u): cannot open required file '%s'\n", cur->path,
-                cur->line_num, name);
-        exit(1);
-    }
-}
-
-static const char *read_require_path(void) {
-    int c = skip_ws_and_comments();
-    SrcFile *cur = &src_stack.data[src_stack.len - 1];
-
-    if (c != '"')
-        ir4_die("expected quoted filename after 'require'");
-    return read_quoted_intern(cur, "unterminated filename in 'require'");
-}
-
-static void push_require(const char *name) { push_require_ex(name, 0); }
-
-static int parse_int(const char *s, i32 *val) {
-    char *endp;
-    int base = 0;
-    const char *p = s;
-
-    if (*p == '$') {
-        base = 16;
-        p++;
-        if (*p == '\0')
-            return 0;
-    } else if ((p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) ||
-               ((p[0] == '-' || p[0] == '+') && p[1] == '0' &&
-                (p[2] == 'b' || p[2] == 'B'))) {
-        int neg = (p[0] == '-');
-        p += (p[0] == '-' || p[0] == '+') ? 3 : 2;
-        if (*p == '\0')
-            return 0;
-        *val = (i32)strtol(p, &endp, 2);
-        if (neg)
-            *val = -*val;
-        return (*endp == '\0');
-    } else {
-        if (*p == '-' || *p == '+')
-            p++;
-        if (!isdigit((unsigned char)*p))
-            return 0;
-        p = s;
-    }
-
-    *val = (i32)strtol(p, &endp, base);
-    return (*endp == '\0');
-}
-
-static int parse_float(const char *s, double *val) {
-    char *endp;
-    const char *p = s;
-
-    if (*p == '-' || *p == '+')
-        p++;
-    if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
-        return 0;
-    if (!isdigit((unsigned char)*p) && *p != '.')
-        return 0;
-    if (*p == '.' && !isdigit((unsigned char)p[1]))
-        return 0;
-    if (strchr(p, '.') == NULL && strchr(p, 'e') == NULL && strchr(p, 'E') == NULL) {
-        return 0;
-    }
-
-    *val = strtod(s, &endp);
-    return (*endp == '\0');
 }
 
 static size_t tstack_bytes(void) {
@@ -558,7 +84,7 @@ static StackType tpop(void) {
 static void tpop_expect(StackType expected) {
     StackType got = tpop();
     if (got != expected) {
-        const SrcFile *cur = &src_stack.data[src_stack.len - 1];
+        const SrcFile *cur = lex_cur();
         fprintf(stderr, "ir4c error (%s:%lu): expected %s, got %s\n", cur->path,
                 (unsigned long)cur->line_num, type_name(expected), type_name(got));
         exit(1);
@@ -775,7 +301,7 @@ static const BuiltinDef builtins[] = {/* Native word (:i) arithmetic & bitwise *
                                       {"i>u32", OP_U2I32, TY_W, TY_NONE, TY_I32},
                                       {"i32>i", OP_I322W, TY_I32, TY_NONE, TY_W}};
 
-static IrInstr *emit_ir(IrKind kind, WordIR *w) {
+IrInstr *emit_ir(IrKind kind, WordIR *w) {
     IrInstr *ins = VEC_ADD(ir_buf);
     memset(ins, 0, sizeof(IrInstr));
     ins->kind = kind;
@@ -1429,7 +955,7 @@ static void free_sig_vecs(FuncSig *s) {
     s->out_types.data = NULL;
 }
 
-static size_t alloc_func(FuncSig **sig_out, WordIR **w_out) {
+size_t alloc_func(FuncSig **sig_out, WordIR **w_out) {
     size_t idx = funcs.len;
     FuncSig *sig = NEW(FuncSig);
     WordIR *w = NEW(WordIR);
@@ -1453,8 +979,8 @@ static void compile_word(int is_default, int is_hot) {
     size_t fidx;
     int existing;
     size_t param_cnt = 0;
-    u16 cur_grp = src_stack.data[src_stack.len - 1].req_group;
-    u8 cur_rank = src_stack.data[src_stack.len - 1].req_rank;
+    u16 cur_grp = lex_cur()->req_group;
+    u8 cur_rank = lex_cur()->req_rank;
 
     name = next_tok_intern();
     if (!name)
@@ -1533,9 +1059,6 @@ static void compile_word(int is_default, int is_hot) {
         ir_buf.len = saved_ir_count;
     }
 }
-
-VEC_OF(IdxVec, size_t);
-static IdxVec init_funcs;
 
 static void raw_emit_u8(size_t *out_len, u8 b) {
     VEC_PUSH(raw_code_buf, b);
@@ -1623,8 +1146,8 @@ static void compile_code(int is_hot) {
     size_t fidx;
 
     int existing;
-    u16 cur_grp = src_stack.data[src_stack.len - 1].req_group;
-    u8 cur_rank = src_stack.data[src_stack.len - 1].req_rank;
+    u16 cur_grp = lex_cur()->req_group;
+    u8 cur_rank = lex_cur()->req_rank;
 
     name = next_tok_intern();
     if (!name)
@@ -2367,7 +1890,7 @@ static void compile_body(WordIR *w) {
         }
 
         {
-            const SrcFile *cur = &src_stack.data[src_stack.len - 1];
+            const SrcFile *cur = lex_cur();
             fprintf(stderr, "ir4c error (%s:%lu): unknown word '%s'\n", cur->path,
                     (unsigned long)cur->line_num, tok);
         }
@@ -2375,449 +1898,6 @@ static void compile_body(WordIR *w) {
     }
 
     ir4_die("unexpected EOF inside word definition (missing ';')");
-}
-
-static Bool can_reach_func(size_t cur, size_t target, Bool *visited) {
-    WordIR *w = words.data[cur];
-    size_t i;
-    if (funcs.data[cur]->is_extern || w->is_code)
-        return false;
-    for (i = 0; i < w->ir_len; i++) {
-        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-        if (ins->kind == IR_CALL) {
-            size_t callee = ins->u.func_idx;
-            if (callee == target)
-                return true;
-            if (!visited[callee]) {
-                visited[callee] = true;
-                if (can_reach_func(callee, target, visited))
-                    return true;
-            }
-        }
-    }
-    return false;
-}
-
-#define HOT_CODE_INLINE_MAX 16
-
-static int can_inline_hot_code(size_t fidx, size_t *out_len) {
-    FuncSig *sig = funcs.data[fidx];
-    WordIR *cw = words.data[fidx];
-    if (!cw->is_code || !sig->is_hot || cw->ir_len == 0 || cw->ir_len > HOT_CODE_INLINE_MAX)
-        return 0;
-    if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "z80") != 0 &&
-        strcmp(be->name, "ez80") != 0)
-        return 0;
-    *out_len = cw->ir_len;
-    return 1;
-}
-
-static void mark_reachable(size_t fidx) {
-    WordIR *w = words.data[fidx];
-    size_t i;
-    if (funcs.data[fidx]->is_extern)
-        return;
-    if (!funcs.data[fidx]->is_defined)
-        ir4_die("called 'fwd' function was never defined");
-    if (w->reachable)
-        return;
-    w->reachable = 1;
-    if (w->is_code)
-        return;
-    for (i = 0; i < w->ir_len; i++) {
-        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-        if (ins->kind == IR_CALL) {
-            size_t inl_len = 0;
-            if (!can_inline_hot_code(ins->u.func_idx, &inl_len))
-                mark_reachable(ins->u.func_idx);
-        } else if (ins->kind == IR_PUSH_FN) {
-            mark_reachable(ins->u.func_idx);
-        }
-    }
-}
-
-typedef struct {
-    size_t patch_offset;
-    size_t target_ir;
-} PendingBr;
-
-typedef struct {
-    size_t call_pc;
-    size_t call_addr;
-    size_t func_idx;
-    Bool is_fn_ptr;
-} FwdCall;
-
-VEC_OF(FwdCallVec, FwdCall);
-VEC_OF(PendingBrVec, PendingBr);
-
-static FwdCallVec fwd_calls;
-static size_t heap_start_off = 0;
-
-static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_start,
-                                  size_t reloc_cnt) {
-    size_t i;
-    size_t base_pc = cb_pc();
-    size_t base_addr = be->cur_addr();
-    for (i = 0; i < raw_len; i++) {
-        cb_emit8(raw_code_buf.data[raw_start + i]);
-    }
-    for (i = 0; i < reloc_cnt; i++) {
-        const CodeReloc *rel = &code_relocs.data[reloc_start + i];
-        size_t pc = base_pc + rel->ir_off;
-        if (rel->kind == CODE_REL_SELF) {
-            cb_patch16(pc, (u16)(base_addr + rel->addend));
-        } else if (rel->kind == CODE_REL_STACK) {
-#if IR4_ENABLE_6502
-            if (be == &be_6502 && be_6502_stack_zp_base() != 0) {
-                cb_patch16(pc, (u16)(be_6502_stack_zp_base() + rel->addend));
-            } else
-#endif
-            {
-                cb_add_data_reloc(pc, be->stack_data_off() + rel->addend);
-            }
-        }
-    }
-}
-
-static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
-    size_t j;
-    for (j = 0; j < w->ir_len; j++) {
-        const IrInstr *bi = &ir_buf.data[w->ir_start + j];
-        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
-            return 1;
-        if (bi->kind == IR_JTAB) {
-            size_t k;
-            for (k = 0; k < bi->u.jtab.count; k++) {
-                if (jtab_targets.data[bi->u.jtab.start + k] == ir_idx)
-                    return 1;
-            }
-        }
-    }
-    return 0;
-}
-
-typedef struct {
-    size_t patch_offset;
-    size_t idx;
-    size_t count;
-    size_t target_ir;
-} PendingJtab;
-VEC_OF(PendingJtabVec, PendingJtab);
-
-static void emit_word(size_t fidx) {
-    static SizeVec ir_addr;
-    FuncSig *sig = funcs.data[fidx];
-    WordIR *w = words.data[fidx];
-    PendingBrVec pending;
-    PendingJtabVec pending_jtab;
-    size_t i, p;
-
-    pending.data = NULL;
-    pending.len = 0;
-    pending.cap = 0;
-    pending_jtab.data = NULL;
-    pending_jtab.len = 0;
-    pending_jtab.cap = 0;
-
-    if (w->is_code) {
-        sig->addr = be->cur_addr();
-        sig->has_addr = 1;
-        emit_raw_code_block(w->ir_start, w->ir_len, w->reloc_start, w->reloc_cnt);
-        if (strcmp(be->name, "6502") == 0)
-            cb_emit8(0x60); /* RTS */
-        else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
-            cb_emit8(0xC9); /* RET */
-        else
-            ir4_die("'code' is not supported on this backend");
-        return;
-    }
-
-    VEC_ENSURE(ir_addr, w->ir_len + 1);
-    sig->addr = be->cur_addr();
-    sig->has_addr = 1;
-    be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
-
-    for (i = 0; i <= w->ir_len; i++) {
-        if (be->peep_fence && ir_is_br_target(w, i))
-            be->peep_fence();
-        for (p = 0; p < pending.len; p++) {
-            if (pending.data[p].target_ir == i) {
-                be->patch_fwd(pending.data[p].patch_offset);
-            }
-        }
-        for (p = 0; p < pending_jtab.len; p++) {
-            if (pending_jtab.data[p].target_ir == i) {
-                be->patch_jtab(pending_jtab.data[p].patch_offset, pending_jtab.data[p].idx,
-                               pending_jtab.data[p].count, be->cur_addr());
-            }
-        }
-        if (i == w->ir_len)
-            break;
-        ir_addr.data[i] = be->cur_addr();
-        {
-            const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-            switch (ins->kind) {
-            case IR_FN_END:
-                be->fn_end(sig, w->locals.data, w->locals.len);
-                break;
-            case IR_PUSH_W:
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_LOCAL_OP) {
-                    const IrInstr *nins = &ir_buf.data[w->ir_start + i + 1];
-                    if (nins->u.loc.op == LOCAL_ADD && be->local_add_imm &&
-                        be->local_add_imm(nins->u.loc.slot, nins->u.loc.type,
-                                          nins->u.loc.stack_bytes, ins->u.w)) {
-                        i++;
-                        break;
-                    }
-                }
-                if (i + 2 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
-                    ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP) {
-                    IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
-                    IrOp mop = ir_buf.data[w->ir_start + i + 2].u.op;
-                    if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
-                        mop <= OP_FSTORE && be->mem_imm) {
-                        i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)ins->u.w) : ins->u.w;
-                        if (be->mem_imm(mop, off)) {
-                            i += 2;
-                            break;
-                        }
-                    }
-                }
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
-                    IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
-                    i32 imm = ins->u.w;
-                    if (aop == OP_ADD || aop == OP_SUB || aop == OP_AADD || aop == OP_ASUB) {
-                        i32 delta = (aop == OP_SUB || aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
-                        if (be->add_imm && be->add_imm(delta)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop >= OP_EQ && aop <= OP_AGT) {
-                        if (i + 2 < w->ir_len && !ir_is_br_target(w, i + 1) &&
-                            !ir_is_br_target(w, i + 2)) {
-                            const IrInstr *bins = &ir_buf.data[w->ir_start + i + 2];
-                            if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ &&
-                                be->cmp_br_fwd) {
-                                size_t patch_off = 0;
-                                if (be->cmp_br_fwd(aop, 1, imm, &patch_off)) {
-                                    PendingBr *pb = VEC_ADD(pending);
-                                    pb->patch_offset = patch_off;
-                                    pb->target_ir = bins->u.br.target;
-                                    i += 2;
-                                    break;
-                                }
-                            } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
-                                       be->cmp_br_back) {
-                                if (be->cmp_br_back(aop, 1, imm,
-                                                    ir_addr.data[bins->u.br.target])) {
-                                    i += 2;
-                                    break;
-                                }
-                            }
-                        }
-                        if (aop <= OP_UGE && be->cmp_imm && be->cmp_imm(aop, imm)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop == OP_LSHIFT || aop == OP_RSHIFT || aop == OP_ARSHIFT ||
-                               aop == OP_SHL32 || aop == OP_RSHR32 || aop == OP_ASHR32) {
-                        u8 max_sh = (aop >= OP_SHL32 || be->word_bytes == 4) ? 31
-                                    : (be->word_bytes == 8)                  ? 63
-                                                                             : (u8)(be->word_bytes * 8 - 1);
-                        if (imm >= 0 && imm <= (i32)max_sh && be->shift_imm &&
-                            be->shift_imm(aop, (u8)imm)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop == OP_AND || aop == OP_OR || aop == OP_XOR) {
-                        if (be->bit_imm && be->bit_imm(aop, imm)) {
-                            i++;
-                            break;
-                        }
-                    }
-                }
-                be->push_w(ins->u.w);
-                break;
-            case IR_PUSH_A:
-                be->push_a(ins->u.a);
-                break;
-            case IR_PUSH_F:
-                be->push_f(ins->u.f);
-                break;
-            case IR_PUSH_I32:
-                be->push_i32(ins->u.w);
-                break;
-            case IR_PUSH_DATA:
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
-                    be->data_mem &&
-                    be->data_mem(ir_buf.data[w->ir_start + i + 1].u.op, ins->u.offset)) {
-                    i++;
-                    break;
-                }
-                be->push_data(ins->u.offset);
-                break;
-            case IR_PUSH_HEAP_START:
-                be->push_data(heap_start_off);
-                break;
-            case IR_LOCAL_OP:
-                if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
-                    if (i + 3 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_PUSH_W &&
-                        ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP &&
-                        ir_buf.data[w->ir_start + i + 3].kind == IR_ALU_OP) {
-                        IrOp aop = ir_buf.data[w->ir_start + i + 2].u.op;
-                        IrOp mop = ir_buf.data[w->ir_start + i + 3].u.op;
-                        if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
-                            mop <= OP_FSTORE) {
-                            i32 imm = ir_buf.data[w->ir_start + i + 1].u.w;
-                            i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
-                            if (be->local_mem(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
-                                i += 3;
-                                break;
-                            }
-                        }
-                    } else if (i + 1 < w->ir_len &&
-                               ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
-                        IrOp mop = ir_buf.data[w->ir_start + i + 1].u.op;
-                        if (mop >= OP_I8FETCH && mop <= OP_FSTORE &&
-                            be->local_mem(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
-                            i += 1;
-                            break;
-                        }
-                    }
-                }
-                be->local_op(ins->u.loc.op, ins->u.loc.slot, ins->u.loc.type,
-                             ins->u.loc.stack_bytes);
-                break;
-            case IR_STACK_OP:
-                be->stack_op(ins->u.stk.op, ins->u.stk.t1, ins->u.stk.t2);
-                break;
-            case IR_ALU_OP:
-                if (ins->u.op >= OP_EQ && ins->u.op <= OP_AGT && i + 1 < w->ir_len &&
-                    !ir_is_br_target(w, i + 1)) {
-                    const IrInstr *bins = &ir_buf.data[w->ir_start + i + 1];
-                    if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ && be->cmp_br_fwd) {
-                        size_t patch_off = 0;
-                        if (be->cmp_br_fwd(ins->u.op, 0, 0, &patch_off)) {
-                            PendingBr *pb = VEC_ADD(pending);
-                            pb->patch_offset = patch_off;
-                            pb->target_ir = bins->u.br.target;
-                            i++;
-                            break;
-                        }
-                    } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
-                               be->cmp_br_back) {
-                        if (be->cmp_br_back(ins->u.op, 0, 0, ir_addr.data[bins->u.br.target])) {
-                            i++;
-                            break;
-                        }
-                    }
-                }
-                be->op(ins->u.op);
-                break;
-            case IR_CALL: {
-                size_t target = ins->u.func_idx;
-                size_t inl_len = 0;
-                if (can_inline_hot_code(target, &inl_len)) {
-                    emit_raw_code_block(words.data[target]->ir_start, inl_len,
-                                        words.data[target]->reloc_start,
-                                        words.data[target]->reloc_cnt);
-                    break;
-                }
-                if (funcs.data[target]->has_addr && be->tail_call && i + 1 < w->ir_len &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_FN_END &&
-                    !ir_is_br_target(w, i + 1)) {
-#if IR4_ENABLE_6502
-                    if (be == &be_6502) {
-                        be_6502_set_call_bank(funcs.data[target]->bank);
-                    }
-#endif
-                    if (be->tail_call(funcs.data[target]->addr, sig, funcs.data[target],
-                                      w->locals.data, w->locals.len)) {
-                        i++;
-                        break;
-                    }
-                }
-                {
-                size_t call_addr = be->cur_addr();
-                size_t call_pc = cb_pc();
-#if IR4_ENABLE_6502
-                if (be == &be_6502) {
-                    be_6502_set_call_bank(funcs.data[target]->bank);
-                }
-#endif
-                be->call(funcs.data[target]->addr);
-                if (!funcs.data[target]->has_addr) {
-                    FwdCall *fc = VEC_ADD(fwd_calls);
-                    fc->call_pc = call_pc;
-                    fc->call_addr = call_addr;
-                    fc->func_idx = target;
-                    fc->is_fn_ptr = 0;
-                }
-                }
-                break;
-            }
-            case IR_PUSH_FN: {
-                size_t target = ins->u.func_idx;
-                size_t fn_addr = be->cur_addr();
-                size_t fn_pc = be->push_fn(funcs.data[target]->addr);
-                if (!funcs.data[target]->has_addr) {
-                    FwdCall *fc = VEC_ADD(fwd_calls);
-                    fc->call_pc = fn_pc;
-                    fc->call_addr = fn_addr;
-                    fc->func_idx = target;
-                    fc->is_fn_ptr = 1;
-                }
-                break;
-            }
-            case IR_ICALL:
-                be->icall();
-                break;
-            case IR_CALL_EXTERN:
-                be->call_extern(funcs.data[ins->u.func_idx]);
-                break;
-            case IR_BR_FWD: {
-                PendingBr *pb = VEC_ADD(pending);
-                pb->patch_offset = be->emit_br_fwd(ins->u.br.cond);
-                pb->target_ir = ins->u.br.target;
-                break;
-            }
-            case IR_BR_BACK:
-                be->emit_br_back(ins->u.br.cond, ir_addr.data[ins->u.br.target]);
-                break;
-            case IR_JTAB: {
-                size_t tbl_off, k;
-                if (!be->emit_jtab || !be->patch_jtab)
-                    ir4_die("'jtab' is not supported on this backend");
-                tbl_off = be->emit_jtab(ins->u.jtab.count);
-                for (k = 0; k < ins->u.jtab.count; k++) {
-                    size_t tir = jtab_targets.data[ins->u.jtab.start + k];
-                    if (tir <= i) {
-                        be->patch_jtab(tbl_off, k, ins->u.jtab.count, ir_addr.data[tir]);
-                    } else {
-                        PendingJtab *pj = VEC_ADD(pending_jtab);
-                        pj->patch_offset = tbl_off;
-                        pj->idx = k;
-                        pj->count = ins->u.jtab.count;
-                        pj->target_ir = tir;
-                    }
-                }
-                break;
-            }
-            case IR_INLINE: {
-                const InlineBlock *ib = &inline_blocks.data[ins->u.inl_idx];
-                if (strcmp(be->name, "bc") == 0)
-                    ir4_die("'inline' is not supported on bytecode target");
-                if (be->peep_fence)
-                    be->peep_fence();
-                emit_raw_code_block(ib->raw_start, ib->raw_len, ib->reloc_start, ib->reloc_cnt);
-                break;
-            }
-            }
-        }
-    }
-    free(pending.data);
-    free(pending_jtab.data);
 }
 
 static void flush_vals_word(i32 val) {
@@ -2831,7 +1911,7 @@ static void flush_vals_word(i32 val) {
 }
 
 static void emit_vals_string(void) {
-    SrcFile *cur = &src_stack.data[src_stack.len - 1];
+    SrcFile *cur = lex_cur();
     for (;;) {
         int c = src_getc(cur);
         if (c == EOF || c == '\n')
@@ -2900,7 +1980,7 @@ static void compile_data(void) {
             emit_vals_string();
             continue;
         }
-        src_ungetc(&src_stack.data[src_stack.len - 1], ch);
+        src_ungetc(lex_cur(), ch);
         tok = next_tok();
         if (!tok)
             break;
@@ -2983,8 +2063,8 @@ static void compile_const(int is_default) {
     double fv = 0.0;
     int is_int;
     int is_float;
-    u16 cur_grp = src_stack.data[src_stack.len - 1].req_group;
-    u8 cur_rank = src_stack.data[src_stack.len - 1].req_rank;
+    u16 cur_grp = lex_cur()->req_group;
+    u8 cur_rank = lex_cur()->req_rank;
     int ex_idx;
     ConstSym cs;
 
@@ -3059,23 +2139,7 @@ static void add_builtin_const(const char *name, i32 val) {
 
 static void init_frontend(FILE *in, const char *path, const Backend *target_be,
                           const char *platform) {
-    const char *root_path = intern_str((path != NULL) ? path : "<stdin>");
-    SrcFile *sf;
-
-    src_stack.len = 0;
-    sf = VEC_ADD(src_stack);
-    sf->fp = in;
-    sf->path = root_path;
-    sf->line_num = 1;
-    sf->req_group = 0;
-    sf->req_rank = 0;
-    sf->buf_pos = 0;
-    sf->buf_len = 0;
-    sf->pushback = -1;
-    next_req_group = 1;
-
-    seen_files.len = 0;
-    VEC_PUSH(seen_files, root_path);
+    lex_init(in, path);
 
     be = target_be;
     platform_name = platform;
@@ -3110,7 +2174,7 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
     raw_code_buf.len = 0;
     inline_blocks.len = 0;
     code_relocs.len = 0;
-    fwd_calls.len = 0;
+    ir_emit_reset();
     init_funcs.len = 0;
 
     if (be->word_bytes < 4 && strcmp(be->name, "bc") != 0 && strcmp(be->name, "ez80") != 0) {
@@ -3177,8 +2241,8 @@ static void parse_toplevel(void) {
             FuncSig ex_sig;
             const char *name;
             int existing;
-            u16 cur_grp = src_stack.data[src_stack.len - 1].req_group;
-            u8 cur_rank = src_stack.data[src_stack.len - 1].req_rank;
+            u16 cur_grp = lex_cur()->req_group;
+            u8 cur_rank = lex_cur()->req_rank;
             name = next_tok_intern();
             if (!name)
                 ir4_die("expected word name after 'extern'");
@@ -3275,300 +2339,6 @@ static void parse_toplevel(void) {
             VEC_PUSH(buffers, bs);
         } else {
             ir4_die("expected top-level 'fn', 'var', 'data', 'extern', or 'require'");
-        }
-    }
-}
-
-static void run_reachability_dce(void) {
-    int main_idx = ir4_find_func("main");
-    size_t f;
-    Bool *visited;
-
-    if (main_idx >= 0 && init_funcs.len > 0) {
-        size_t wrap_idx;
-        FuncSig *wsig;
-        WordIR *ww;
-        IrInstr *ins;
-        size_t k;
-        funcs.data[main_idx]->name = intern_str("__main_body");
-        wrap_idx = alloc_func(&wsig, &ww);
-        wsig->name = intern_str("main");
-        wsig->is_defined = 1;
-        for (k = 0; k < funcs.data[main_idx]->out_types.len; k++) {
-            VEC_PUSH(wsig->out_types, funcs.data[main_idx]->out_types.data[k]);
-        }
-        ww->ir_start = ir_buf.len;
-        for (k = 0; k < init_funcs.len; k++) {
-            ins = emit_ir(IR_CALL, ww);
-            ins->u.func_idx = init_funcs.data[k];
-        }
-        ins = emit_ir(IR_CALL, ww);
-        ins->u.func_idx = (size_t)main_idx;
-        emit_ir(IR_FN_END, ww);
-        main_idx = (int)wrap_idx;
-    }
-    if (main_idx >= 0) {
-        size_t di;
-        mark_reachable((size_t)main_idx);
-        for (di = 0; di < cb_data_init_reloc_count(); di++) {
-            size_t po, tv;
-            u8 ab;
-            Bool is_c;
-            cb_get_data_init_reloc(di, &po, &tv, &ab, &is_c);
-            if (is_c)
-                mark_reachable(tv);
-        }
-    } else {
-        for (f = 0; f < funcs.len; f++) {
-            if (!funcs.data[f]->is_extern && funcs.data[f]->is_defined)
-                words.data[f]->reachable = true;
-        }
-    }
-
-    visited = (Bool *)vec_calloc(funcs.len ? funcs.len : 1, sizeof(Bool));
-    for (f = 0; f < funcs.len; f++) {
-        if (words.data[f]->reachable) {
-            memset(visited, 0, funcs.len * sizeof(Bool));
-            funcs.data[f]->is_recursive = can_reach_func(f, f, visited);
-        }
-    }
-    free(visited);
-}
-
-static u16 assign_code_banks(void) {
-    u16 max_bank = 0;
-    u32 soft_cap = (u32)(cb_bank_size() > 4096 ? cb_bank_size() - 4096 : cb_bank_size());
-    u16 cur_b = 1;
-    u32 cur_sz = 0;
-    size_t f;
-
-    for (f = 0; f < funcs.len; f++) {
-        FuncSig *sig = funcs.data[f];
-        WordIR *w = words.data[f];
-        if (sig->is_extern || !w->reachable) {
-            sig->bank = 0;
-            continue;
-        }
-        if (sig->is_hot || w->is_code || strcmp(sig->name, "main") == 0 ||
-            strcmp(sig->name, "init") == 0) {
-            sig->bank = 0;
-        } else {
-            u32 est_sz = (u32)(w->ir_len * 64);
-            if (est_sz == 0)
-                est_sz = 16;
-            if (cur_sz > 0 && cur_sz + est_sz > soft_cap) {
-                cur_b++;
-                cur_sz = 0;
-            }
-            sig->bank = cur_b;
-            cur_sz += est_sz;
-            if (cur_b > max_bank)
-                max_bank = cur_b;
-        }
-    }
-    return max_bank;
-}
-
-#if IR4_ENABLE_6502
-static Bool *select_compact_funcs(void) {
-    Bool *fn_compact = NULL;
-    u32 *est = (u32 *)vec_calloc(funcs.len, sizeof(u32));
-    u32 *heat = (u32 *)vec_calloc(funcs.len, sizeof(u32));
-    u32 total_est = 0;
-    size_t max_ir = 1;
-    size_t f;
-
-    for (f = 0; f < funcs.len; f++) {
-        if (!funcs.data[f]->is_extern && words.data[f]->reachable && !words.data[f]->is_code) {
-            est[f] = (u32)(words.data[f]->ir_len * 10);
-            total_est += est[f];
-            if (words.data[f]->ir_len > max_ir)
-                max_ir = words.data[f]->ir_len;
-        }
-    }
-    if (total_est > 10240) {
-        u8 *depth = (u8 *)vec_calloc(max_ir, sizeof(u8));
-        u32 native_budget = 6144;
-        int pass;
-        fn_compact = (Bool *)vec_calloc(funcs.len, sizeof(Bool));
-        for (f = 0; f < funcs.len; f++) {
-            WordIR *w = words.data[f];
-            size_t i;
-            if (funcs.data[f]->is_extern || !w->reachable || w->is_code)
-                continue;
-            fn_compact[f] = !(funcs.data[f]->is_hot || w->has_inline);
-            if (funcs.data[f]->is_hot)
-                heat[f] += 10000;
-            if (funcs.data[f]->is_recursive)
-                heat[f] += 100;
-            memset(depth, 0, w->ir_len);
-            for (i = 0; i < w->ir_len; i++) {
-                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-                if (ins->kind == IR_BR_BACK) {
-                    size_t k;
-                    for (k = ins->u.br.target; k <= i; k++) {
-                        if (depth[k] < 255)
-                            depth[k]++;
-                    }
-                }
-            }
-            for (i = 0; i < w->ir_len; i++) {
-                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-                u32 wgt = (depth[i] == 0) ? 0 : (depth[i] == 1 ? 10 : 100);
-                heat[f] += wgt;
-                if (ins->kind == IR_CALL && wgt > 0) {
-                    heat[ins->u.func_idx] += wgt * 4;
-                }
-            }
-        }
-        /* Propagate loop heat one hop to callees of hot functions */
-        for (pass = 0; pass < 2; pass++) {
-            for (f = 0; f < funcs.len; f++) {
-                WordIR *w = words.data[f];
-                size_t i;
-                if (funcs.data[f]->is_extern || !w->reachable || w->is_code || heat[f] == 0)
-                    continue;
-                for (i = 0; i < w->ir_len; i++) {
-                    const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-                    if (ins->kind == IR_CALL && heat[ins->u.func_idx] < heat[f]) {
-                        heat[ins->u.func_idx] += heat[f] / 2;
-                    }
-                }
-            }
-        }
-        /* Greedily keep hottest functions (by heat/byte) native up to budget */
-        for (;;) {
-            size_t best_f = funcs.len;
-            u32 best_score = 0;
-            for (f = 0; f < funcs.len; f++) {
-                u32 score;
-                if (!fn_compact[f] || heat[f] == 0 || est[f] > native_budget)
-                    continue;
-                score = (heat[f] * 100) / (est[f] ? est[f] : 1);
-                if (score > best_score) {
-                    best_score = score;
-                    best_f = f;
-                }
-            }
-            if (best_f == funcs.len)
-                break;
-            fn_compact[best_f] = false;
-            native_budget -= est[best_f];
-        }
-        free(depth);
-    }
-    free(est);
-    free(heat);
-    return fn_compact;
-}
-#endif
-
-static void emit_program(void) {
-#if IR4_ENABLE_6502
-    int saved_compact = (be == &be_6502) ? be_6502_get_compact() : 0;
-#endif
-    Bool *fn_compact = NULL;
-    u16 max_bank = 0;
-    size_t f;
-    size_t c;
-
-#if IR4_ENABLE_6502
-    if (be == &be_6502)
-        (void)be_6502_stack_data_off();
-#endif
-    heap_start_off = cb_alloc_data(0, be->word_bytes);
-
-    if (cb_is_banked() && funcs.len > 0) {
-        max_bank = assign_code_banks();
-    }
-#if IR4_ENABLE_6502
-    else if (be == &be_6502 && saved_compact == 2 && funcs.len > 0) {
-        fn_compact = select_compact_funcs();
-    }
-#endif
-
-    if (cb_is_banked()) {
-        u16 b;
-#if IR4_ENABLE_6502
-        if (be == &be_6502)
-            be_6502_set_compact(0);
-#endif
-        for (b = 0; b <= max_bank; b++) {
-            if (b > 0)
-                cb_begin_bank(b);
-            for (f = 0; f < funcs.len; f++) {
-                if (!funcs.data[f]->is_extern && words.data[f]->reachable &&
-                    funcs.data[f]->bank == b) {
-                    emit_word(f);
-                }
-            }
-#if IR4_ENABLE_6502
-            if (b == 0 && max_bank > 0 && be == &be_6502) {
-                int need_mul = 0, need_div = 0, need_icall = 0, need_fp = 0;
-                for (f = 0; f < funcs.len; f++) {
-                    WordIR *w = words.data[f];
-                    size_t i;
-                    if (funcs.data[f]->is_extern || !w->reachable || funcs.data[f]->bank == 0)
-                        continue;
-                    for (i = 0; i < w->ir_len; i++) {
-                        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
-                        if (ins->kind == IR_ICALL) {
-                            need_icall = 1;
-                        } else if (ins->kind == IR_ALU_OP) {
-                            IrOp op = ins->u.op;
-                            if (op == OP_MUL)
-                                need_mul = 1;
-                            else if (op == OP_DIV || op == OP_MOD || op == OP_UDIV || op == OP_UMOD)
-                                need_div = 1;
-                            else if ((op >= OP_FADD && op <= OP_FDIV) ||
-                                     (op >= OP_FEQ && op <= OP_FGT) || op == OP_W2F ||
-                                     op == OP_F2W)
-                                need_fp = 1;
-                        }
-                    }
-                }
-                be_6502_ensure_helpers(need_mul, need_div, need_icall, need_fp);
-            }
-#endif
-        }
-        cb_end_banks();
-    } else {
-        for (f = 0; f < funcs.len; f++) {
-            if (!funcs.data[f]->is_extern && words.data[f]->reachable) {
-#if IR4_ENABLE_6502
-                if (funcs.data[f]->is_hot)
-                    be_6502_set_compact(0);
-                else if (fn_compact)
-                    be_6502_set_compact(fn_compact[f] ? 1 : 0);
-                else if (be == &be_6502 && saved_compact == 2)
-                    be_6502_set_compact(0);
-#endif
-                emit_word(f);
-            }
-        }
-    }
-#if IR4_ENABLE_6502
-    if (be == &be_6502)
-        be_6502_set_compact(saved_compact);
-#endif
-    free(fn_compact);
-
-    for (c = 0; c < fwd_calls.len; c++) {
-        if (fwd_calls.data[c].is_fn_ptr) {
-            be->patch_fn(fwd_calls.data[c].call_pc, fwd_calls.data[c].call_addr,
-                         funcs.data[fwd_calls.data[c].func_idx]->addr);
-        } else {
-            be->patch_call(fwd_calls.data[c].call_pc, fwd_calls.data[c].call_addr,
-                           funcs.data[fwd_calls.data[c].func_idx]->addr);
-        }
-    }
-    for (c = 0; c < cb_data_init_reloc_count(); c++) {
-        size_t po, tv;
-        u8 ab;
-        Bool is_c;
-        cb_get_data_init_reloc(c, &po, &tv, &ab, &is_c);
-        if (is_c) {
-            cb_patch_data_init_reloc(c, funcs.data[tv]->addr);
         }
     }
 }

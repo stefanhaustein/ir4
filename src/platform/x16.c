@@ -1,4 +1,4 @@
-/* x16.c - Commander X16 (.prg & banked .crt cartridge) platform support (Strict C89) */
+/* x16.c - Commander X16 (.prg & banked .crt cartridge) platform support */
 #include "codebuf.h"
 #include "frontend.h"
 #include "backend/6502.h"

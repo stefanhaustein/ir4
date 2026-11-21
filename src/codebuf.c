@@ -1,4 +1,4 @@
-/* codebuf.c - Shared binary code & data emission buffer for IR4th (Strict C89) */
+/* codebuf.c - Shared binary code & data emission buffer for IR4th */
 #include "codebuf.h"
 #include "strpool.h"
 #include "vec.h"
@@ -40,6 +40,8 @@ static BankDescVec banks;
 static size_t cfg_bank_base = 0;
 static size_t cfg_bank_size = 0;
 static u16 cur_bank_id = 0;
+
+/* Code buffer & emission */
 
 void cb_reset(size_t base) {
     BankDesc *b0;
@@ -167,6 +169,8 @@ Bool cb_write_raw(FILE *fp, Bool include_data) {
     return true;
 }
 
+/* Data segment */
+
 size_t cb_alloc_data(size_t size, u8 align) {
     size_t aligned = data_buf.len;
     size_t new_len;
@@ -217,6 +221,8 @@ void cb_emit_data_word(i32 val, u8 word_bytes) {
 const u8 *cb_init_data(void) { return data_buf.data; }
 
 size_t cb_init_data_size(void) { return data_init_size; }
+
+/* Relocations */
 
 void cb_add_data_reloc(size_t patch_offset, size_t data_offset) {
     DataReloc *r = VEC_ADD(relocs);
@@ -310,6 +316,8 @@ const char *cb_extern_reloc_name(size_t idx, size_t *patch_offset) {
     *patch_offset = ext_relocs.data[idx].patch_offset;
     return ext_relocs.data[idx].name;
 }
+
+/* Banked code */
 
 void cb_set_bank_config(size_t bank_base, size_t bank_size) {
     cfg_bank_base = bank_base;
