@@ -159,6 +159,8 @@ static void emit_word(size_t fidx) {
             cb_emit8(0x60); /* RTS */
         else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
             cb_emit8(0xC9); /* RET */
+        else if (strcmp(be->name, "rv32") == 0)
+            cb_emit32(0x00008067UL); /* RET (JALR x0, 0(ra)) */
         else
             ir4_die("'code' is not supported on this backend");
         return;
