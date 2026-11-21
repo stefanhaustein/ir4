@@ -255,4 +255,8 @@ fn main ( -> :i )
   CORE_C1 CORE_C2 + 42 50 assert_eq
   dup 0 <> if return then drop
   CORE_C3 i>a a>i 256 51 assert_eq
+  dup 0 <> if return then drop
+  true -1 52 assert_eq
+  dup 0 <> if return then drop
+  false 0 53 assert_eq
 end

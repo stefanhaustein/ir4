@@ -2937,6 +2937,15 @@ static void compile_const(int is_default) {
     }
 }
 
+static void add_builtin_const(const char *name, i32 val) {
+    ConstSym *cs = NEW(ConstSym);
+    memset(cs, 0, sizeof(ConstSym));
+    cs->name = intern_str(name);
+    cs->type = TY_W;
+    cs->w_val = val;
+    VEC_PUSH(consts, cs);
+}
+
 void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
                         const char *platform) {
     const char *tok;
@@ -2965,6 +2974,8 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
     words.len = 0;
     buffers.len = 0;
     consts.len = 0;
+    add_builtin_const("true", -1);
+    add_builtin_const("false", 0);
     ir_buf.len = 0;
     raw_code_buf.len = 0;
     inline_blocks.len = 0;

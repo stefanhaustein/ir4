@@ -31,6 +31,7 @@ IR4th v0.3 defines **four stack types** on a **single unified stack** with **exp
 ### 2.1 Literal Typing Rules
 * **Bare Integer Literals** (`0`, `1`, `-42`, `0x10`, `$FF`) implicitly default to **`:i`**.
 * **Bare Floating-Point Literals** (`3.14`, `-0.5`, `1e-3` — containing `.` or `e`/`E`) implicitly default to **`:f`**.
+* **Built-in Boolean Constants:** `true` (`-1`) and `false` (`0`) are predefined `:i` constants.
 * **Literal Cast Folding:** Applying `i>i32`, `i>u32`, or `i>a` directly to an integer literal (e.g., `100000 i>i32`, `0x0400 i>a`) folds to a single `:i32` or `:a` push at compile time.
 * **Literal Width Restriction:** In the current implementation, integer and address literals are restricted to 32-bit values (`-2147483648..2147483647` for `:i`, `0..0xFFFFFFFF` for `:a`), even on 64-bit targets.
 
