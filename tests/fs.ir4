@@ -1,4 +1,4 @@
-\ Test lib/file.ir4 (fsopen, fswrite, fsread, fsclose)
+\ Test lib/file.ir4 (fsopen, fswrite, fsread, fsclose, fsputc, fsgetc)
 
 require "file.ir4"
 
@@ -25,6 +25,21 @@ fn main ( -> :i )
     1 +-> i
   repeat
   fd fsclose 0 <> if 7 return then
+
+  test_fname 11 fsmode_write fsopen -> fd
+  fd 0 < if 8 return then
+  fd 65 fsputc 0 <> if 9 return then
+  fd 66 fsputc 0 <> if 10 return then
+  fd 67 fsputc 0 <> if 11 return then
+  fd fsclose 0 <> if 12 return then
+
+  test_fname 11 fsmode_read fsopen -> fd
+  fd 0 < if 13 return then
+  fd fsgetc 65 <> if 14 return then
+  fd fsgetc 66 <> if 15 return then
+  fd fsgetc 67 <> if 16 return then
+  target_arm64 if fd fsgetc -1 <> if 17 return then then
+  fd fsclose 0 <> if 18 return then
 
   0
 end

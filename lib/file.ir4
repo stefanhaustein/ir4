@@ -33,3 +33,18 @@ fn fsopen0 ( path0 :a mode :i -> :i )
   begin p u8@ 0 <> while p 1 a+ -> p repeat
   path0 p path0 adiff mode fsopen
 end
+
+\ Read a single byte from fd; returns 0..255 or -1 on EOF/error
+default fn fsgetc ( fd :i -> :i )
+  var b :bytes 1
+  fd b 1 fsread 1 <> if -1 return then
+  b u8@
+end
+
+\ Write a single byte c to fd; returns 0 on success or < 0 on error
+default fn fsputc ( fd :i c :i -> :i )
+  var b :bytes 1
+  c b i8!
+  fd b 1 fswrite 1 <> if -1 return then
+  0
+end

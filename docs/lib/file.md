@@ -14,6 +14,7 @@ Portable sequential file I/O (fallback stubs + convenience wrappers)
 
   Close file descriptor fd; returns 0 on success or < 0 on error
 
+- **fsgetc** ( fd :i -> :i ) — Read a single byte from fd; returns 0..255 or -1 on EOF/error
 - **fsmode_read** ( -> :i )
 
 - **fsmode_write** ( -> :i )
@@ -25,6 +26,10 @@ Portable sequential file I/O (fallback stubs + convenience wrappers)
 - **fsopen0** ( path0 :a mode :i -> :i )
 
   Open NUL-terminated path0 with mode; returns fd >= 0 or < 0 on error
+
+- **fsputc** ( fd :i c :i -> :i )
+
+  Write a single byte c to fd; returns 0 on success or < 0 on error
 
 - **fsread** ( fd :i buf :a len :i -> :i )
 
