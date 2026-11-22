@@ -31,6 +31,9 @@ fn main ( -> :i )
   5 8 typebw
   65 emit
   66 xemit
+  34 xemit
+  3 fgcolor 0 bgcolor
+  0 1 gotoxy
   cr
 
   \ Repeated color + cursor + formatting loop (50x catches stack leaks on 6502 ZP stack)

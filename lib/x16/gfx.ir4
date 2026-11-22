@@ -167,7 +167,7 @@ fn gfxtext ( x :i y :i s :a len :i )
   begin
     len 0 >
   while
-    s u8@ __c64_xlat -> var p :i
+    s u8@ __x16_xlat -> var p :i
     p -> var sc :i
     p 64 >= p 96 < and if p 64 - -> sc then
     p 160 >= p 192 < and if p 64 - -> sc then

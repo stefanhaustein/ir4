@@ -217,28 +217,19 @@ static void push_src_file(FILE *fp, const char *path, u16 req_group, u8 req_rank
     sf->pushback = -1;
 }
 
-const char *platform_parent(const char *plat) {
-    if (plat && strcmp(plat, "x16") == 0)
-        return "c64";
-    return NULL;
-}
-
 void push_require_ex(const char *name, int lib_only) {
-    const char *cands[4];
+    const char *cands[3];
     int n_cands = 0;
     int c;
-    FILE *found_fps[4];
-    const char *found_paths[4];
-    u8 found_ranks[4];
+    FILE *found_fps[3];
+    const char *found_paths[3];
+    u8 found_ranks[3];
     int found_cnt = 0;
     int seen_cnt = 0;
 
     if (name[0] != '/') {
         if (platform_name != NULL && platform_name[0] != '\0') {
-            const char *par = platform_parent(platform_name);
             cands[n_cands++] = path_join(platform_name, name);
-            if (par)
-                cands[n_cands++] = path_join(par, name);
         }
         cands[n_cands++] = path_join(be->name, name);
     }

@@ -53,18 +53,21 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **xemit** ( c :i )
 
   Emit character *c* with platform text mapping (defaults to raw emit; PETSCII on C64)
-  - *c64:* Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII A-Z, a-z, _, and | to PETSCII.
+  - *c64:* Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII to PETSCII and clears quote mode (`$D4`) after `"`.
+  - *x16:* Switches X16 to Lowercase/Uppercase mode (14 emit) at startup; uses `$80` verbatim mode for `"` so quote mode never triggers.
 
 - **xinkey** ( -> :i )
 
   Non-blocking read of next key mapped to normalized ASCII (defaults to raw inkey)
   - *c64:* Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
+  - *x16:* Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
   - *zx81:* Decodes LAST_K (`$4025`) via ROM `$07BD` to normalized ASCII, or 0 if no key is pressed.
 
 - **xkey** ( -> :i )
 
   Blocking read of next key mapped to normalized ASCII (defaults to raw key)
   - *c64:* Blocking read using xinkey.
+  - *x16:* Blocking read using xinkey.
   - *zx81:* Blocking read using xinkey.
 
 ## Platforms
@@ -84,7 +87,7 @@ CP/M BDOS console I/O (BDOS 2 / 6 / 11)
 
 ### x16
 
-Commander X16 overrides (inherits emit, inkey, key, xemit, cls, gotoxy from c64/stdio.ir4)
+Commander X16 KERNAL console I/O (`$FFD2` / `$FFE4` / `$FFF0`)
 
 ### zx81
 

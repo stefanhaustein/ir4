@@ -8,7 +8,6 @@ require "joy.ir4"
 
 data s_title  "IR4th Diagnostics (" 0 :i8 end
 data s_quit   ":quit)" 0 :i8 end
-data s_term   "Term: " 0 :i8 end
 data s_sfx    "Sfx:  " 0 :i8 end
 data s_joy    "  Joy: " 0 :i8 end
 data s_spr    "Spr:  " 0 :i8 end
@@ -32,30 +31,26 @@ data s_jcol   " : " 0 :i8 end
 data s_jhdr   "         4321RLDU" 0 :i8 end
 data s_chdr   "   0123456789ABCDEF 0123456789ABCDEF" 0 :i8 end
 data s_chdr_n "0123456789ABCDEF0123456789ABCDEF" 0 :i8 end
-data s_emit   ":emit " 0 :i8 end
-data s_xemit  ":xemit" 0 :i8 end
+data s_raw    ":raw  " 0 :i8 end
+data s_xplat  ":xplat" 0 :i8 end
 data s_colk   ":" 0 :i8 end
 
 fn print_key ( ch :i )
   3 fgcolor ch xemit 7 fgcolor
 end
 
-fn draw_charset ( r0 :i use_x :i fg :i bg :i bd :i )
+fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
   termwidth 36 < -> var narrow :i
-  7 fgcolor bg bgcolor
+  7 fgcolor sb bgcolor
   0 2 gotoxy
-  s_term type0 termwidth typei 120 emit termheight typei
-  narrow 0 = if 32 emit then
-  32 emit
+  termwidth typei 120 emit termheight typei 32 emit
   70 print_key s_colk type0 6 fgcolor fg 2 typehw 7 fgcolor 32 emit
-  narrow 0 = if 32 emit then
-  66 print_key s_colk type0 6 fgcolor bg 2 typehw 7 fgcolor 32 emit
-  narrow 0 = if 32 emit then
+  66 print_key s_colk type0 6 fgcolor cb 2 typehw 7 fgcolor 32 emit
+  83 print_key s_colk type0 6 fgcolor sb 2 typehw 7 fgcolor 32 emit
   79 print_key s_colk type0 6 fgcolor bd 2 typehw 7 fgcolor 32 emit
-  narrow 0 = if 32 emit then
   88 print_key
   6 fgcolor
-  use_x if s_xemit else s_emit then type0
+  use_x if s_xplat else s_raw then type0
   7 fgcolor
   0 r0 gotoxy
   narrow if s_chdr_n else s_chdr then type0
@@ -63,9 +58,9 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i bd :i )
   0x20 -> var base :i
   begin row_i 3 < while
     0 r0 1 + row_i + gotoxy
-    7 fgcolor bg bgcolor
+    7 fgcolor sb bgcolor
     narrow 0 = if base 2 typehw 58 emit then
-    fg fgcolor bg bgcolor
+    fg fgcolor cb bgcolor
     0 -> var col :i
     begin col 32 < while
       narrow 0 = col 16 = and if 32 emit then
@@ -78,18 +73,19 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i bd :i )
     32 +-> base
     1 +-> row_i
     13 emit
+    7 fgcolor sb bgcolor
   repeat
-  7 fgcolor bg bgcolor
+  7 fgcolor sb bgcolor
 end
 
-fn draw_static ( use_x :i fg :i bg :i bd :i -> :i )
+fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
   bd gfxborder
-  7 fgcolor bg bgcolor
+  7 fgcolor sb bgcolor
   cls
   0 0 gotoxy
   s_title type0 81 print_key s_quit type0
 
-  4 use_x fg bg bd draw_charset
+  4 use_x fg cb sb bd draw_charset
 
   0 10 gotoxy
   s_sfx type0 sfxcount typei
@@ -138,9 +134,10 @@ end
 fn main ( )
   0 -> var use_x :i
   7 -> var fg :i
-  0 -> var bg :i
+  0 -> var cb :i
+  0 -> var sb :i
   0 -> var bd :i
-  use_x fg bg bd draw_static -> var r_joy :i
+  use_x fg cb sb bd draw_static -> var r_joy :i
 
   0 -> var last_k :i
   0 -> var prev_k :i
@@ -161,20 +158,24 @@ fn main ( )
       then
       k 120 = k 88 = or if
         1 use_x xor -> use_x
-        4 use_x fg bg bd draw_charset
+        4 use_x fg cb sb bd draw_charset
       then
       k 102 = k 70 = or if
         fg 1 + 15 and -> fg
-        4 use_x fg bg bd draw_charset
+        4 use_x fg cb sb bd draw_charset
       then
       k 98 = k 66 = or if
-        bg 1 + 15 and -> bg
-        use_x fg bg bd draw_static -> r_joy
+        cb 1 + 15 and -> cb
+        4 use_x fg cb sb bd draw_charset
+      then
+      k 115 = k 83 = or if
+        sb 1 + 15 and -> sb
+        use_x fg cb sb bd draw_static -> r_joy
       then
       k 111 = k 79 = or if
         bd 1 + 15 and -> bd
         bd gfxborder
-        4 use_x fg bg bd draw_charset
+        4 use_x fg cb sb bd draw_charset
       then
       k -> last_k
       1 +-> key_cnt
@@ -184,8 +185,9 @@ fn main ( )
     use_x if s_xinkey else s_inkey then type0
     6 fgcolor last_k 2 typehw 32 emit 40 emit
     last_k 32 >= last_k 126 <= and if last_k xemit else 46 emit then
-    41 emit s_cnt type0 key_cnt typei 7 fgcolor
+    41 emit s_cnt type0 key_cnt typei
     13 emit
+    7 fgcolor
 
     -1 -> var p :i
     begin p jc < while

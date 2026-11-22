@@ -95,7 +95,7 @@ default const SCREEN_W 80
 * The value must be an integer literal (inferred as `:i`, checked against the target's `word_bytes` range) or a floating-point literal (inferred as `:f`).
 * Referencing `<name>` inside a function pushes the literal directly onto the stack (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
 * Constants declared with `default const` may be overridden by a `const` with the same inferred type within the same `require` group.
-* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with all active hierarchy levels (`platform`, parent platform, and architecture) set to `true`.
+* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with both the active `platform` and `architecture` set to `true`.
 
 ### 3.4 Pre-Initialized Data (`data ... end`)
 Top-level read-only tables and constants can be defined outside word definitions:
@@ -126,7 +126,7 @@ require "<filename>"
 
 * `<filename>` is resolved by searching roots in order: the directory of the file containing `require`, any `-I <dir>` directories in CLI order, and finally the compiler's `lib/` roots.
 * Within the **first root** that contains at least one match, all matching specificity levels are loaded under a shared `require` group (most-specific parsed first):
-  1. `<root>/<platform>/<filename>` and any parent platform directories (e.g. `-t x16` checks `x16/` then `c64/`, `-t agon` checks `agon/`)
+  1. `<root>/<platform>/<filename>` (e.g. `c64/stdio.ir4`, `x16/gfx.ir4`, `agon/stdio.ir4`)
   2. `<root>/<cpu>/<filename>` (e.g. `6502/i32.ir4`, `z80/mem.ir4`, `ez80/...`)
   3. `<root>/<filename>` (portable fallback)
 * Functions declared with `default fn` (and constants declared with `default const`) may be overridden by a non-default definition with a matching signature or type within the same `require` group. Overrides outside that `require` group, duplicate `default` declarations, and duplicate non-default definitions are rejected.

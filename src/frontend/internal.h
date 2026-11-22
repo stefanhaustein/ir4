@@ -130,7 +130,6 @@ void src_ungetc(SrcFile *sf, int c);
 int skip_ws_and_comments(void);
 const char *next_tok(void);
 const char *next_tok_intern(void);
-const char *platform_parent(const char *plat);
 void push_require_ex(const char *name, int lib_only);
 const char *read_require_path(void);
 void push_require(const char *name);

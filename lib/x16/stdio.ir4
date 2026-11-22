@@ -1,8 +1,79 @@
-\ x16/stdio.ir4 - Commander X16 overrides (inherits emit, inkey, key, xemit, gotoxy from c64/stdio.ir4)
+\ lib/x16/stdio.ir4 - Commander X16 KERNAL console I/O (`$FFD2` / `$FFE4` / `$FFF0`)
 
-fwd emit ( c :i )
+extern emit 0xFFD2 ( A :i )
+extern __x16_inkey 0xFFE4 ( -> A :i )
+
+fn inkey ( -> :i ) __x16_inkey end
+
+fn key ( -> :i )
+  0 -> var c :i
+  begin
+    inkey -> c
+    c 0 =
+  while repeat
+  c
+end
+
+\ Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
+fn xinkey ( -> :i )
+  inkey -> var c :i
+  c 0 = if 0 return then
+  c 65 >= c 90 <= and if c 32 + return then
+  c 193 >= c 218 <= and if c 128 - return then
+  c 20 = if 8 return then
+  c
+end
+
+\ Blocking read using xinkey.
+fn xkey ( -> :i )
+  0 -> var c :i
+  begin
+    xinkey -> c
+    c 0 =
+  while repeat
+  c
+end
+
+init
+  14 emit
+end
+
+\ Map normalized ASCII to PETSCII (Lowercase/Uppercase mode: A-Z, a-z, _, |).
+fn __x16_xlat ( c :i -> :i )
+  c 65 >= c 90 <= and if c 128 + return then
+  c 97 >= c 122 <= and if c 32 - return then
+  c 0x5F = if 0xA4 return then
+  c 0x7C = if 0xDD return then
+  c
+end
+
+\ Switches X16 to Lowercase/Uppercase mode (14 emit) at startup; uses `$80` verbatim mode for `"` so quote mode never triggers.
+fn xemit ( c :i )
+  c 10 = c 13 = or if 13 emit return then
+  c 8 = if 20 emit return then
+  c 34 = if 128 emit 34 emit return then
+  c 32 < c 126 > or if return then
+  c __x16_xlat emit
+end
 
 fn cls ( ) 147 emit end
+
+\ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
+code __x16_plot ( x :i y :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x18 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+fn gotoxy ( x :i y :i )
+  x 0 < if 0 -> x then
+  y 0 < if 0 -> y then
+  x y __x16_plot
+end
 
 fn termwidth ( -> :i ) 80 end
 fn termheight ( -> :i ) 60 end

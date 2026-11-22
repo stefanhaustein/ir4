@@ -2189,14 +2189,12 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
         static const char *const known_targets[] = {
             "z80", "ez80", "6502", "arm64", "rv32", "bc",
             "cpm", "zx81", "agon", "sim65", "c64",  "x16", "virt", "obj", "jit"};
-        const char *par = platform_parent(platform_name);
         size_t ti;
         for (ti = 0; ti < sizeof(known_targets) / sizeof(known_targets[0]); ti++) {
             const char *t = known_targets[ti];
             char cname[32];
             int active = (strcmp(be->name, t) == 0) ||
-                         (platform_name && strcmp(platform_name, t) == 0) ||
-                         (par && strcmp(par, t) == 0);
+                         (platform_name && strcmp(platform_name, t) == 0);
             strcpy(cname, "target_");
             strcat(cname, t);
             add_builtin_const(cname, active ? -1 : 0);

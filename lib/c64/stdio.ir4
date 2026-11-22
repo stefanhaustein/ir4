@@ -50,22 +50,36 @@ fn __c64_xlat ( c :i -> :i )
   c
 end
 
-\ Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII A-Z, a-z, _, and | to PETSCII.
+\ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
+code __c64_plot ( x :i y :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x18 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+fn gotoxy ( x :i y :i )
+  x 0 < if 0 -> x then
+  y 0 < if 0 -> y then
+  x y __c64_plot
+end
+
+\ Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII to PETSCII and clears quote mode (`$D4`) after `"`.
 fn xemit ( c :i )
-  c 10 = if 13 emit return then
+  c 10 = c 13 = or if 13 emit return then
+  c 8 = if 20 emit return then
+  c 32 < c 126 > or if return then
   c __c64_xlat emit
+  c 34 = if 0 212 i>a i8! then
 end
 
 \ Applies saved bgcolor (`$D021`) and clears the text screen.
 fn cls ( )
   __c64_txt_bg 0xD021 i>a i8!
   147 emit
-end
-
-fn gotoxy ( x :i y :i )
-  19 emit
-  begin y 0 > while 17 emit -1 +-> y repeat
-  begin x 0 > while 29 emit -1 +-> x repeat
 end
 
 fn termwidth ( -> :i )
