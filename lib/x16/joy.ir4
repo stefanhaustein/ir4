@@ -69,31 +69,40 @@ end
 
 fn joycount ( -> :i ) 5 end
 
-fn __x16_keystate ( key :i -> :i )
-  key 0 < key 127 > or if 0 return then
-  __x16_keys key 3 u>> a+ u8@ 1 key 7 and << and 0 <>
+data __x16_dpad_tbl
+  0 :i8 8 :i8 4 :i8 12 :i8 2 :i8 10 :i8 6 :i8 14 :i8
+  1 :i8 9 :i8 5 :i8 13 :i8 3 :i8 11 :i8 7 :i8 15 :i8
+end
+
+data __x16_btn_tbl
+  0  :i8 128 :i8 64 :i8 192 :i8 0  :i8 128 :i8 64 :i8 192 :i8
+  16 :i8 144 :i8 80 :i8 208 :i8 16 :i8 144 :i8 80 :i8 208 :i8
+end
+
+data __x16_joy_keys
+  0x53 :i8  1 :i8  0x12 :i8  1 :i8
+  0x54 :i8  2 :i8  0x20 :i8  2 :i8
+  0x4F :i8  4 :i8  0x1F :i8  4 :i8
+  0x59 :i8  8 :i8  0x21 :i8  8 :i8
+  0x3D :i8 16 :i8
 end
 
 fn joystate ( port :i -> :i )
   port -1 = if
     0 -> var out :i
-    0x53 __x16_keystate 0x12 __x16_keystate or if 1  +-> out then
-    0x54 __x16_keystate 0x20 __x16_keystate or if 2  +-> out then
-    0x4F __x16_keystate 0x1F __x16_keystate or if 4  +-> out then
-    0x59 __x16_keystate 0x21 __x16_keystate or if 8  +-> out then
-    0x3D __x16_keystate if 16 +-> out then
+    0 -> var i :i
+    begin i 18 < while
+      __x16_joy_keys i a+ u8@ -> var k :i
+      __x16_keys k 3 u>> a+ u8@ __x16_bit_tbl k 7 and a+ u8@ and if
+        out __x16_joy_keys i 1 + a+ u8@ or -> out
+      then
+      2 +-> i
+    repeat
     out return
   then
   port 0 < port 4 > or if 0 return then
   port __x16_joy_get -> var raw :i
-  0 -> out
-  raw 0x0008 and if out 1 or -> out then
-  raw 0x0004 and if out 2 or -> out then
-  raw 0x0002 and if out 4 or -> out then
-  raw 0x0001 and if out 8 or -> out then
-  raw 0x0080 and if out 16 or -> out then
-  raw 0x8000 and if out 32 or -> out then
-  raw 0x0020 and if out 64 or -> out then
-  raw 0x0010 and if out 128 or -> out then
-  out
+  __x16_dpad_tbl raw 15 and a+ u8@
+  __x16_btn_tbl raw 4 u>> 15 and a+ u8@ or
+  raw 0 < if 32 or then
 end
