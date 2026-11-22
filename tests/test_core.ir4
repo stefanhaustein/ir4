@@ -1,4 +1,4 @@
-\ core.ir4 - Core language, control-flow, ALU, comparison, and address tests
+\ test_core.ir4 - Core language, control-flow, ALU, comparison, and address tests
 \ Expected main() return value: 0 (all checks pass)
 
 fn assert_eq ( got :i expected :i code :i -> :i )

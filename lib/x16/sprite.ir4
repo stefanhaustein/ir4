@@ -30,7 +30,7 @@ fn __x16_spr_attr_addr ( id :i off :i )
 end
 
 hot fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
-  img 0 < img 63 > or w 0 <= or h 0 <= or w 64 > or h 64 > or ncolors 0 < or ncolors 255 > or if 0 return then
+  img 0 < img 63 > or w 0 <= or h 0 <= or w 64 > or h 64 > or ncolors 0 <= or ncolors 255 > or if 0 return then
   __x16_spr_u_buf @ -> var spr_u :i
   spr_u 0 = if
     2400 -> spr_u
@@ -92,6 +92,7 @@ fn sprset ( id :i img :i )
 end
 
 fn sprpos ( id :i x :i y :i )
+  id 0 < id 127 > or if return then
   id 2 __x16_spr_attr_addr
   x 255 and 0x9F23 i>a i8!
   x 8 u>> 255 and 0x9F23 i>a i8!
@@ -100,6 +101,7 @@ fn sprpos ( id :i x :i y :i )
 end
 
 fn sprshow ( id :i on :i )
+  id 0 < id 127 > or if return then
   id 6 __x16_spr_attr_addr
   on 0 <> if 0x0C else 0 then 0x9F23 i>a i8!
 end

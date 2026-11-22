@@ -1,4 +1,4 @@
-\ fib.ir4 - Recursive and iterative Fibonacci in IR4th
+\ test_fib.ir4 - Recursive and iterative Fibonacci in IR4th
 
 fn fib_rec ( n :i -> :i )
   n 2 < if

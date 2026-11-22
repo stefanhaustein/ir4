@@ -31,7 +31,7 @@ const sprmaxw  256
 const sprmaxh  256
 
 fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
-  img 0 < img 255 > or w 0 <= or h 0 <= or ncolors 0 < or if 0 return then
+  img 0 < img 255 > or w 0 <= or h 0 <= or w 256 > or h 256 > or ncolors 0 <= or if 0 return then
   -1 -> __agon_spr_active
   23 emit 27 emit 0 emit img emit
   23 emit 27 emit 1 emit w __vdu16 h __vdu16

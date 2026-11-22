@@ -1,0 +1,83 @@
+\ Test lib/sprite.ir4 (sprcount, sprdepth, sprmaxw, sprmaxh, sprimg, sprset, sprpos, sprshow)
+
+require "stdio.ir4"
+require "sprite.ir4"
+
+data spr_px
+  0 :i8 1 :i8 2 :i8 0 :i8
+  1 :i8 3 :i8 3 :i8 1 :i8
+  1 :i8 2 :i8 2 :i8 1 :i8
+  0 :i8 1 :i8 1 :i8 0 :i8
+end
+
+var spr_pal :bytes 4
+
+fn main ( -> :i )
+  320 200 8 gfxinit
+
+  255 255 255 gfxrgb spr_pal i8!
+  255 0 0 gfxrgb spr_pal 1 a+ i8!
+  0 255 0 gfxrgb spr_pal 2 a+ i8!
+
+  target_c64 target_x16 or target_agon or -> var has_hw :i
+  has_hw 0 = if
+    sprcount 0 <> if 1 return then
+    sprdepth 0 <> if 2 return then
+    sprmaxw 0 <> if 3 return then
+    sprmaxh 0 <> if 4 return then
+    0 4 4 spr_px spr_pal 3 sprimg 0 <> if 5 return then
+  else
+    sprcount 0 <= if 6 return then
+    sprdepth 0 <= if 7 return then
+    sprmaxw 0 <= if 8 return then
+    sprmaxh 0 <= if 9 return then
+
+    \ Invalid sprimg arguments must return 0
+    -1 4 4 spr_px spr_pal 3 sprimg 0 <> if 10 return then
+    999 4 4 spr_px spr_pal 3 sprimg 0 <> if 11 return then
+    0 0 4 spr_px spr_pal 3 sprimg 0 <> if 12 return then
+    0 4 0 spr_px spr_pal 3 sprimg 0 <> if 13 return then
+    0 sprmaxw 1 + 4 spr_px spr_pal 3 sprimg 0 <> if 14 return then
+    0 4 sprmaxh 1 + spr_px spr_pal 3 sprimg 0 <> if 15 return then
+    0 4 4 spr_px spr_pal 0 sprimg 0 <> if 16 return then
+    0 4 4 spr_px spr_pal -1 sprimg 0 <> if 17 return then
+
+    \ Valid 1-color and 3-color sprite images must return -1
+    0 4 4 spr_px spr_pal 1 sprimg -1 <> if 18 return then
+    1 4 4 spr_px spr_pal 3 sprimg -1 <> if 19 return then
+  then
+
+  \ Invalid sprite ids must be safe no-ops
+  -1 0 sprset
+  sprcount 0 sprset
+  -1 10 20 sprpos
+  sprcount 10 20 sprpos
+  -1 1 sprshow
+  sprcount 0 sprshow
+
+  \ Bind, move (including >255 X coordinate MSB), show, and hide
+  0 0 sprset
+  0 300 50 sprpos
+  0 1 sprshow
+  0 0 sprshow
+
+  has_hw if
+    sprcount 1 - 1 sprset
+    sprcount 1 - 40 80 sprpos
+    sprcount 1 - 1 sprshow
+    sprcount 1 - 0 sprshow
+  then
+
+  \ Repeated pos/show loop (50x catches stack leaks)
+  0 -> var i :i
+  begin i 50 < while
+    0 i 4 << i 2 << sprpos
+    0 i 1 and sprshow
+    1 +-> i
+  repeat
+  0 0 sprshow
+
+  gfxdone
+  cr
+  0
+end

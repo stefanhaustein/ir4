@@ -1,4 +1,4 @@
-\ muldiv.ir4 - Multiply, divide, and remainder tests (ARM64 + Z80)
+\ test_muldiv.ir4 - Multiply, divide, and remainder tests (ARM64 + Z80)
 \ Expected main() return value: 0
 
 fn assert_eq ( got :i expected :i code :i -> :i )

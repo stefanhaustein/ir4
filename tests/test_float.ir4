@@ -1,4 +1,4 @@
-\ float.ir4 - Z80 math48 floating-point tests
+\ test_float.ir4 - Z80 math48 floating-point tests
 \ Expected main() return value: 0
 
 var fbuf :bytes 6

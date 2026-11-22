@@ -29,7 +29,7 @@ end
 \ ncolors = 1 uses hires (24x21); ncolors >= 2 uses multicolor (12x21, 1->`$D025`, 2->`$D027`+hw, 3->`$D026`).
 \ Pads any w < 24 or h < 21 with transparent pixels (0).
 fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
-  img 0 < img 47 > or w 0 <= or h 0 <= or w 24 > or h 21 > or ncolors 0 < or if 0 return then
+  img 0 < img 47 > or w 0 <= or h 0 <= or w 24 > or h 21 > or ncolors 0 <= or if 0 return then
   0xC000 img 6 << + i>a -> var dst :a
   ncolors 1 = if
     0 __c64_img_mc img a+ i8!

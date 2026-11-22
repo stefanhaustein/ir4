@@ -1,4 +1,4 @@
-\ fnptr.ir4 - Function addresses (& fn) and typed indirect calls (( ... -> ... ))
+\ test_fnptr.ir4 - Function addresses (& fn) and typed indirect calls (( ... -> ... ))
 \ Expected main() return value: 0
 
 var fp_global :a

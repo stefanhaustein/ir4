@@ -1,4 +1,4 @@
-\ mem.ir4 - Named buffer and memory load/store tests (i8@, u8@, i8!, i16@, u16@, i16!, @, !, a@, a!)
+\ test_mem.ir4 - Named buffer and memory load/store tests (i8@, u8@, i8!, i16@, u16@, i16!, @, !, a@, a!)
 \ Expected main() return value: 0
 
 var buf_a :bytes 16

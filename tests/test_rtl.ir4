@@ -1,4 +1,4 @@
-\ rtl.ir4 - Portable RTL tests (stdio.ir4, mem.ir4)
+\ test_rtl.ir4 - Portable RTL tests (stdio.ir4, mem.ir4)
 \ Expected main() output ends with 0 (return code)
 
 require "stdio.ir4"

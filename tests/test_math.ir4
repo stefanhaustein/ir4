@@ -1,4 +1,4 @@
-\ math.ir4 - Tests for lib/math.ir4
+\ test_math.ir4 - Tests for lib/math.ir4
 \ Expected main() return value: 0
 
 require "../lib/math.ir4"
