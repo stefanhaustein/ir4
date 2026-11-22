@@ -1,16 +1,15 @@
-\ c64/gfx.ir4 - Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 ($C000-$FFFF)
+\ c64/gfx.ir4 - Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 (`$C000-$FFFF`)
 \
 \ Memory layout:
-\   $0801-$CBFF (~49 KB) : Unbroken Code + BSS + Heap + bfp frame stack (ram_top = $CC00)
-\   $CC00-$CFE7 (1000 B) : VIC Character RAM (foreground/background 8x8 color attributes)
-\   $D000-$DFFF          : VIC / SID / CIA I/O
-\   $E000-$FF3F (8000 B) : VIC Graphics RAM (underneath KERNAL ROM; CPU writes go to RAM,
-\                          reads use __c64_peek_under with $01=$35 while IRQs are disabled)
+\ - `$0801-$CBFF` (~49 KB): Unbroken Code + BSS + Heap + bfp frame stack (`ram_top = $CC00`)
+\ - `$CC00-$CFE7` (1000 B): VIC Character RAM (foreground/background 8x8 color attributes)
+\ - `$D000-$DFFF`: VIC / SID / CIA I/O
+\ - `$E000-$FF3F` (8000 B): VIC Graphics RAM (underneath KERNAL ROM; CPU writes go to RAM,
+\   reads use `__c64_peek_under` with `$01=$35` while IRQs are disabled)
 \
-\ Color model:
-\   gfxdepth returns 1 (1 bpp pixel density, so B/W-aware apps like mandel avoid clash),
-\   while gfxrgb maps RGB to 8 C64 colors and gfxpx/gfxhline/gfxvline update the 8x8 cell
-\   foreground attribute in $CC00 (ZX Spectrum-style attribute clash; bg stays color 0).
+\ **Color model:** gfxdepth returns 1 (1 bpp pixel density, so B/W-aware apps like mandel avoid clash),
+\ while gfxrgb maps RGB to 8 C64 colors and gfxpx/gfxhline/gfxvline update the 8x8 cell
+\ foreground attribute in `$CC00` (ZX Spectrum-style attribute clash; bg stays color 0).
 
 require "mem.ir4"
 require "stdio.ir4"

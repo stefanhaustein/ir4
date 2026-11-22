@@ -4,10 +4,6 @@
 
 Portable sequential file I/O (fallback stubs + convenience wrappers)
 
-## Platforms
-
-- *cpm:* CP/M BDOS sequential file I/O (4 static FCB + 128-byte DMA slots)
-
 ## Functions
 
 - **fsclose** ( fd :i -> :i )
@@ -38,3 +34,9 @@ Portable sequential file I/O (fallback stubs + convenience wrappers)
 - **fswrite** ( fd :i buf :a len :i -> :i )
 
   Write len bytes from buf to fd; returns bytes written or < 0 on error
+
+## Platforms
+
+### cpm
+
+CP/M BDOS sequential file I/O (4 static FCB + 128-byte DMA slots)

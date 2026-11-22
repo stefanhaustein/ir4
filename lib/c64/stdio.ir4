@@ -1,4 +1,4 @@
-\ lib/c64/stdio.ir4 - Commodore 64 KERNAL console I/O ($FFD2 / $FFE4)
+\ lib/c64/stdio.ir4 - Commodore 64 KERNAL console I/O (`$FFD2` / `$FFE4`)
 
 extern emit 0xFFD2 ( A :i )
 extern __c64_inkey 0xFFE4 ( -> A :i )

@@ -5,12 +5,6 @@
 Sound effects (optional override per platform)
 Waveforms: 0 = pulse/square, 1 = sawtooth, 2 = triangle, 3 = noise.
 
-## Platforms
-
-- *agon:* Agon VDP sound effects (VDU 23, 0, &85)
-- *c64:* Commodore 64 SID sound effects (3 voices at $D400)
-- *x16:* Commander X16 VERA PSG sound effects (16 channels at VRAM $1F9C0)
-
 ## Functions
 
 - **sfxcount** ( -> :i ) — Query number of hardware sound channels (0 = sound unsupported)
@@ -22,3 +16,17 @@ Waveforms: 0 = pulse/square, 1 = sawtooth, 2 = triangle, 3 = noise.
 - **sfxtick** ( )
 
   Advance software duration timers once per frame (required on platforms without hardware duration, e.g. C64/X16; default: no-op).
+
+## Platforms
+
+### agon
+
+Agon VDP sound effects (VDU 23, 0, &85)
+
+### c64
+
+Commodore 64 SID sound effects (3 voices at $D400)
+
+### x16
+
+Commander X16 VERA PSG sound effects (16 channels at VRAM $1F9C0)

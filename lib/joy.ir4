@@ -1,6 +1,6 @@
 \ lib/joy.ir4 - Joystick and gamepad input (optional override per platform)
 \ Bitmask returned by joystate:
-\   1 = Up, 2 = Down, 4 = Left, 8 = Right, 16 = Fire/Btn1, 32 = Btn2, 64 = Select, 128 = Start
+\ 1 = Up, 2 = Down, 4 = Left, 8 = Right, 16 = Fire/Btn1, 32 = Btn2, 64 = Select, 128 = Start
 
 \ Query number of hardware joystick/gamepad ports (0 = hardware joysticks unsupported)
 default fn joycount ( -> :i ) 0 end

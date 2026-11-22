@@ -38,7 +38,8 @@ def parse_lib(path: Path):
     header = []
     i = 0
     while i < len(lines) and lines[i].startswith("\\"):
-        header.append(lines[i][1:].strip())
+        raw = lines[i][2:] if lines[i].startswith("\\ ") else lines[i][1:]
+        header.append(raw.rstrip())
         i += 1
 
     entries = []
@@ -84,7 +85,7 @@ def strip_mod_prefix(line: str, name: str, plat: str = "") -> str:
 
 
 def collect_platform_notes(mod_name: str):
-    headers: list[tuple[str, str]] = []
+    headers: list[tuple[str, list[str]]] = []
     notes: dict[str, list[tuple[str, str]]] = {}
     for plat in PLATFORMS:
         p = LIB_DIR / plat / mod_name
@@ -92,9 +93,13 @@ def collect_platform_notes(mod_name: str):
             continue
         hdr, entries = parse_lib(p)
         if hdr:
-            summary = strip_mod_prefix(hdr[0], mod_name, plat)
-            if summary:
-                headers.append((plat, summary))
+            full_hdr = [strip_mod_prefix(h, mod_name, plat) for h in hdr]
+            while full_hdr and not full_hdr[0]:
+                full_hdr.pop(0)
+            while full_hdr and not full_hdr[-1]:
+                full_hdr.pop()
+            if full_hdr:
+                headers.append((plat, full_hdr))
         for name, _, doc in entries:
             if doc:
                 notes.setdefault(name, []).append((plat, doc))
@@ -139,12 +144,6 @@ def main():
             mod_out.extend(body_hdr)
             mod_out.append("")
         plat_headers, plat_notes = collect_platform_notes(p.name)
-        if plat_headers:
-            mod_out.append("## Platforms")
-            mod_out.append("")
-            for plat, psummary in plat_headers:
-                mod_out.append(f"- *{plat}:* {psummary}")
-            mod_out.append("")
         mod_out.append("## Functions")
         mod_out.append("")
         for name, sig_md, doc in sorted(entries, key=lambda e: e[0].lower()):
@@ -159,6 +158,16 @@ def main():
             for plat, pdoc in pnotes:
                 mod_out.append(f"  - *{plat}:* {pdoc}")
             if not (doc and len(sig_md) + len(doc) <= 88 and not pnotes):
+                mod_out.append("")
+        if plat_headers:
+            if mod_out and mod_out[-1] != "":
+                mod_out.append("")
+            mod_out.append("## Platforms")
+            mod_out.append("")
+            for plat, phdr in plat_headers:
+                mod_out.append(f"### {plat}")
+                mod_out.append("")
+                mod_out.extend(phdr)
                 mod_out.append("")
         if mod_out and mod_out[-1] != "":
             mod_out.append("")

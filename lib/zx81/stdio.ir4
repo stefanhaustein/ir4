@@ -1,4 +1,4 @@
-\ lib/zx81/stdio.ir4 - Sinclair ZX81 console I/O (ROM RST $10 / CLS $0A2A)
+\ lib/zx81/stdio.ir4 - Sinclair ZX81 console I/O (ROM RST `$10` / CLS `$0A2A`)
 
 extern __zx81_rst10 0x0010 ( A :i )
 extern __zx81_cls 0x0A2A ( )
@@ -60,13 +60,13 @@ fn __zx81_to_ascii ( c :i -> :i )
   0
 end
 
-\ Returns raw 2-byte LAST_K ($4025) scan code (non-ASCII), or 0 if no key is pressed.
+\ Returns raw 2-byte LAST_K (`$4025`) scan code (non-ASCII), or 0 if no key is pressed.
 fn inkey ( -> :i )
   0x4025 i>a u16@ -> var k :i
   k 0xFFFF = if 0 else k then
 end
 
-\ Decodes LAST_K ($4025) via ROM $07BD to normalized ASCII, or 0 if no key is pressed.
+\ Decodes LAST_K (`$4025`) via ROM `$07BD` to normalized ASCII, or 0 if no key is pressed.
 fn xinkey ( -> :i )
   0x4025 i>a u16@ -> var k :i
   k 0xFFFF = if 0 return then
@@ -114,7 +114,7 @@ fn fgcolor ( c :i ) c drop end
 \ No-op on ZX81 (monochrome display).
 fn bgcolor ( c :i ) c drop end
 
-\ Updates DF_CC ($400E) and S_POSN ($4039/$403A) directly in D_FILE (clamped to 32x22).
+\ Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
 fn gotoxy ( x :i y :i )
   x 0 < if 0 -> x then
   x 31 > if 31 -> x then

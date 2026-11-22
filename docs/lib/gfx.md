@@ -5,14 +5,6 @@
 Pixel graphics (default: ANSI 8-color UTF-8 half-block backend)
 Platform overrides implement the `default fn` entries below.
 
-## Platforms
-
-- *agon:* Agon VDP stateful graphics
-- *c64:* Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 ($C000-$FFFF)
-- *cpm:* CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
-- *x16:* Commander X16 VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
-- *zx81:* Sinclair ZX81 64x48 block-mosaic pixel graphics in D_FILE
-
 ## Functions
 
 - **gfxborder** ( c :i )
@@ -90,3 +82,36 @@ Platform overrides implement the `default fn` entries below.
 
 - **gfxvsync** ( ) — Wait for vertical blank / next frame sync (default: no-op)
 - **gfxwidth** ( -> :i ) — Current graphics screen width in pixels
+
+## Platforms
+
+### agon
+
+Agon VDP stateful graphics
+
+### c64
+
+Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 (`$C000-$FFFF`)
+
+Memory layout:
+- `$0801-$CBFF` (~49 KB): Unbroken Code + BSS + Heap + bfp frame stack (`ram_top = $CC00`)
+- `$CC00-$CFE7` (1000 B): VIC Character RAM (foreground/background 8x8 color attributes)
+- `$D000-$DFFF`: VIC / SID / CIA I/O
+- `$E000-$FF3F` (8000 B): VIC Graphics RAM (underneath KERNAL ROM; CPU writes go to RAM,
+  reads use `__c64_peek_under` with `$01=$35` while IRQs are disabled)
+
+**Color model:** gfxdepth returns 1 (1 bpp pixel density, so B/W-aware apps like mandel avoid clash),
+while gfxrgb maps RGB to 8 C64 colors and gfxpx/gfxhline/gfxvline update the 8x8 cell
+foreground attribute in `$CC00` (ZX Spectrum-style attribute clash; bg stays color 0).
+
+### cpm
+
+CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
+
+### x16
+
+Commander X16 VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
+
+### zx81
+
+Sinclair ZX81 64x48 block-mosaic pixel graphics in D_FILE

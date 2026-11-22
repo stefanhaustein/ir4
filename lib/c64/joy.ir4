@@ -1,4 +1,4 @@
-\ lib/c64/joy.ir4 - Commodore 64 joystick ports (port 0 = CIA1 Port 2 $DC00, port 1 = Port 1 $DC01, port -1 = keyboard)
+\ lib/c64/joy.ir4 - Commodore 64 joystick ports (port 0 = CIA1 Port 2 `$DC00`, port 1 = Port 1 `$DC01`, port -1 = keyboard)
 
 fn joycount ( -> :i ) 2 end
 

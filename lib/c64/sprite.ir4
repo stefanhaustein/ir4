@@ -25,8 +25,8 @@ fn __c64_spr_bit ( reg :i bit :i on :i )
   on 0 <> if v bit or else v bit 255 xor and then r i8!
 end
 
-\ Define sprite image `img` (0..47) in VIC Bank 3 ($C000 + img*64).
-\ ncolors = 1 uses hires (24x21); ncolors >= 2 uses multicolor (12x21, 1->$D025, 2->$D027+hw, 3->$D026).
+\ Define sprite image img (0..47) in VIC Bank 3 (`$C000 + img*64`).
+\ ncolors = 1 uses hires (24x21); ncolors >= 2 uses multicolor (12x21, 1->`$D025`, 2->`$D027`+hw, 3->`$D026`).
 \ Pads any w < 24 or h < 21 with transparent pixels (0).
 fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
   img 0 < img 47 > or w 0 <= or h 0 <= or w 24 > or h 21 > or ncolors 0 < or if 0 return then
