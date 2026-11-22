@@ -1,0 +1,61 @@
+\ lib/arm64/file.ir4 - File I/O via C stdio (fopen/fclose/fread/fwrite)
+
+require "mem.ir4"
+
+extern fopen ( path0 :a mode0 :a -> :a )
+extern fclose ( fp :a -> :i )
+extern fread ( ptr :a size :i nmemb :i fp :a -> :i )
+extern fwrite ( ptr :a size :i nmemb :i fp :a -> :i )
+
+data __arm64_fmode_r "rb" 0 :i8 end
+data __arm64_fmode_w "wb" 0 :i8 end
+
+var __arm64_fps :bytes 128   \ 16 FILE* slots (8 bytes each)
+var __arm64_path :bytes 256
+
+fn __arm64_fp_addr ( fd :i -> :a )
+  __arm64_fps fd 3 << a+
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  len 0 < len 255 > or if -1 return then
+  0 -> var fd :i
+  begin
+    fd 16 < if fd __arm64_fp_addr a@ 0 i>a a<> else false then
+  while
+    1 +-> fd
+  repeat
+  fd 16 >= if -1 return then
+  __arm64_path path len memcpy
+  __arm64_path len a+ 0 swap i8!
+  mode 1 = if __arm64_fmode_w else __arm64_fmode_r then -> var m0 :a
+  __arm64_path m0 fopen -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp fd __arm64_fp_addr a!
+  fd
+end
+
+fn fsclose ( fd :i -> :i )
+  fd 0 < fd 15 > or if -1 return then
+  fd __arm64_fp_addr a@ -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp fclose -> var rc :i
+  0 i>a fd __arm64_fp_addr a!
+  rc
+end
+
+fn fsread ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 15 > or len 0 < or if -1 return then
+  fd __arm64_fp_addr a@ -> var fp :a
+  fp 0 i>a a= if -1 return then
+  len 0 = if 0 return then
+  buf 1 len fp fread
+end
+
+fn fswrite ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 15 > or len 0 < or if -1 return then
+  fd __arm64_fp_addr a@ -> var fp :a
+  fp 0 i>a a= if -1 return then
+  len 0 = if 0 return then
+  buf 1 len fp fwrite
+end

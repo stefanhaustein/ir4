@@ -1,0 +1,170 @@
+\ lib/cpm/file.ir4 - CP/M BDOS sequential file I/O (4 static FCB + 128-byte DMA slots)
+
+require "mem.ir4"
+require "stdio.ir4"
+
+\ Slot layout (168 bytes per slot):
+\   +0..35:   FCB (36 bytes)
+\   +36..163: 128-byte sector buffer
+\   +164:     flags (0=free, 1=read, 2=write)
+\   +165:     pos (0..128)
+\   +166:     len (0..128, valid bytes in read buffer)
+\   +167:     eof (0/1)
+var __cpm_fslots :bytes 672
+
+fn __cpm_slot ( fd :i -> :a )
+  __cpm_fslots fd 168 * a+
+end
+
+fn __cpm_upper ( c :i -> :i )
+  c 97 >= c 122 <= and if c 32 - return then
+  c
+end
+
+fn __cpm_parse_fcb ( fcb :a path :a len :i -> :i )
+  var ch :i
+  fcb 36 0 fillchar
+  fcb 1 a+ 11 32 fillchar
+  0 -> var i :i
+  0 -> var drv :i
+  len 2 >= if
+    path 1 a+ u8@ 58 = if
+      path u8@ __cpm_upper -> ch
+      ch 65 >= ch 80 <= and if
+        ch 64 - -> drv
+        2 -> i
+      else
+        -1 return
+      then
+    then
+  then
+  drv fcb i8!
+  1 -> var pos :i
+  begin
+    i len < if
+      path i a+ u8@ -> ch
+      ch 46 <>
+    else false then
+  while
+    pos 9 < if
+      ch __cpm_upper fcb pos a+ i8!
+      1 +-> pos
+    then
+    1 +-> i
+  repeat
+  i len < if
+    1 +-> i
+    9 -> pos
+    begin i len < while
+      pos 12 < if
+        path i a+ u8@ __cpm_upper fcb pos a+ i8!
+        1 +-> pos
+      then
+      1 +-> i
+    repeat
+  then
+  0
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  0 -> var fd :i
+  begin
+    fd 4 < if fd __cpm_slot 164 a+ u8@ 0 <> else false then
+  while
+    1 +-> fd
+  repeat
+  fd 4 >= if -1 return then
+  fd __cpm_slot -> var s :a
+  s path len __cpm_parse_fcb 0 <> if -1 return then
+  mode 1 = if
+    19 s a>i bdos drop
+    22 s a>i bdos 255 = if -1 return then
+    2 s 164 a+ i8!
+    0 s 165 a+ i8!
+    0 s 166 a+ i8!
+    0 s 167 a+ i8!
+  else
+    15 s a>i bdos 255 = if -1 return then
+    1 s 164 a+ i8!
+    0 s 165 a+ i8!
+    0 s 166 a+ i8!
+    0 s 167 a+ i8!
+  then
+  fd
+end
+
+fn fsclose ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  fd __cpm_slot -> var s :a
+  s 164 a+ u8@ -> var fl :i
+  fl 0 = if -1 return then
+  0 -> var rc :i
+  fl 2 = if
+    s 165 a+ u8@ -> var pos :i
+    pos 0 > if
+      pos 128 < if
+        s 36 a+ pos a+ 128 pos - 26 fillchar
+      then
+      26 s 36 a+ a>i bdos drop
+      21 s a>i bdos 0 <> if -1 -> rc then
+    then
+  then
+  16 s a>i bdos 255 = if -1 -> rc then
+  0 s 164 a+ i8!
+  rc
+end
+
+fn fsread ( fd :i buf :a len :i -> :i )
+  var pos :i
+  var slen :i
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  fd __cpm_slot -> var s :a
+  s 164 a+ u8@ 1 <> if -1 return then
+  0 -> var total :i
+  begin total len < while
+    s 165 a+ u8@ -> pos
+    s 166 a+ u8@ -> slen
+    pos slen >= if
+      s 167 a+ u8@ 0 <> if total return then
+      26 s 36 a+ a>i bdos drop
+      20 s a>i bdos 0 <> if
+        1 s 167 a+ i8!
+        total return
+      then
+      0 -> pos
+      128 -> slen
+      0 s 165 a+ i8!
+      128 s 166 a+ i8!
+    then
+    slen pos - -> var avail :i
+    len total - -> var chunk :i
+    avail chunk < if avail -> chunk then
+    buf total a+ s 36 a+ pos a+ chunk memcpy
+    pos chunk + s 165 a+ i8!
+    chunk +-> total
+  repeat
+  total
+end
+
+fn fswrite ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  fd __cpm_slot -> var s :a
+  s 164 a+ u8@ 2 <> if -1 return then
+  0 -> var total :i
+  begin total len < while
+    s 165 a+ u8@ -> var pos :i
+    128 pos - -> var space :i
+    len total - -> var chunk :i
+    space chunk < if space -> chunk then
+    s 36 a+ pos a+ buf total a+ chunk memcpy
+    pos chunk + -> pos
+    total chunk + -> total
+    pos 128 >= if
+      26 s 36 a+ a>i bdos drop
+      21 s a>i bdos 0 <> if -1 return then
+      0 -> pos
+    then
+    pos s 165 a+ i8!
+  repeat
+  total
+end

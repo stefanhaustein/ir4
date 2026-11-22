@@ -1,0 +1,30 @@
+\ Test lib/file.ir4 (fsopen, fswrite, fsread, fsclose)
+
+require "file.ir4"
+
+data test_fname "IR4TEST.TMP" end
+data test_payload "Hello, IR4(th) file I/O!" end
+var rbuf :bytes 64
+
+fn main ( -> :i )
+  \ Fallback targets without a filesystem return < 0 on fsopen
+  target_arm64 target_cpm or 0 = if 0 return then
+
+  test_fname 11 fsmode_write fsopen -> var fd :i
+  fd 0 < if 1 return then
+  fd test_payload 24 fswrite 24 <> if 2 return then
+  fd fsclose 0 <> if 3 return then
+
+  test_fname 11 fsmode_read fsopen -> fd
+  fd 0 < if 4 return then
+  fd rbuf 64 fsread -> var n :i
+  n 24 < if 5 return then
+  0 -> var i :i
+  begin i 24 < while
+    rbuf i a+ u8@ test_payload i a+ u8@ <> if 6 return then
+    1 +-> i
+  repeat
+  fd fsclose 0 <> if 7 return then
+
+  0
+end
