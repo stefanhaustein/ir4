@@ -1126,7 +1126,7 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
                 ir4_die("relocation offset out of range");
             rel = VEC_ADD(code_relocs);
             rel->ir_off = *out_len;
-            rel->addend = (u16)pending;
+            rel->addend = (size_t)pending;
             rel->kind = (strcmp(tok, ":ar") == 0) ? CODE_REL_SELF : CODE_REL_STACK;
             if (rel->kind == CODE_REL_STACK && !be->stack_data_off) {
                 ir4_die("':as' is only supported on targets with a RAM data stack");
@@ -1135,6 +1135,28 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
             raw_emit_u8(out_len, 0x00);
             raw_emit_u8(out_len, 0x00);
             has_pending = 0;
+        } else if (strcmp(tok, "&") == 0) {
+            int idx;
+            CodeReloc *rel;
+            u8 b;
+            if (has_pending)
+                ir4_die("missing width (:i8, :i16, :i32) before '&' in raw code");
+            if (be->addr_bytes != 2 && be->addr_bytes != 3)
+                ir4_die("'&' in raw code is only supported on 16-bit and 24-bit targets");
+            tok = next_tok();
+            if (!tok)
+                ir4_die("expected identifier after '&' in raw code");
+            idx = find_buffer(tok);
+            if (idx < 0)
+                ir4_die("expected 'var' or 'data' identifier after '&' in raw code");
+            rel = VEC_ADD(code_relocs);
+            rel->ir_off = *out_len;
+            rel->addend = buffers.data[idx]->offset;
+            rel->kind = CODE_REL_DATA;
+            (*out_reloc_cnt)++;
+            for (b = 0; b < be->addr_bytes; b++) {
+                raw_emit_u8(out_len, 0x00);
+            }
         } else if (parse_int(tok, &num_val)) {
             if (has_pending)
                 ir4_die("missing width (:i8, :i16, :i32) before literal in raw code");

@@ -116,6 +116,13 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
             {
                 cb_add_data_reloc(pc, be->stack_data_off() + rel->addend);
             }
+        } else if (rel->kind == CODE_REL_DATA) {
+            if (be->addr_bytes == 3)
+                cb_add_data_reloc24(pc, rel->addend);
+            else if (be->addr_bytes == 2)
+                cb_add_data_reloc(pc, rel->addend);
+            else
+                ir4_die("'&' in raw code is only supported on 16-bit and 24-bit targets");
         }
     }
 }

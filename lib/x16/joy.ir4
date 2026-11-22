@@ -1,6 +1,12 @@
 \ lib/x16/joy.ir4 - Commander X16 KERNAL joystick (ports 0..4) + KEYHDL keyboard-as-joystick (port -1)
 
-\ Interrupt-safe KEYHDL ($032E) handler + 16-byte key-down bitmap at offset 62.
+data __x16_bit_tbl
+  1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8
+end
+
+var __x16_keys :bytes 16
+
+\ Interrupt-safe KEYHDL ($032E) handler updating __x16_keys bitmap.
 code __x16_keyhdl ( )
   0x48 :i8                    \ PHA (orig A)
   0x8A :i8 0x48 :i8           \ TXA; PHA
@@ -11,30 +17,25 @@ code __x16_keyhdl ( )
   0x4A :i8 0x4A :i8 0x4A :i8  \ LSR A x3 (byte idx 0..15)
   0xA8 :i8                    \ TAY
   0xBD :i8 0x03 :i8 0x01 :i8  \ LDA $0103,X (orig A)
-  0x30 :i8 0x0E :i8           \ BMI key_up (+14 -> 34)
-  \ key_down (20..33):
+  0x30 :i8 0x0E :i8           \ BMI key_up (+14)
+  \ key_down:
   0x29 :i8 0x07 :i8           \ AND #$07
   0xAA :i8                    \ TAX
-  0xBD :i8 54 :ar             \ LDA bit_tbl,X
-  0x19 :i8 62 :ar             \ ORA keys_buf,Y
-  0x99 :i8 62 :ar             \ STA keys_buf,Y
-  0x80 :i8 0x0E :i8           \ BRA done (+14 -> 48)
-  \ key_up (34..47):
+  0xBD :i8 & __x16_bit_tbl    \ LDA __x16_bit_tbl,X
+  0x19 :i8 & __x16_keys       \ ORA __x16_keys,Y
+  0x99 :i8 & __x16_keys       \ STA __x16_keys,Y
+  0x80 :i8 0x0E :i8           \ BRA done (+14)
+  \ key_up:
   0x29 :i8 0x07 :i8           \ AND #$07
   0xAA :i8                    \ TAX
-  0xBD :i8 54 :ar             \ LDA bit_tbl,X
+  0xBD :i8 & __x16_bit_tbl    \ LDA __x16_bit_tbl,X
   0x49 :i8 0xFF :i8           \ EOR #$FF
-  0x39 :i8 62 :ar             \ AND keys_buf,Y
-  0x99 :i8 62 :ar             \ STA keys_buf,Y
-  \ done (48..53):
+  0x39 :i8 & __x16_keys       \ AND __x16_keys,Y
+  0x99 :i8 & __x16_keys       \ STA __x16_keys,Y
+  \ done:
   0x68 :i8 0xA8 :i8           \ PLA; TAY
   0x68 :i8 0xAA :i8           \ PLA; TAX
-  0x68 :i8                    \ PLA (RTS implied)
-  \ bit_tbl (54..61):
-  1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8
-  \ keys_buf (62..77): 16 zero bytes
-  0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8
-  0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8 0 :i8
+  0x68 :i8                    \ PLA
 end
 
 init
@@ -70,7 +71,7 @@ fn joycount ( -> :i ) 5 end
 
 fn __x16_keystate ( key :i -> :i )
   key 0 < key 127 > or if 0 return then
-  & __x16_keyhdl 62 a+ key 3 u>> a+ u8@ 1 key 7 and << and 0 <>
+  __x16_keys key 3 u>> a+ u8@ 1 key 7 and << and 0 <>
 end
 
 fn joystate ( port :i -> :i )

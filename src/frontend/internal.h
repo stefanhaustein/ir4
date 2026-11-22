@@ -63,11 +63,11 @@ typedef struct {
     } u;
 } IrInstr;
 
-enum { CODE_REL_SELF = 1, CODE_REL_STACK = 2 };
+enum { CODE_REL_SELF = 1, CODE_REL_STACK = 2, CODE_REL_DATA = 3 };
 
 typedef struct {
     size_t ir_off;
-    u16 addend;
+    size_t addend;
     u8 kind;
 } CodeReloc;
 
