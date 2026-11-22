@@ -136,6 +136,17 @@ static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
     return 0;
 }
 
+static int ir_can_fuse(const WordIR *w, size_t i, size_t extra) {
+    size_t k;
+    if (i + extra >= w->ir_len)
+        return 0;
+    for (k = 1; k <= extra; k++) {
+        if (ir_is_br_target(w, i + k))
+            return 0;
+    }
+    return 1;
+}
+
 static void emit_word(size_t fidx) {
     static SizeVec ir_addr;
     FuncSig *sig = funcs.data[fidx];
@@ -195,7 +206,8 @@ static void emit_word(size_t fidx) {
                 be->fn_end(sig, w->locals.data, w->locals.len);
                 break;
             case IR_PUSH_W:
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_LOCAL_OP) {
+                if (ir_can_fuse(w, i, 1) &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_LOCAL_OP) {
                     const IrInstr *nins = &ir_buf.data[w->ir_start + i + 1];
                     if (nins->u.loc.op == LOCAL_ADD && be->local_add_imm &&
                         be->local_add_imm(nins->u.loc.slot, nins->u.loc.type,
@@ -204,7 +216,8 @@ static void emit_word(size_t fidx) {
                         break;
                     }
                 }
-                if (i + 2 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
+                if (ir_can_fuse(w, i, 2) &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
                     ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP) {
                     IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
                     IrOp mop = ir_buf.data[w->ir_start + i + 2].u.op;
@@ -217,7 +230,8 @@ static void emit_word(size_t fidx) {
                         }
                     }
                 }
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
+                if (ir_can_fuse(w, i, 1) &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
                     IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
                     i32 imm = ins->u.w;
                     if (aop == OP_ADD || aop == OP_SUB || aop == OP_AADD || aop == OP_ASUB) {
@@ -227,8 +241,7 @@ static void emit_word(size_t fidx) {
                             break;
                         }
                     } else if (aop >= OP_EQ && aop <= OP_AGT) {
-                        if (i + 2 < w->ir_len && !ir_is_br_target(w, i + 1) &&
-                            !ir_is_br_target(w, i + 2)) {
+                        if (ir_can_fuse(w, i, 2)) {
                             const IrInstr *bins = &ir_buf.data[w->ir_start + i + 2];
                             if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ &&
                                 be->cmp_br_fwd) {
@@ -282,7 +295,8 @@ static void emit_word(size_t fidx) {
                 be->push_i32(ins->u.w);
                 break;
             case IR_PUSH_DATA:
-                if (i + 1 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
+                if (ir_can_fuse(w, i, 1) &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
                     be->data_mem &&
                     be->data_mem(ir_buf.data[w->ir_start + i + 1].u.op, ins->u.offset)) {
                     i++;
@@ -295,7 +309,8 @@ static void emit_word(size_t fidx) {
                 break;
             case IR_LOCAL_OP:
                 if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
-                    if (i + 3 < w->ir_len && ir_buf.data[w->ir_start + i + 1].kind == IR_PUSH_W &&
+                    if (ir_can_fuse(w, i, 3) &&
+                        ir_buf.data[w->ir_start + i + 1].kind == IR_PUSH_W &&
                         ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP &&
                         ir_buf.data[w->ir_start + i + 3].kind == IR_ALU_OP) {
                         IrOp aop = ir_buf.data[w->ir_start + i + 2].u.op;
@@ -309,7 +324,7 @@ static void emit_word(size_t fidx) {
                                 break;
                             }
                         }
-                    } else if (i + 1 < w->ir_len &&
+                    } else if (ir_can_fuse(w, i, 1) &&
                                ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
                         IrOp mop = ir_buf.data[w->ir_start + i + 1].u.op;
                         if (mop >= OP_I8FETCH && mop <= OP_FSTORE &&
@@ -326,8 +341,7 @@ static void emit_word(size_t fidx) {
                 be->stack_op(ins->u.stk.op, ins->u.stk.t1, ins->u.stk.t2);
                 break;
             case IR_ALU_OP:
-                if (ins->u.op >= OP_EQ && ins->u.op <= OP_AGT && i + 1 < w->ir_len &&
-                    !ir_is_br_target(w, i + 1)) {
+                if (ins->u.op >= OP_EQ && ins->u.op <= OP_AGT && ir_can_fuse(w, i, 1)) {
                     const IrInstr *bins = &ir_buf.data[w->ir_start + i + 1];
                     if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ && be->cmp_br_fwd) {
                         size_t patch_off = 0;
@@ -357,9 +371,8 @@ static void emit_word(size_t fidx) {
                                         words.data[target]->reloc_cnt);
                     break;
                 }
-                if (funcs.data[target]->has_addr && be->tail_call && i + 1 < w->ir_len &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_FN_END &&
-                    !ir_is_br_target(w, i + 1)) {
+                if (funcs.data[target]->has_addr && be->tail_call && ir_can_fuse(w, i, 1) &&
+                    ir_buf.data[w->ir_start + i + 1].kind == IR_FN_END) {
 #if IR4_ENABLE_6502
                     if (be == &be_6502) {
                         be_6502_set_call_bank(funcs.data[target]->bank);

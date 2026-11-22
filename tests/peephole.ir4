@@ -1,0 +1,139 @@
+\ Test that peephole lookahead fusions do not cross branch targets
+
+data d_a 0x11 :i8 0x22 :i8 0x33 :i8 0x44 :i8 end
+data d_b 0x55 :i8 0x66 :i8 0x77 :i8 0x88 :i8 end
+var gbuf :bytes 8
+
+\ 1. local_add_imm: if <imm> else <imm> then +-> local (hot & cold)
+hot fn hot_ladd ( x :i c :i -> :i )
+  c 0 <> if 313 else 1 then +-> x
+  x
+end
+
+fn cold_ladd ( x :i c :i -> :i )
+  c 0 <> if 313 else 1 then +-> x
+  x
+end
+
+hot fn hot_aadd ( p :a c :i -> :a )
+  c 0 <> if 313 else 1 then +-> p
+  p
+end
+
+\ 2. add_imm / sub_imm / aadd / asub across branch target
+hot fn test_add_imm ( x :i c :i -> :i )
+  x c 0 <> if 10 else 20 then +
+end
+
+hot fn test_sub_imm ( x :i c :i -> :i )
+  x c 0 <> if 10 else 20 then -
+end
+
+hot fn test_aadd_imm ( c :i -> :i )
+  d_a c 0 <> if 2 else 1 then a+ u8@
+end
+
+hot fn test_asub_imm ( c :i -> :i )
+  d_a 3 a+ c 0 <> if 2 else 1 then a- u8@
+end
+
+\ 3. cmp_imm, shift_imm, bit_imm across branch target
+hot fn test_cmp_imm ( x :i c :i -> :i )
+  x c 0 <> if 5 else 3 then = if 1 else 0 then
+end
+
+hot fn test_shift_imm ( x :i c :i -> :i )
+  x c 0 <> if 2 else 1 then <<
+end
+
+hot fn test_ushift_imm ( x :i c :i -> :i )
+  x c 0 <> if 2 else 1 then u>>
+end
+
+hot fn test_bit_imm ( x :i c :i -> :i )
+  x c 0 <> if 0x05 else 0x03 then and
+end
+
+\ 4. mem_imm (store & fetch) across branch target
+hot fn test_mem_imm ( c :i -> :i )
+  0xAA gbuf 1 a+ i8!
+  0xBB gbuf 3 a+ i8!
+  0xCC gbuf c 0 <> if 3 else 1 then a+ i8!
+  gbuf c 0 <> if 3 else 1 then a+ u8@
+end
+
+\ 5. data_mem (IR_PUSH_DATA + u8@) across branch target
+hot fn test_data_mem ( c :i -> :i )
+  c 0 <> if d_a else d_b then u8@
+end
+
+\ 6. local_mem (LOCAL_ADDR + u8@ / a+ u8@) across branch target
+hot fn test_local_mem ( c :i -> :i )
+  var loc_a :bytes 4
+  var loc_b :bytes 4
+  0x42 loc_a i8!
+  0x99 loc_b i8!
+  0x77 loc_a 2 a+ i8!
+  0x88 loc_a 1 a+ i8!
+  c 0 <> if loc_a else loc_b then u8@
+  loc_a c 0 <> if 2 else 1 then a+ u8@ +
+end
+
+\ 7. Backend peep_fence: push before branch, consume (dup/drop/swap/+) after then
+hot fn test_peep_fence_hot ( c :i -> :i )
+  10
+  c 0 <> if 20 else 30 then
+  swap drop
+  c 0 <> if 1 + then
+  dup +
+end
+
+fn test_peep_fence_cold ( c :i -> :i )
+  10
+  c 0 <> if 20 else 30 then
+  swap drop
+  c 0 <> if 1 + then
+  dup +
+end
+
+fn main ( -> :i )
+  10 1 hot_ladd 323 <> if 1 return then
+  10 0 hot_ladd 11 <> if 2 return then
+  10 1 cold_ladd 323 <> if 3 return then
+  10 0 cold_ladd 11 <> if 4 return then
+  d_a 1 hot_aadd d_a adiff 313 <> if 5 return then
+  d_a 0 hot_aadd d_a adiff 1 <> if 6 return then
+
+  100 1 test_add_imm 110 <> if 7 return then
+  100 0 test_add_imm 120 <> if 8 return then
+  100 1 test_sub_imm 90 <> if 9 return then
+  100 0 test_sub_imm 80 <> if 10 return then
+  1 test_aadd_imm 0x33 <> if 11 return then
+  0 test_aadd_imm 0x22 <> if 12 return then
+  1 test_asub_imm 0x22 <> if 13 return then
+  0 test_asub_imm 0x33 <> if 14 return then
+
+  5 1 test_cmp_imm 1 <> if 15 return then
+  3 1 test_cmp_imm 0 <> if 16 return then
+  3 0 test_cmp_imm 1 <> if 17 return then
+  3 1 test_shift_imm 12 <> if 18 return then
+  3 0 test_shift_imm 6 <> if 19 return then
+  16 1 test_ushift_imm 4 <> if 20 return then
+  16 0 test_ushift_imm 8 <> if 21 return then
+  0x0F 1 test_bit_imm 0x05 <> if 22 return then
+  0x0F 0 test_bit_imm 0x03 <> if 23 return then
+
+  1 test_mem_imm 0xCC <> if 24 return then
+  0 test_mem_imm 0xCC <> if 25 return then
+  1 test_data_mem 0x11 <> if 26 return then
+  0 test_data_mem 0x55 <> if 27 return then
+  1 test_local_mem 0x42 0x77 + <> if 28 return then
+  0 test_local_mem 0x99 0x88 + <> if 29 return then
+
+  1 test_peep_fence_hot 42 <> if 30 return then
+  0 test_peep_fence_hot 60 <> if 31 return then
+  1 test_peep_fence_cold 42 <> if 32 return then
+  0 test_peep_fence_cold 60 <> if 33 return then
+
+  0
+end

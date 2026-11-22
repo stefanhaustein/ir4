@@ -29,7 +29,7 @@ var c_red :i
 var c_blue :i
 var c_amber :i
 
-data s_label "IR (4th)" :i8 end
+data s_label "IR (4th)" end
 
 fn init_colors ( )
   0 0 0 gfxrgb -> c_black

@@ -176,42 +176,33 @@ hot fn gfxvline ( x :i y :i h :i )
   h 0 <= if return then
   y 3 u>> -> var row :i
   x 3 u>> -> var col :i
-  y 7 and -> var ry :i
-  0xE000 i>a row 8 << row 6 << + col 3 << + ry + a+ -> var p :a
+  0xE000 i>a row 8 << row 6 << + col 3 << + y 7 and + a+ -> var p :a
   128 x 7 and u>> -> var mask :i
   __c64_ram_on
   __c64_col __c64_bg = if
     mask invert -> var nmask :i
-    begin h 0 > while
+    begin
       p u8@ nmask and p i8!
       -1 +-> h
-      h 0 > if
-        ry 7 = if
-          0 -> ry
-          313 +-> p
-        else
-          1 +-> ry
-          1 +-> p
-        then
-      then
+      h 0 >
+    while
+      p a>i 7 and 7 = if 313 else 1 then +-> p
     repeat
   else
     0xCC00 i>a row 5 << row 3 << + col + a+ -> var cell :a
     __c64_col 4 << -> var fgnib :i
     cell u8@ 15 and fgnib or cell i8!
-    begin h 0 > while
+    begin
       p u8@ mask or p i8!
       -1 +-> h
-      h 0 > if
-        ry 7 = if
-          0 -> ry
-          313 +-> p
-          40 +-> cell
-          cell u8@ 15 and fgnib or cell i8!
-        else
-          1 +-> ry
-          1 +-> p
-        then
+      h 0 >
+    while
+      p a>i 7 and 7 = if
+        313 +-> p
+        40 +-> cell
+        cell u8@ 15 and fgnib or cell i8!
+      else
+        1 +-> p
       then
     repeat
   then

@@ -78,7 +78,19 @@ test: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4 test
 	./$(TARGET) -t z80   -o $(BUILD)/fnptr_z80.bin    tests/fnptr.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/fnptr_6502.bin   tests/fnptr.ir4
 	./$(TARGET) -t arm64 -o $(BUILD)/fnptr_arm64.bin  --run tests/fnptr.ir4
+	./$(TARGET) -t z80   -o $(BUILD)/peephole_z80.bin   tests/peephole.ir4
+	./$(TARGET) -t 6502  -o $(BUILD)/peephole_6502.bin  tests/peephole.ir4
+	./$(TARGET) -t arm64 -o $(BUILD)/peephole_arm64.bin --run tests/peephole.ir4
 	$(MAKE) test-err
+	$(MAKE) test-examples
+
+test-examples: $(TARGET)
+	@for f in examples/*.ir4; do \
+		./$(TARGET) -t arm64 -o $(BUILD)/ex_arm64.bin $$f >/dev/null; \
+		./$(TARGET) -t c64   -o $(BUILD)/ex_c64.prg   $$f >/dev/null; \
+		./$(TARGET) -t cpm   -o $(BUILD)/ex_cpm.com   $$f >/dev/null; \
+		echo "OK (examples): $$f"; \
+	done
 
 test-err: $(TARGET)
 	@for f in tests/errors/*.ir4; do \
@@ -99,6 +111,7 @@ test-z80: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4 
 	./$(TARGET) -t cpm -o build/data.com   tests/data.ir4
 	./$(TARGET) -t cpm -o build/ext.com    tests/ext.ir4
 	./$(TARGET) -t cpm -o build/fnptr.com  tests/fnptr.ir4
+	./$(TARGET) -t cpm -o build/peephole.com tests/peephole.ir4
 	@if command -v tnylpo >/dev/null 2>&1; then \
 		out=$$(cd $(BUILD) && tnylpo fib.com | tr -d '\r\n') && \
 		echo "tnylpo fib.com -> $$out" && \
@@ -123,7 +136,10 @@ test-z80: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4 
 		test "$$out" = "0" && \
 		out=$$(cd $(BUILD) && tnylpo ext.com | tr -d '\r\n') && \
 		echo "tnylpo ext.com -> $$out" && \
-		test "$$out" = "OK0"; \
+		test "$$out" = "OK0" && \
+		out=$$(cd $(BUILD) && tnylpo peephole.com | tr -d '\r\n') && \
+		echo "tnylpo peephole.com -> $$out" && \
+		test "$$out" = "0"; \
 	else \
 		echo "tnylpo not found; skipping Z80 execution"; \
 	fi
@@ -140,11 +156,12 @@ test-ez80: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4
 	./$(TARGET) -t agon -o $(BUILD)/math_agon.bin   tests/math.ir4
 	./$(TARGET) -t agon -o $(BUILD)/fnptr_agon.bin  tests/fnptr.ir4
 	./$(TARGET) -t agon -o $(BUILD)/i32_agon.bin    tests/i32.ir4
+	./$(TARGET) -t agon -o $(BUILD)/peephole_agon.bin tests/peephole.ir4
 	@emu=$$(command -v "$(AGON_EMU)" 2>/dev/null || true); \
 	if [ -n "$$emu" ] && [ -x "$$emu" ]; then \
 		sd="$$(pwd)/$(BUILD)/agon-sd"; \
 		mkdir -p "$$sd"; \
-		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000"; do \
+		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000" "peephole_agon.bin:000000"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			cp $(BUILD)/$$f "$$sd/test.bin"; \
 			printf "load test.bin\nrun\n" > "$$sd/autoexec.txt"; \
@@ -198,6 +215,10 @@ test-6502: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4
 		out=$$(sim65 $(BUILD)/fnptr_sim65.bin | tr -d '\r\n'); \
 		echo "sim65 fnptr_sim65.bin -> $$out"; \
 		test "$$out" = "0"; \
+		./$(TARGET) -t sim65 -o $(BUILD)/peephole_sim65.bin tests/peephole.ir4; \
+		out=$$(sim65 $(BUILD)/peephole_sim65.bin | tr -d '\r\n'); \
+		echo "sim65 peephole_sim65.bin -> $$out"; \
+		test "$$out" = "0"; \
 	else \
 		echo "sim65 not found; skipping 6502 execution"; \
 	fi
@@ -213,8 +234,9 @@ test-rv32: $(TARGET) tests/fib.ir4 tests/core.ir4 tests/muldiv.ir4 tests/mem.ir4
 	./$(TARGET) -t virt -o $(BUILD)/ext_rv32.elf    tests/ext.ir4
 	./$(TARGET) -t virt -o $(BUILD)/math_rv32.elf   tests/math.ir4
 	./$(TARGET) -t virt -o $(BUILD)/fnptr_rv32.elf  tests/fnptr.ir4
+	./$(TARGET) -t virt -o $(BUILD)/peephole_rv32.elf tests/peephole.ir4
 	@if command -v qemu-system-riscv32 >/dev/null 2>&1; then \
-		for pair in "fib_rv32.elf:0" "core_rv32.elf:0" "muldiv_rv32.elf:0" "mem_rv32.elf:0" "float_rv32.elf:0" "req_rv32.elf:0" "data_rv32.elf:0" "ext_rv32.elf:OK0" "math_rv32.elf:0" "fnptr_rv32.elf:0"; do \
+		for pair in "fib_rv32.elf:0" "core_rv32.elf:0" "muldiv_rv32.elf:0" "mem_rv32.elf:0" "float_rv32.elf:0" "req_rv32.elf:0" "data_rv32.elf:0" "ext_rv32.elf:OK0" "math_rv32.elf:0" "fnptr_rv32.elf:0" "peephole_rv32.elf:0"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(qemu-system-riscv32 -machine virt -cpu rv32 -bios none -nographic -kernel $(BUILD)/$$f | tr -d '\r\n'); \
 			echo "qemu-system-riscv32 $$f -> $$out"; \
