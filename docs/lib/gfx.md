@@ -101,8 +101,12 @@ Memory layout:
   reads use `__c64_peek_under` with `$01=$35` while IRQs are disabled)
 
 **Color model:** gfxdepth returns 1 (1 bpp pixel density, so B/W-aware apps like mandel avoid clash),
-while gfxrgb maps RGB to 8 C64 colors and gfxpx/gfxhline/gfxvline update the 8x8 cell
-foreground attribute in `$CC00` (ZX Spectrum-style attribute clash; bg stays color 0).
+while gfxrgb maps RGB to 8 C64 colors. Calling gfxcolor followed by gfxclear sets the
+screen background color (`__c64_bg`), clears `$E000-$FF3F` to 0, and fills `$CC00-$CFE7`
+with that background color in the low nibble. Drawing with gfxcolor = bg clears bitmap
+bits (revealing the cell background without altering its foreground nibble); drawing with
+gfxcolor <> bg sets bitmap bits and updates the 8x8 cell's foreground (high) nibble in
+`$CC00` while preserving its background nibble (ZX Spectrum-style attribute clash).
 
 ### cpm
 
