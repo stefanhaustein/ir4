@@ -114,6 +114,9 @@ fn fgcolor ( c :i ) c drop end
 \ No-op on ZX81 (monochrome display).
 fn bgcolor ( c :i ) c drop end
 
+\ Always returns `charset_native` (`0`: ZX81 ROM has uppercase and block symbols only).
+fn getcharset ( -> :i ) 0 end
+
 \ Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
 fn gotoxy ( x :i y :i )
   x 0 < if 0 -> x then

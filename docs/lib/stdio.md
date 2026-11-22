@@ -13,6 +13,14 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
   - *c64:* Records background color for the next cls (`$D021`; standard text mode has no per-character background).
   - *zx81:* No-op on ZX81 (monochrome display).
 
+- **charset_native** ( -> :i )
+
+  Native boot/symbol-oriented character set (`setcharset`/`getcharset`)
+
+- **charset_text** ( -> :i )
+
+  Text-oriented character set with lowercase support (`setcharset`/`getcharset`)
+
 - **cls** ( )
 
   Clear screen (using active background color where supported) and home cursor (ANSI default)
@@ -23,6 +31,11 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 
   Set foreground text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
   - *zx81:* No-op on ZX81 (monochrome display).
+
+- **getcharset** ( -> :i )
+
+  Return active effective character set (`charset_text` when lowercase is supported, `charset_native` otherwise)
+  - *zx81:* Always returns `charset_native` (`0`: ZX81 ROM has uppercase and block symbols only).
 
 - **gotoxy** ( x :i y :i ) — Move text cursor to 0-based column *x*, row *y* (ANSI default)
   - *zx81:* Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
@@ -35,6 +48,12 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **key** ( -> :i )
 
   Wait for and return the next character from the input buffer (blocking except when unsupported; defaults to 0 in that case)
+
+- **setcharset** ( mode :i )
+
+  Select text character set (`charset_native` or `charset_text`; no-op where fixed)
+  - *c64:* Switch between `charset_native` (`0`, `142 emit`) and `charset_text` (`1`, `14 emit`).
+  - *x16:* Switch between `charset_native` (`0`, `143 emit 142 emit`) and `charset_text` (`1`, `15 emit` ISO-8859-15).
 
 - **termheight** ( -> :i ) — Return terminal height in rows (default: 24)
 - **termwidth** ( -> :i ) — Return terminal width in columns (default: 80)
@@ -53,14 +72,14 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **xemit** ( c :i )
 
   Emit character *c* with platform text mapping (defaults to raw emit; PETSCII on C64)
-  - *c64:* Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII to PETSCII and clears quote mode (`$D4`) after `"`.
-  - *x16:* Switches X16 to Lowercase/Uppercase mode (14 emit) at startup; uses `$80` verbatim mode for `"` so quote mode never triggers.
+  - *c64:* Maps ASCII to PETSCII (`charset_text`: mixed case; `charset_native`: folds `a..z` to uppercase) and clears quote mode (`$D4`) after `"`.
+  - *x16:* Maps ASCII to ISO (`charset_text`) or uppercase PETSCII (`charset_native`); uses `$80` verbatim mode for `"` so quote mode never triggers.
 
 - **xinkey** ( -> :i )
 
   Non-blocking read of next key mapped to normalized ASCII (defaults to raw inkey)
   - *c64:* Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
-  - *x16:* Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
+  - *x16:* Maps key input to normalized ASCII (direct pass-through in ISO `charset_text`; PETSCII case swap in `charset_native`).
   - *zx81:* Decodes LAST_K (`$4025`) via ROM `$07BD` to normalized ASCII, or 0 if no key is pressed.
 
 - **xkey** ( -> :i )

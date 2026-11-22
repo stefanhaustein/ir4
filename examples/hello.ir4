@@ -5,6 +5,7 @@ data msg
 end
 
 fn main ( -> :i )
+  charset_text setcharset
   msg type0
   0
 end

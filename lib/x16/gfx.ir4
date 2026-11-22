@@ -19,6 +19,8 @@ code __x16_mode_txt ( )
   0xA9 :i8 0x00 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
 end
 
+extern __x16_set_charset 0xFF62 ( A :i )
+
 fn gfxmodes ( -> :a :i )
   __x16_modes 2
 end
@@ -52,6 +54,7 @@ end
 fn gfxmode ( mode :i )
   15 -> __x16_col
   __x16_mode_gfx
+  1 __x16_set_charset
   __x16_init_pal
   mode 1 = if
     160 -> __x16_w
@@ -69,6 +72,7 @@ fn gfxdone ( )
   0 0x9F25 i>a i8!
   0x9F29 i>a u8@ 0xBF and 0x9F29 i>a i8!
   __x16_mode_txt
+  getcharset charset_text = if 1 else 2 then __x16_set_charset
 end
 
 extern __x16_rdtim 0xFFDE ( -> A :i )
@@ -161,17 +165,13 @@ end
 fn gfxcharw ( -> :i ) 8 end
 fn gfxcharh ( -> :i ) 8 end
 
-\ Pixel-positioned 8x8 text from VERA VRAM ($1F000) using `xemit` ASCII mapping.
+\ Pixel-positioned 8x8 text from VERA VRAM ($1F000) using ISO ASCII font loaded by `gfxmode`.
 fn gfxtext ( x :i y :i s :a len :i )
   var buf :bytes 8
   begin
     len 0 >
   while
-    s u8@ __x16_xlat -> var p :i
-    p -> var sc :i
-    p 64 >= p 96 < and if p 64 - -> sc then
-    p 160 >= p 192 < and if p 64 - -> sc then
-    p 192 >= p 224 < and if p 128 - -> sc then
+    s u8@ -> var sc :i
     0 0x9F25 i>a i8!
     sc 3 << 255 and 0x9F20 i>a i8!
     0xF0 sc 5 u>> + 0x9F21 i>a i8!

@@ -18,6 +18,20 @@ fn main ( -> :i )
   cls
   0 0 gotoxy
 
+  \ Charset selection & query
+  charset_native setcharset
+  target_c64 target_x16 or target_zx81 or if
+    getcharset charset_native <> if 10 return then
+  else
+    getcharset charset_text <> if 10 return then
+  then
+  charset_text setcharset
+  target_zx81 if
+    getcharset charset_native <> if 11 return then
+  else
+    getcharset charset_text <> if 11 return then
+  then
+
   \ String and numeric formatting
   s_hi 2 type
   s_abc type0

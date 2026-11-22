@@ -1,6 +1,11 @@
 \ stdio.ir4 - Console I/O, formatting, and screen control
 \ Platform overrides implement raw `emit` (and optionally the `default fn` entries below).
 
+\ Native boot/symbol-oriented character set (`setcharset`/`getcharset`)
+const charset_native 0
+\ Text-oriented character set with lowercase support (`setcharset`/`getcharset`)
+const charset_text   1
+
 \ Emit character *c* with platform text mapping (defaults to raw emit; PETSCII on C64)
 default fn xemit ( c :i )
   c emit
@@ -198,4 +203,14 @@ default fn bgcolor ( c :i )
   27 emit 91 emit
   c 8 < if 40 c + else 92 c + then typeu
   109 emit
+end
+
+\ Select text character set (`charset_native` or `charset_text`; no-op where fixed)
+default fn setcharset ( mode :i )
+  mode drop
+end
+
+\ Return active effective character set (`charset_text` when lowercase is supported, `charset_native` otherwise)
+default fn getcharset ( -> :i )
+  charset_text
 end

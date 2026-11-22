@@ -35,10 +35,25 @@ fn xkey ( -> :i )
 end
 
 var __c64_txt_bg :i
+var __c64_charset :i
 
 init
-  14 emit
   0xD021 i>a u8@ -> __c64_txt_bg
+end
+
+\ Switch between `charset_native` (`0`, `142 emit`) and `charset_text` (`1`, `14 emit`).
+fn setcharset ( mode :i )
+  mode 1 = if
+    1 -> __c64_charset
+    14 emit
+  else
+    0 -> __c64_charset
+    142 emit
+  then
+end
+
+fn getcharset ( -> :i )
+  __c64_charset
 end
 
 \ Map normalized ASCII to PETSCII (Lowercase/Uppercase mode: A-Z, a-z, _, |).
@@ -67,12 +82,16 @@ fn gotoxy ( x :i y :i )
   x y __c64_plot
 end
 
-\ Switches C64 to Lowercase/Uppercase mode (14 emit) at startup; maps ASCII to PETSCII and clears quote mode (`$D4`) after `"`.
+\ Maps ASCII to PETSCII (`charset_text`: mixed case; `charset_native`: folds `a..z` to uppercase) and clears quote mode (`$D4`) after `"`.
 fn xemit ( c :i )
   c 10 = c 13 = or if 13 emit return then
   c 8 = if 20 emit return then
   c 32 < c 126 > or if return then
-  c __c64_xlat emit
+  __c64_charset 0 = c 65 >= and c 90 <= and if
+    c emit
+  else
+    c __c64_xlat emit
+  then
   c 34 = if 0 212 i>a i8! then
 end
 

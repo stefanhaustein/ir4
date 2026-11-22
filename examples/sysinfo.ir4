@@ -33,6 +33,8 @@ data s_chdr   "   0123456789ABCDEF 0123456789ABCDEF" 0 :i8 end
 data s_chdr_n "0123456789ABCDEF0123456789ABCDEF" 0 :i8 end
 data s_raw    ":raw  " 0 :i8 end
 data s_xplat  ":xplat" 0 :i8 end
+data s_nat    ":nat" 0 :i8 end
+data s_txt    ":txt" 0 :i8 end
 data s_colk   ":" 0 :i8 end
 
 fn print_key ( ch :i )
@@ -43,11 +45,14 @@ fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
   termwidth 36 < -> var narrow :i
   7 fgcolor sb bgcolor
   0 2 gotoxy
-  termwidth typei 120 emit termheight typei 32 emit
+  termwidth typei 120 xemit termheight typei 32 emit
   70 print_key s_colk type0 6 fgcolor fg 2 typehw 7 fgcolor 32 emit
   66 print_key s_colk type0 6 fgcolor cb 2 typehw 7 fgcolor 32 emit
   83 print_key s_colk type0 6 fgcolor sb 2 typehw 7 fgcolor 32 emit
   79 print_key s_colk type0 6 fgcolor bd 2 typehw 7 fgcolor 32 emit
+  67 print_key 6 fgcolor
+  getcharset charset_text = if s_txt else s_nat then type0
+  7 fgcolor 32 emit
   88 print_key
   6 fgcolor
   use_x if s_xplat else s_raw then type0
@@ -93,7 +98,7 @@ fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
 
   0 11 gotoxy
   s_spr type0 sprcount typei s_slots type0
-  sprmaxw typei 120 emit sprmaxh typei 32 emit
+  sprmaxw typei 120 xemit sprmaxh typei 32 emit
   sprdepth typei s_bpp type0
 
   gfxmodes -> var nmodes :i -> var mptr :a
@@ -105,7 +110,7 @@ fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
     0 row gotoxy
     s_hash type0 i typei s_colon type0
     mptr i 3 << a+ -> var ent :a
-    ent 2 a+ i16@ typei 120 emit
+    ent 2 a+ i16@ typei 120 xemit
     ent 4 a+ i16@ typei 32 emit
     ent 6 a+ i16@ typei s_mid type0
     ent i16@ typei 41 emit
@@ -159,6 +164,10 @@ fn main ( )
       k 120 = k 88 = or if
         1 use_x xor -> use_x
         4 use_x fg cb sb bd draw_charset
+      then
+      k 99 = k 67 = or if
+        getcharset charset_text = if charset_native else charset_text then setcharset
+        use_x fg cb sb bd draw_static -> r_joy
       then
       k 102 = k 70 = or if
         fg 1 + 15 and -> fg
