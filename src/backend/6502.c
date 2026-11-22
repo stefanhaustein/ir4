@@ -862,7 +862,7 @@ void be_6502_peep_fence(void) {
 static void m6502_pop2(void) {
     cb_emit8(M6502_INX);
     cb_emit8(M6502_INX);
-    if (!m6502_compact)
+    if (ir4_get_opt_level() && !m6502_compact)
         m6502_inx2_pc = cb_pc();
 }
 
@@ -2010,7 +2010,7 @@ static size_t m6502_emit_br_fwd(BranchCond cond) {
         cb_emit16(0x0000);
         return patch_pos;
     }
-    if (cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
+    if (ir4_get_opt_level() && cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
         u8 n_inx = (u8)(m6502_cmp_pops * 2);
         u8 k;
         cb_rewind(cb_pc() - m6502_cmp_mat_pc);
@@ -2046,7 +2046,7 @@ static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
         cb_emit8_16(cond == BR_JZ ? BC_JZ : BC_JMP, (u16)target_addr);
         return;
     }
-    if (cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
+    if (ir4_get_opt_level() && cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
         u8 n_inx = (u8)(m6502_cmp_pops * 2);
         u8 k;
         cb_rewind(cb_pc() - m6502_cmp_mat_pc);

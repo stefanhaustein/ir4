@@ -60,7 +60,8 @@ static Bool can_reach_func(size_t cur, size_t target, Bool *visited) {
 static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     FuncSig *sig = funcs.data[fidx];
     WordIR *cw = words.data[fidx];
-    if (!cw->is_code || !sig->is_hot || cw->ir_len == 0 || cw->ir_len > HOT_CODE_INLINE_MAX)
+    if (!ir4_get_opt_level() || !cw->is_code || !sig->is_hot || cw->ir_len == 0 ||
+        cw->ir_len > HOT_CODE_INLINE_MAX)
         return 0;
     if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "z80") != 0 &&
         strcmp(be->name, "ez80") != 0)
@@ -138,6 +139,8 @@ static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
 
 static int ir_can_fuse(const WordIR *w, size_t i, size_t extra) {
     size_t k;
+    if (!ir4_get_opt_level())
+        return 0;
     if (i + extra >= w->ir_len)
         return 0;
     for (k = 1; k <= extra; k++) {

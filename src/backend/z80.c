@@ -33,8 +33,10 @@ static void z80_peep_barrier(void) { z80_last_push_op = 0; }
 
 static void z80_push(u8 op) {
     cb_emit8(op);
-    z80_last_push_op = op;
-    z80_last_push_pc = cb_pc();
+    if (ir4_get_opt_level()) {
+        z80_last_push_op = op;
+        z80_last_push_pc = cb_pc();
+    }
 }
 
 static void z80_pop(u8 op) {

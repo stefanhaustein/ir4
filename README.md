@@ -76,7 +76,7 @@ qemu-system-riscv32 -machine virt -bios none -nographic -kernel build/core_p.elf
 Compile with `ir4c`:
 
 ```sh
-./build/ir4c [-t z80|ez80|6502|arm64|rv32|bc|cpm|zx81|agon|sim65|c64|x16|x16-cart|virt|obj] [-b hex_addr] [-o out.bin] [-I dir] [--platform name] [--zp hex_addr] [--stack-zp hex_addr[:init_x]] [--no-stack-zp] [--run] <input.ir4>
+./build/ir4c [-t z80|ez80|6502|arm64|rv32|bc|cpm|zx81|agon|sim65|c64|x16|x16-cart|virt|obj] [-b hex_addr] [-o out.bin] [-I dir] [-O0|-O1] [--platform name] [--zp hex_addr] [--stack-zp hex_addr[:init_x]] [--no-stack-zp] [--run] <input.ir4>
 ```
 
 Pass `-I dir` (repeatable) to add library search directories ahead of the built-in `lib/` directory.

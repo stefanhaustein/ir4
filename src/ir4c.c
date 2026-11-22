@@ -35,7 +35,7 @@ static const Platform *const platforms[] = {
 
 static void print_usage(void) {
     fprintf(stderr, "Usage: ir4c [-t z80|ez80|6502|arm64|rv32|bc|cpm|zx81|agon|sim65|c64|x16|x16-cart|virt|obj] "
-                    "[-b hex_addr] [-o out.bin] [-I dir] [--platform name] "
+                    "[-b hex_addr] [-o out.bin] [-I dir] [-O0|-O1] [--platform name] "
                     "[--zp hex_addr] [--stack-zp hex_addr] [--no-stack-zp] [--run] <input.ir4>\n");
 }
 
@@ -151,6 +151,10 @@ int main(int argc, char **argv) {
             ir4_add_lib_root(argv[i]);
         } else if (strncmp(argv[i], "-I", 2) == 0 && argv[i][2] != '\0') {
             ir4_add_lib_root(argv[i] + 2);
+        } else if (strcmp(argv[i], "-O0") == 0) {
+            ir4_set_opt_level(0);
+        } else if (strcmp(argv[i], "-O1") == 0 || strcmp(argv[i], "-O") == 0) {
+            ir4_set_opt_level(1);
         } else if (strcmp(argv[i], "--platform") == 0 && i + 1 < argc) {
             i++;
             platform = argv[i];

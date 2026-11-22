@@ -95,8 +95,10 @@ static void ez_peep_fence(void) { ez_last_push_op = 0; }
 
 static void ez_push_hl(void) {
     cb_emit8(EZ80_PUSH_HL);
-    ez_last_push_op = EZ80_PUSH_HL;
-    ez_last_push_pc = cb_pc();
+    if (ir4_get_opt_level()) {
+        ez_last_push_op = EZ80_PUSH_HL;
+        ez_last_push_pc = cb_pc();
+    }
     ez_stack_bytes += 3;
 }
 

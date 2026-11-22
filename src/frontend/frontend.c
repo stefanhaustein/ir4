@@ -37,7 +37,11 @@ CodeRelocVec code_relocs;
 InlineVec inline_blocks;
 SizeVec init_funcs;
 
+static int ir4_opt_level = 1;
 static size_t fold_fence = 0;
+
+void ir4_set_opt_level(int level) { ir4_opt_level = level ? 1 : 0; }
+int ir4_get_opt_level(void) { return ir4_opt_level; }
 static BufVec buffers;
 static LocalVec locals;
 static TypeVec cur_outs;
@@ -615,127 +619,132 @@ static int handle_builtin(const char *tok, WordIR *w) {
             tstack.len -= need;
             if (builtins[i].out != TY_NONE)
                 tpush(builtins[i].out);
-            if (builtins[i].op == OP_INVERT && w->ir_len >= fold_fence + 1) {
-                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                if (p1->kind == IR_PUSH_W) {
-                    p1->u.w = ~p1->u.w;
-                    return 1;
-                }
-            }
-            if ((builtins[i].op == OP_W2A || builtins[i].op == OP_W2I32 ||
-                 builtins[i].op == OP_U2I32) &&
-                w->ir_len >= fold_fence + 1) {
-                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                if (p1->kind == IR_PUSH_W) {
-                    if (builtins[i].op == OP_W2A) {
-                        p1->kind = IR_PUSH_A;
-                        p1->u.a = (u32)p1->u.w;
-                    } else {
-                        p1->kind = IR_PUSH_I32;
-                    }
-                    return 1;
-                }
-            }
-            if (w->ir_len >= fold_fence + 1) {
-                IrOp sop = swapped_store_op(builtins[i].op);
-                if (sop != builtins[i].op) {
+            if (ir4_opt_level > 0) {
+                if (builtins[i].op == OP_INVERT && w->ir_len >= fold_fence + 1) {
                     IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                    if (p1->kind == IR_STACK_OP && p1->u.stk.op == OP_SWAP) {
-                        p1->kind = IR_ALU_OP;
-                        p1->u.op = sop;
+                    if (p1->kind == IR_PUSH_W) {
+                        p1->u.w = ~p1->u.w;
                         return 1;
                     }
                 }
-            }
-            if (w->ir_len >= fold_fence + 2) {
-                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 2];
-                IrInstr *p2 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                i32 folded;
-                if (p1->kind == IR_PUSH_W && p2->kind == IR_PUSH_W &&
-                    try_fold_const_w(builtins[i].op, p1->u.w, p2->u.w, &folded)) {
-                    p1->u.w = folded;
-                    w->ir_len--;
-                    ir_buf.len--;
-                    return 1;
-                }
-                if (p1->kind == IR_PUSH_DATA && p2->kind == IR_PUSH_W &&
-                    (builtins[i].op == OP_AADD || builtins[i].op == OP_ASUB)) {
-                    i32 delta = (builtins[i].op == OP_ASUB) ? (i32)(0UL - (u32)p2->u.w) : p2->u.w;
-                    if (delta >= 0) {
-                        if ((u32)delta <= 0xFFFFUL) {
-                            p1->u.offset += (size_t)delta;
-                            w->ir_len--;
-                            ir_buf.len--;
-                            return 1;
+                if ((builtins[i].op == OP_W2A || builtins[i].op == OP_W2I32 ||
+                     builtins[i].op == OP_U2I32) &&
+                    w->ir_len >= fold_fence + 1) {
+                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                    if (p1->kind == IR_PUSH_W) {
+                        if (builtins[i].op == OP_W2A) {
+                            p1->kind = IR_PUSH_A;
+                            p1->u.a = (u32)p1->u.w;
+                        } else {
+                            p1->kind = IR_PUSH_I32;
                         }
-                    } else {
-                        size_t mag = (size_t)(0UL - (u32)delta);
-                        if (mag <= p1->u.offset) {
-                            p1->u.offset -= mag;
-                            w->ir_len--;
-                            ir_buf.len--;
+                        return 1;
+                    }
+                }
+                if (w->ir_len >= fold_fence + 1) {
+                    IrOp sop = swapped_store_op(builtins[i].op);
+                    if (sop != builtins[i].op) {
+                        IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                        if (p1->kind == IR_STACK_OP && p1->u.stk.op == OP_SWAP) {
+                            p1->kind = IR_ALU_OP;
+                            p1->u.op = sop;
                             return 1;
                         }
                     }
                 }
-            }
-            if (w->ir_len >= fold_fence + 1) {
-                IrOp rop = builtins[i].op;
-                IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                if (p1->kind == IR_PUSH_W) {
-                    if ((p1->u.w == 0 &&
-                         (rop == OP_ADD || rop == OP_SUB || rop == OP_AADD || rop == OP_ASUB ||
-                          rop == OP_OR || rop == OP_XOR || rop == OP_LSHIFT || rop == OP_RSHIFT ||
-                          rop == OP_ARSHIFT)) ||
-                        (p1->u.w == -1 && rop == OP_AND)) {
+                if (w->ir_len >= fold_fence + 2) {
+                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 2];
+                    IrInstr *p2 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                    i32 folded;
+                    if (p1->kind == IR_PUSH_W && p2->kind == IR_PUSH_W &&
+                        try_fold_const_w(builtins[i].op, p1->u.w, p2->u.w, &folded)) {
+                        p1->u.w = folded;
                         w->ir_len--;
                         ir_buf.len--;
                         return 1;
                     }
-                    if (p1->u.w == 0 && (rop == OP_MUL || rop == OP_AND)) {
-                        p1->kind = IR_STACK_OP;
-                        p1->u.stk.op = OP_DROP;
-                        p1->u.stk.t1 = TY_W;
-                        p1->u.stk.t2 = TY_NONE;
-                        ins = emit_ir(IR_PUSH_W, w);
-                        ins->u.w = 0;
-                        return 1;
+                    if (p1->kind == IR_PUSH_DATA && p2->kind == IR_PUSH_W &&
+                        (builtins[i].op == OP_AADD || builtins[i].op == OP_ASUB)) {
+                        i32 delta =
+                            (builtins[i].op == OP_ASUB) ? (i32)(0UL - (u32)p2->u.w) : p2->u.w;
+                        if (delta >= 0) {
+                            if ((u32)delta <= 0xFFFFUL) {
+                                p1->u.offset += (size_t)delta;
+                                w->ir_len--;
+                                ir_buf.len--;
+                                return 1;
+                            }
+                        } else {
+                            size_t mag = (size_t)(0UL - (u32)delta);
+                            if (mag <= p1->u.offset) {
+                                p1->u.offset -= mag;
+                                w->ir_len--;
+                                ir_buf.len--;
+                                return 1;
+                            }
+                        }
                     }
                 }
-                if (rop == OP_MUL || rop == OP_UDIV || rop == OP_UMOD || rop == OP_MUL32 ||
-                    rop == OP_UDIV32 || rop == OP_UMOD32) {
+                if (w->ir_len >= fold_fence + 1) {
+                    IrOp rop = builtins[i].op;
                     IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
-                    u8 is32 = (rop == OP_MUL32 || rop == OP_UDIV32 || rop == OP_UMOD32);
-                    if ((!is32 && p1->kind == IR_PUSH_W) || (is32 && p1->kind == IR_PUSH_I32)) {
-                        u32 mask = (be->word_bytes == 2)   ? 0xFFFFUL
-                                   : (be->word_bytes == 3) ? 0xFFFFFFUL
-                                                           : 0xFFFFFFFFUL;
-                        u32 v = (!is32 && be->word_bytes < 4) ? ((u32)p1->u.w & mask) : (u32)p1->u.w;
-                        if (v == 1 && (rop == OP_MUL || rop == OP_UDIV || rop == OP_MUL32 ||
-                                       rop == OP_UDIV32)) {
+                    if (p1->kind == IR_PUSH_W) {
+                        if ((p1->u.w == 0 &&
+                             (rop == OP_ADD || rop == OP_SUB || rop == OP_AADD || rop == OP_ASUB ||
+                              rop == OP_OR || rop == OP_XOR || rop == OP_LSHIFT ||
+                              rop == OP_RSHIFT || rop == OP_ARSHIFT)) ||
+                            (p1->u.w == -1 && rop == OP_AND)) {
                             w->ir_len--;
                             ir_buf.len--;
                             return 1;
                         }
-                        if (v >= 2 && (v & (v - 1)) == 0 &&
-                            (is32 || be->word_bytes < 4 || p1->u.w > 0)) {
-                            u8 sh = 0;
-                            while ((v >> sh) > 1)
-                                sh++;
-                            if (rop == OP_UMOD || rop == OP_UMOD32) {
-                                p1->u.w = (i32)(v - 1);
-                                ins = emit_ir(IR_ALU_OP, w);
-                                ins->u.op = is32 ? OP_AND32 : OP_AND;
+                        if (p1->u.w == 0 && (rop == OP_MUL || rop == OP_AND)) {
+                            p1->kind = IR_STACK_OP;
+                            p1->u.stk.op = OP_DROP;
+                            p1->u.stk.t1 = TY_W;
+                            p1->u.stk.t2 = TY_NONE;
+                            ins = emit_ir(IR_PUSH_W, w);
+                            ins->u.w = 0;
+                            return 1;
+                        }
+                    }
+                    if (rop == OP_MUL || rop == OP_UDIV || rop == OP_UMOD || rop == OP_MUL32 ||
+                        rop == OP_UDIV32 || rop == OP_UMOD32) {
+                        IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                        u8 is32 = (rop == OP_MUL32 || rop == OP_UDIV32 || rop == OP_UMOD32);
+                        if ((!is32 && p1->kind == IR_PUSH_W) ||
+                            (is32 && p1->kind == IR_PUSH_I32)) {
+                            u32 mask = (be->word_bytes == 2)   ? 0xFFFFUL
+                                       : (be->word_bytes == 3) ? 0xFFFFFFUL
+                                                               : 0xFFFFFFFFUL;
+                            u32 v = (!is32 && be->word_bytes < 4) ? ((u32)p1->u.w & mask)
+                                                                  : (u32)p1->u.w;
+                            if (v == 1 && (rop == OP_MUL || rop == OP_UDIV || rop == OP_MUL32 ||
+                                           rop == OP_UDIV32)) {
+                                w->ir_len--;
+                                ir_buf.len--;
                                 return 1;
                             }
-                            p1->kind = IR_PUSH_W;
-                            p1->u.w = (i32)sh;
-                            ins = emit_ir(IR_ALU_OP, w);
-                            ins->u.op = (rop == OP_MUL)     ? OP_LSHIFT
-                                        : (rop == OP_UDIV)  ? OP_RSHIFT
-                                        : (rop == OP_MUL32) ? OP_SHL32
-                                                            : OP_RSHR32;
-                            return 1;
+                            if (v >= 2 && (v & (v - 1)) == 0 &&
+                                (is32 || be->word_bytes < 4 || p1->u.w > 0)) {
+                                u8 sh = 0;
+                                while ((v >> sh) > 1)
+                                    sh++;
+                                if (rop == OP_UMOD || rop == OP_UMOD32) {
+                                    p1->u.w = (i32)(v - 1);
+                                    ins = emit_ir(IR_ALU_OP, w);
+                                    ins->u.op = is32 ? OP_AND32 : OP_AND;
+                                    return 1;
+                                }
+                                p1->kind = IR_PUSH_W;
+                                p1->u.w = (i32)sh;
+                                ins = emit_ir(IR_ALU_OP, w);
+                                ins->u.op = (rop == OP_MUL)     ? OP_LSHIFT
+                                            : (rop == OP_UDIV)  ? OP_RSHIFT
+                                            : (rop == OP_MUL32) ? OP_SHL32
+                                                                : OP_RSHR32;
+                                return 1;
+                            }
                         }
                     }
                 }
@@ -1459,7 +1468,8 @@ static int handle_var_op(const char *tok, WordIR *w) {
             if (lv->size > 0)
                 ir4_die("cannot assign to ':bytes' local");
             tpop_expect(lv->type);
-            if ((lv->type == TY_W || lv->type == TY_A) && w->ir_len >= fold_fence + 3) {
+            if (ir4_opt_level > 0 && (lv->type == TY_W || lv->type == TY_A) &&
+                w->ir_len >= fold_fence + 3) {
                 IrInstr *p0 = &ir_buf.data[w->ir_start + w->ir_len - 3];
                 IrInstr *p1 = p0 + 1;
                 IrInstr *p2 = p0 + 2;

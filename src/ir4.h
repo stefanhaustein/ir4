@@ -275,6 +275,10 @@ typedef struct {
 /* Error reporting (implemented in frontend/lexer.c) */
 void ir4_die(const char *msg);
 
+/* Optimization control (implemented in frontend/frontend.c) */
+void ir4_set_opt_level(int level);
+int ir4_get_opt_level(void);
+
 /* Platform / output-format hooks (startup stub, epilogue, file writer, runner). */
 typedef struct {
     const char *flag;
