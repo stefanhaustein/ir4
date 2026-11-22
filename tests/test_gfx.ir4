@@ -1,0 +1,57 @@
+\ Test lib/gfx.ir4 (modes, init, colors, pixels, lines, shapes, text, sync)
+
+require "gfx.ir4"
+
+data s_gfx "GFX" end
+
+fn main ( -> :i )
+  gfxmodes -> var cnt :i -> var mptr :a
+  cnt 0 <= if 1 return then
+  mptr 2 a+ i16@ 0 <= if 2 return then
+  mptr 4 a+ i16@ 0 <= if 3 return then
+  mptr 6 a+ i16@ 0 <= if 4 return then
+
+  320 200 8 gfxinit
+  gfxwidth 0 <= if 5 return then
+  gfxheight 0 <= if 6 return then
+  gfxdepth 0 <= if 7 return then
+  gfxcharw 0 <= if 8 return then
+  gfxcharh 0 <= if 9 return then
+
+  0 0 0 gfxrgb gfxcolor
+  gfxclear
+  1 gfxborder
+
+  255 255 255 gfxrgb -> var c_white :i
+  0 255 0 gfxrgb -> var c_green :i
+  c_white gfxcolor
+
+  \ Clipping / out-of-bounds guards + primitives
+  -5 -5 gfxpx
+  9999 9999 gfxpx
+  0 0 gfxpx
+  0 1 20 gfxhline
+  2 0 15 gfxvline
+  0 0 15 15 gfxline
+  2 2 10 8 gfxrect
+  c_green gfxcolor
+  4 4 6 4 gfxfillrect
+  10 10 5 gfxcircle
+  1 1 s_gfx 3 gfxtext
+
+  \ Repeated draw + sync loop (50x catches stack leaks)
+  0 -> var i :i
+  begin i 50 < while
+    i 3 << 255 and dup dup gfxrgb gfxcolor
+    i 15 and i 7 and gfxpx
+    0 i 7 and 8 gfxhline
+    i 15 and 0 8 gfxvline
+    1 +-> i
+  repeat
+
+  gfxticks drop
+  gfxvsync
+  gfxdone
+  cr
+  0
+end

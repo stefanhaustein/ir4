@@ -10,10 +10,14 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **bgcolor** ( c :i )
 
   Set background text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
-  - *c64:* No-op on C64 (standard text mode has no per-character background color).
+  - *c64:* Records background color for the next cls (`$D021`; standard text mode has no per-character background).
   - *zx81:* No-op on ZX81 (monochrome display).
 
-- **cls** ( ) — Clear screen and home cursor (ANSI default)
+- **cls** ( )
+
+  Clear screen (using active background color where supported) and home cursor (ANSI default)
+  - *c64:* Applies saved bgcolor (`$D021`) and clears the text screen.
+
 - **cr** ( ) — Emit a newline
 - **fgcolor** ( c :i )
 

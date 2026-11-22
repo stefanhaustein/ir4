@@ -40,15 +40,18 @@ fn print_key ( ch :i )
   3 fgcolor ch xemit 7 fgcolor
 end
 
-fn draw_charset ( r0 :i use_x :i fg :i bg :i )
+fn draw_charset ( r0 :i use_x :i fg :i bg :i bd :i )
   termwidth 36 < -> var narrow :i
-  7 fgcolor 0 bgcolor
+  7 fgcolor bg bgcolor
   0 2 gotoxy
-  s_term type0 termwidth typei 120 emit termheight typei 32 emit
+  s_term type0 termwidth typei 120 emit termheight typei
   narrow 0 = if 32 emit then
+  32 emit
   70 print_key s_colk type0 6 fgcolor fg 2 typehw 7 fgcolor 32 emit
   narrow 0 = if 32 emit then
   66 print_key s_colk type0 6 fgcolor bg 2 typehw 7 fgcolor 32 emit
+  narrow 0 = if 32 emit then
+  79 print_key s_colk type0 6 fgcolor bd 2 typehw 7 fgcolor 32 emit
   narrow 0 = if 32 emit then
   88 print_key
   6 fgcolor
@@ -60,7 +63,7 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i )
   0x20 -> var base :i
   begin row_i 3 < while
     0 r0 1 + row_i + gotoxy
-    7 fgcolor 0 bgcolor
+    7 fgcolor bg bgcolor
     narrow 0 = if base 2 typehw 58 emit then
     fg fgcolor bg bgcolor
     0 -> var col :i
@@ -76,16 +79,17 @@ fn draw_charset ( r0 :i use_x :i fg :i bg :i )
     1 +-> row_i
     13 emit
   repeat
-  7 fgcolor 0 bgcolor
+  7 fgcolor bg bgcolor
 end
 
-fn draw_static ( use_x :i fg :i bg :i -> :i )
+fn draw_static ( use_x :i fg :i bg :i bd :i -> :i )
+  bd gfxborder
+  7 fgcolor bg bgcolor
   cls
-  7 fgcolor 0 bgcolor
   0 0 gotoxy
   s_title type0 81 print_key s_quit type0
 
-  4 use_x fg bg draw_charset
+  4 use_x fg bg bd draw_charset
 
   0 10 gotoxy
   s_sfx type0 sfxcount typei
@@ -113,7 +117,11 @@ fn draw_static ( use_x :i fg :i bg :i -> :i )
     1 +-> i
   repeat
 
-  row 1 +
+  row 1 + -> var r_joy :i
+  0 r_joy gotoxy
+  7 fgcolor
+  s_jhdr type0
+  r_joy
 end
 
 fn print_joy_bits ( mask :i )
@@ -131,11 +139,8 @@ fn main ( )
   0 -> var use_x :i
   7 -> var fg :i
   0 -> var bg :i
-  use_x fg bg draw_static -> var r_joy :i
-
-  0 r_joy gotoxy
-  7 fgcolor
-  s_jhdr type0
+  0 -> var bd :i
+  use_x fg bg bd draw_static -> var r_joy :i
 
   0 -> var last_k :i
   0 -> var prev_k :i
@@ -156,15 +161,20 @@ fn main ( )
       then
       k 120 = k 88 = or if
         1 use_x xor -> use_x
-        4 use_x fg bg draw_charset
+        4 use_x fg bg bd draw_charset
       then
       k 102 = k 70 = or if
         fg 1 + 15 and -> fg
-        4 use_x fg bg draw_charset
+        4 use_x fg bg bd draw_charset
       then
       k 98 = k 66 = or if
         bg 1 + 15 and -> bg
-        4 use_x fg bg draw_charset
+        use_x fg bg bd draw_static -> r_joy
+      then
+      k 111 = k 79 = or if
+        bd 1 + 15 and -> bd
+        bd gfxborder
+        4 use_x fg bg bd draw_charset
       then
       k -> last_k
       1 +-> key_cnt

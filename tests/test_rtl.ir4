@@ -2,7 +2,7 @@
 \ Expected main() output ends with 0 (return code)
 
 require "stdio.ir4"
-require "../lib/mem.ir4"
+require "mem.ir4"
 
 data s_exp "HiWorld" 0 :i8 end
 data c_msg "RTL:" 0 :i8 end

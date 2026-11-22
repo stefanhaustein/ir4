@@ -365,6 +365,10 @@ static void emit_word(size_t fidx) {
             case IR_CALL: {
                 size_t target = ins->u.func_idx;
                 size_t inl_len = 0;
+                if (funcs.data[target]->is_extern) {
+                    be->call_extern(funcs.data[target]);
+                    break;
+                }
                 if (can_inline_hot_code(target, &inl_len)) {
                     emit_raw_code_block(words.data[target]->ir_start, inl_len,
                                         words.data[target]->reloc_start,

@@ -34,8 +34,11 @@ fn xkey ( -> :i )
   c
 end
 
+var __c64_txt_bg :i
+
 init
   14 emit
+  0xD021 i>a u8@ -> __c64_txt_bg
 end
 
 \ Map normalized ASCII to PETSCII (Lowercase/Uppercase mode: A-Z, a-z, _, |).
@@ -53,7 +56,9 @@ fn xemit ( c :i )
   c __c64_xlat emit
 end
 
+\ Applies saved bgcolor (`$D021`) and clears the text screen.
 fn cls ( )
+  __c64_txt_bg 0xD021 i>a i8!
   147 emit
 end
 
@@ -79,7 +84,7 @@ fn fgcolor ( c :i )
   __c64_pal c 7 and a+ u8@ 646 i>a i8!
 end
 
-\ No-op on C64 (standard text mode has no per-character background color).
+\ Records background color for the next cls (`$D021`; standard text mode has no per-character background).
 fn bgcolor ( c :i )
-  c drop
+  __c64_pal c 7 and a+ u8@ -> __c64_txt_bg
 end

@@ -28,7 +28,7 @@ fn main ( -> :i )
 end
 ```
 
-Typed memory loop & recursion ([tests/fib.ir4](tests/fib.ir4), [lib/mem.ir4](lib/mem.ir4)):
+Typed memory loop & recursion ([tests/test_fib.ir4](tests/test_fib.ir4), [lib/mem.ir4](lib/mem.ir4)):
 
 ```forth
 fn fib ( n :i -> :i )
@@ -67,7 +67,7 @@ Because `ir4c` includes multiple backends, peephole passes, banking, and compact
 
 ```sh
 fpc -Mtp -O2 -FEbuild ref/ir4p.pas
-./build/ir4p tests/core.ir4 -o build/core_p.elf
+./build/ir4p tests/test_core.ir4 -o build/core_p.elf
 qemu-system-riscv32 -machine virt -bios none -nographic -kernel build/core_p.elf
 ```
 

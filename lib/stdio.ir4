@@ -141,7 +141,7 @@ fn typeb ( n :i )
   n w typebw
 end
 
-\ Clear screen and home cursor (ANSI default)
+\ Clear screen (using active background color where supported) and home cursor (ANSI default)
 default fn cls ( )
   27 emit 91 emit 50 emit 74 emit
   27 emit 91 emit 72 emit

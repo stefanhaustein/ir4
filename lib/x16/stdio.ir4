@@ -1,6 +1,8 @@
-\ x16/stdio.ir4 - Commander X16 overrides (inherits emit, inkey, key, xemit, cls, gotoxy from c64/stdio.ir4)
+\ x16/stdio.ir4 - Commander X16 overrides (inherits emit, inkey, key, xemit, gotoxy from c64/stdio.ir4)
 
 fwd emit ( c :i )
+
+fn cls ( ) 147 emit end
 
 fn termwidth ( -> :i ) 80 end
 fn termheight ( -> :i ) 60 end

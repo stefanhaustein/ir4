@@ -1,0 +1,53 @@
+\ Test lib/stdio.ir4 (formatting, cursor/colors, non-blocking input; skips blocking key/xkey)
+
+require "stdio.ir4"
+
+data s_abc "ABC" 0 :i8 end
+data s_hi "Hi" end
+
+fn main ( -> :i )
+  termwidth 0 <= if 1 return then
+  termheight 0 <= if 2 return then
+
+  \ Non-blocking input calls must return cleanly without blocking
+  inkey drop
+  xinkey drop
+
+  \ Clear, cursor move, and colors
+  7 fgcolor 0 bgcolor
+  cls
+  0 0 gotoxy
+
+  \ String and numeric formatting
+  s_hi 2 type
+  s_abc type0
+  0 typeu
+  65535 typeu
+  -123 typei
+  42 5 typeiw
+  0x1A typeh
+  0x0F 4 typehw
+  5 typeb
+  5 8 typebw
+  65 emit
+  66 xemit
+  cr
+
+  \ Repeated color + cursor + formatting loop (50x catches stack leaks on 6502 ZP stack)
+  0 -> var i :i
+  begin i 50 < while
+    i 15 and fgcolor
+    i 7 and bgcolor
+    i 7 and i 3 and gotoxy
+    s_abc type0
+    i 2 typehw
+    i 8 typebw
+    i typei
+    41 emit
+    1 +-> i
+  repeat
+
+  7 fgcolor 0 bgcolor
+  cr
+  0
+end
