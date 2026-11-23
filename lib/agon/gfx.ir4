@@ -64,7 +64,7 @@ fn gfxdone ( )
   23 emit 1 emit 1 emit
 end
 
-code gfxticks ( -> :i )
+code agon gfxticks ( -> :i )
   0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
   0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8
   0xDD :i8 0x6E :i8 0x00 :i8

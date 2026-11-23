@@ -1,0 +1,8 @@
+\ Error test: 'code' missing target name
+code myword ( -> :i )
+  0x60 :i8
+end
+
+fn main ( -> :i )
+  0
+end

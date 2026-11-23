@@ -81,7 +81,7 @@ end
 fn cls ( ) 147 emit end
 
 \ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
-code __x16_plot ( x :i y :i )
+code x16 __x16_plot ( x :i y :i )
   0xBD :i8 0 :as 0x85 :i8 0x02 :i8
   0xBD :i8 2 :as 0xA8 :i8
   0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8

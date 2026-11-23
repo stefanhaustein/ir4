@@ -11,11 +11,11 @@ var __x16_col :i
 var __x16_w :i
 var __x16_h :i
 
-code __x16_mode_gfx ( )
+code x16 __x16_mode_gfx ( )
   0xA9 :i8 0x80 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
 end
 
-code __x16_mode_txt ( )
+code x16 __x16_mode_txt ( )
   0xA9 :i8 0x00 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
 end
 

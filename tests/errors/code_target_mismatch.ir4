@@ -1,0 +1,7 @@
+\ Error test: 'code' target mismatch (compiled for arm64 in test-err)
+code 6502 myword ( )
+end
+
+fn main ( -> :i )
+  0
+end

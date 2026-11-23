@@ -7,7 +7,7 @@ end
 var __x16_keys :bytes 16
 
 \ Interrupt-safe KEYHDL ($032E) handler updating __x16_keys bitmap.
-code __x16_keyhdl ( )
+code x16 __x16_keyhdl ( )
   0x48 :i8                    \ PHA (orig A)
   0x8A :i8 0x48 :i8           \ TXA; PHA
   0x98 :i8 0x48 :i8           \ TYA; PHA
@@ -44,7 +44,7 @@ end
 
 \ Calls KERNAL JOYSTICK_GET ($FF56).
 \ Returns active-high (byte1 << 8) | byte0, or 0 if not present.
-code __x16_joy_get ( port :i -> :i )
+code x16 __x16_joy_get ( port :i -> :i )
   0x8A :i8                  \ TXA
   0x48 :i8                  \ PHA (save data stack pointer on HW stack)
   0xBD :i8 0 :as            \ LDA 0,X (port)

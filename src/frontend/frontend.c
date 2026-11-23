@@ -48,6 +48,44 @@ static TypeVec cur_outs;
 static TypeVec tstack;
 static BlockVec blocks;
 
+static const char *const known_targets[] = {
+    "z80", "ez80", "6502", "arm64", "rv32", "bc",
+    "cpm", "zx81", "agon", "sim65", "c64",  "x16", "virt", "obj", "jit"};
+
+static int is_known_raw_target(const char *tok) {
+    size_t i;
+    if (!tok)
+        return 0;
+    for (i = 0; i < sizeof(known_targets) / sizeof(known_targets[0]); i++) {
+        if (strcmp(known_targets[i], "bc") != 0 && strcmp(known_targets[i], tok) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static void expect_raw_target(const char *kw) {
+    const char *targ = next_tok();
+    int matches;
+    char msg[160];
+
+    if (!targ || !is_known_raw_target(targ)) {
+        sprintf(msg, "expected target name after '%s'", kw);
+        ir4_die(msg);
+    }
+    matches = (strcmp(be->name, targ) == 0) ||
+              (platform_name && strcmp(platform_name, targ) == 0);
+    if (!matches) {
+        if (platform_name) {
+            sprintf(msg, "'%s' target '%.32s' does not match active target '%s' (%s)",
+                    kw, targ, platform_name, be->name);
+        } else {
+            sprintf(msg, "'%s' target '%.32s' does not match active target '%s'",
+                    kw, targ, be->name);
+        }
+        ir4_die(msg);
+    }
+}
+
 static const char *type_name(StackType t) {
     if (t == TY_W)
         return ":i";
@@ -1180,6 +1218,7 @@ static void compile_code(int is_hot) {
     u16 cur_grp = lex_cur()->req_group;
     u8 cur_rank = lex_cur()->req_rank;
 
+    expect_raw_target("code");
     name = next_tok_intern();
     if (!name)
         ir4_die("expected word name after 'code'");
@@ -1831,6 +1870,7 @@ static void compile_body(WordIR *w) {
 
         if (strcmp(tok, "inline") == 0) {
             InlineBlock ib;
+            expect_raw_target("inline");
             parse_raw_code_body(&ib.raw_start, &ib.raw_len, &ib.reloc_start, &ib.reloc_cnt);
             w->has_inline = 1;
             if (!unreachable) {
@@ -2186,9 +2226,6 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
     add_builtin_const("size_a", (i32)be->addr_bytes);
     add_builtin_const("size_f", (i32)be->float_bytes);
     {
-        static const char *const known_targets[] = {
-            "z80", "ez80", "6502", "arm64", "rv32", "bc",
-            "cpm", "zx81", "agon", "sim65", "c64",  "x16", "virt", "obj", "jit"};
         size_t ti;
         for (ti = 0; ti < sizeof(known_targets) / sizeof(known_targets[0]); ti++) {
             const char *t = known_targets[ti];

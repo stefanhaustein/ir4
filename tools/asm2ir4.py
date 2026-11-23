@@ -122,7 +122,7 @@ def main():
         if toks and toks[-1] == ret_tok:
             toks.pop()
         total_bytes += len(b0)
-        out_lines.append(f"code {sig}")
+        out_lines.append(f"code {args.cpu} {sig}")
         for off in range(0, len(toks), 8):
             out_lines.append("  " + " ".join(toks[off : off + 8]))
         out_lines.append("end")
