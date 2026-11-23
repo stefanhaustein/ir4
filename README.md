@@ -1,6 +1,6 @@
-# IR4(th)
+A typed Forth dialect as an Intermediate Representation
 
-**IR4(th)** (*Typed Forth as an Intermediate Representation*) is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as Z80 and 6502) and constrained embedded systems.
+**IR4(th)** is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as Z80 and 6502) and constrained embedded systems.
 
 IR4(th) programs are compiled via a 2-pass direct machine-code compiler (with reachability dead-code elimination) using ir4c (written in strict C89).
 
