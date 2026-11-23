@@ -1,4 +1,4 @@
-A typed Forth dialect as an Intermediate Representation
+# A typed Forth dialect as an Intermediate Representation
 
 **IR4(th)** is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as Z80 and 6502) and constrained embedded systems.
 
