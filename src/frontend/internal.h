@@ -135,6 +135,7 @@ const char *read_require_path(void);
 void push_require(const char *name);
 StackType parse_type_tok(const char *tok);
 int parse_int(const char *s, i32 *val);
+int parse_addr(const char *s, u32 *val);
 int parse_float(const char *s, double *val);
 
 /* DCE & Pass 2 emitter (defined in ir_emit.c) */

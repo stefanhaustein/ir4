@@ -63,6 +63,6 @@ Lower `switch` based on case density:
 
 ## 6. Platform Abstraction
 
-- Emit `const NAME VALUE` for compile-time `:i` or `:f` constants; they participate in constant folding and immediate instruction fusion (`add_imm`, `bit_imm`, `cmp_imm`, `shift_imm`).
+- Emit `const NAME VALUE :<type>` for compile-time `:i`, `:i32`, `:a`, or `:f` constants; they participate in constant folding and immediate instruction fusion (`add_imm`, `bit_imm`, `cmp_imm`, `shift_imm`).
 - Use built-in `target_<name>` (`true`/`false`) for target/platform checks.
 - Use `default const` and `default fn` in portable libraries so target-specific `require` overrides can specialize them cleanly.

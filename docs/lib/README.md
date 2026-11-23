@@ -12,7 +12,7 @@
 ## Modules
 
 - [file](file.md) — Portable sequential file I/O (fallback stubs + convenience wrappers)
-- [gfx](gfx.md) — Pixel graphics (default: ANSI 8-color UTF-8 half-block backend)
+- [gfx](gfx.md) — Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 - [i32](i32.md) — 32-bit signed division and modulo fallbacks (auto-required when i32/ or i32mod is used)
 - [joy](joy.md) — Joystick and gamepad input (optional override per platform)
 - [math](math.md) — Floating-point math helpers

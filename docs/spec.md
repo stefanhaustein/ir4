@@ -84,18 +84,20 @@ var <name> :bytes <size> \ Raw byte buffer
 * **`__heap_start`:** Built-in constant pushing the `:a` address immediately following all static code, `data`, `var`, and target runtime data.
 
 ### 3.3 Compile-Time Constants (`const`)
-Top-level compile-time constants can be declared outside word definitions:
+Top-level compile-time constants can be declared outside word definitions with an explicit type (`:i`, `:i32`, `:a`, or `:f`):
 
 ```forth
-const KEY_ESC 27
-const PI 3.14159
-default const SCREEN_W 80
+const KEY_ESC 27 :i
+const VIC_CTRL 0xD011 :a
+const TICK_HZ 1000000 :i32
+const PI 3.14159 :f
+default const SCREEN_W 80 :i
 ```
 
-* The value must be an integer literal (inferred as `:i`, checked against the target's `word_bytes` range) or a floating-point literal (inferred as `:f`).
-* Referencing `<name>` inside a function pushes the literal directly onto the stack (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
-* Constants declared with `default const` may be overridden by a `const` with the same inferred type within the same `require` group.
-* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with both the active `platform` and `architecture` set to `true`.
+* Syntax: `const <name> <val> :<type>` (or `default const <name> <val> :<type>`). Integer literals are checked against `word_bytes` for `:i` or 32-bit range for `:i32`; `:a` accepts unsigned integer literals checked against `addr_bytes`; `:f` accepts floating-point or integer literals.
+* Referencing `<name>` inside a function pushes the literal directly onto the stack with its declared type (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
+* Constants declared with `default const` may be overridden by a `const` with the same type — or 1:1 by a nullary `fn <name> ( -> :<type> )` — within the same `require` group; likewise, a `default fn <name> ( -> :<type> )` may be overridden by a matching `const` within the same `require` group (Uniform Access Principle).
+* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target `:i` byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with both the active `platform` and `architecture` set to `true`.
 
 ### 3.4 Pre-Initialized Data (`data ... end`)
 Top-level read-only tables and constants can be defined outside word definitions:
@@ -129,7 +131,7 @@ require "<filename>"
   1. `<root>/<platform>/<filename>` (e.g. `c64/stdio.ir4`, `x16/gfx.ir4`, `agon/stdio.ir4`)
   2. `<root>/<cpu>/<filename>` (e.g. `6502/i32.ir4`, `z80/mem.ir4`, `ez80/...`)
   3. `<root>/<filename>` (portable fallback)
-* Functions declared with `default fn` (and constants declared with `default const`) may be overridden by a non-default definition with a matching signature or type within the same `require` group. Overrides outside that `require` group, duplicate `default` declarations, and duplicate non-default definitions are rejected.
+* Functions declared with `default fn` and constants declared with `default const` may be overridden within the same `require` group by a non-default definition with a matching signature or type (including 1:1 `default const` ↔ `fn ( -> :<type> )` overrides). Overrides outside that `require` group, duplicate `default` declarations, and duplicate non-default definitions are rejected.
 * Repeated `require` directives for an already-loaded file path are ignored.
 
 ### 3.6 External Functions (`extern`)

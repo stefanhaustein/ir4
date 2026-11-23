@@ -1,7 +1,7 @@
 \ lib/file.ir4 - Portable sequential file I/O (fallback stubs + convenience wrappers)
 
-const fsmode_read  0
-const fsmode_write 1
+const fsmode_read  0 :i
+const fsmode_write 1 :i
 
 \ Open file at (path, len) with mode (fsmode_read or fsmode_write); returns fd >= 0 or < 0 on error
 default fn fsopen ( path :a len :i mode :i -> :i )

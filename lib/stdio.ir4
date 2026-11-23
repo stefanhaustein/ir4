@@ -2,9 +2,9 @@
 \ Platform overrides implement raw `emit` (and optionally the `default fn` entries below).
 
 \ Native boot/symbol-oriented character set (`setcharset`/`getcharset`)
-const charset_native 0
+const charset_native 0 :i
 \ Text-oriented character set with lowercase support (`setcharset`/`getcharset`)
-const charset_text   1
+const charset_text   1 :i
 
 \ Emit character *c* with platform text mapping (defaults to raw emit; PETSCII on C64)
 default fn xemit ( c :i )

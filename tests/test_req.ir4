@@ -4,4 +4,6 @@ require "req_base.ir4"
 
 fn main ( -> :i )
   40 inc2 42 -
+  uap_c2f uap_f2c + 42 - +
+  uap_c_first uap_f_first + 42 - +
 end

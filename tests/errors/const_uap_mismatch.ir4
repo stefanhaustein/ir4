@@ -1,0 +1,7 @@
+default const X 10 :i
+fn X ( -> :i32 )
+  10 i>i32
+end
+fn main ( -> :i )
+  0
+end

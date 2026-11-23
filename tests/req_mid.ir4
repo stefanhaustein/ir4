@@ -1,5 +1,15 @@
 require "req_base.ir4"
 
+const uap_c_first 15 :i
+default fn uap_c_first ( -> :i )
+  99
+end
+
+fn uap_f_first ( -> :i )
+  27
+end
+default const uap_f_first 99 :i
+
 fn inc2 ( n :i -> :i )
   n inc1 inc1
 end

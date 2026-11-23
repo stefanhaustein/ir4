@@ -365,6 +365,48 @@ int parse_int(const char *s, i32 *val) {
     return (*endp == '\0');
 }
 
+int parse_addr(const char *s, u32 *val) {
+    unsigned long uv = 0;
+    const char *p = s;
+    unsigned int base = 10;
+
+    if (!s || *s == '\0' || *s == '-')
+        return 0;
+    if (*p == '+')
+        p++;
+    if (*p == '$') {
+        base = 16;
+        p++;
+    } else if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X')) {
+        base = 16;
+        p += 2;
+    } else if (p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) {
+        base = 2;
+        p += 2;
+    }
+    if (*p == '\0')
+        return 0;
+    while (*p) {
+        unsigned int d;
+        if (*p >= '0' && *p <= '9')
+            d = (unsigned int)(*p - '0');
+        else if (base == 16 && *p >= 'a' && *p <= 'f')
+            d = (unsigned int)(*p - 'a' + 10);
+        else if (base == 16 && *p >= 'A' && *p <= 'F')
+            d = (unsigned int)(*p - 'A' + 10);
+        else
+            return 0;
+        if (d >= base)
+            return 0;
+        if (uv > (0xFFFFFFFFUL - d) / base)
+            return 0;
+        uv = uv * base + d;
+        p++;
+    }
+    *val = (u32)uv;
+    return 1;
+}
+
 int parse_float(const char *s, double *val) {
     char *endp;
     const char *p = s;

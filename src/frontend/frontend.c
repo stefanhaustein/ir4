@@ -223,6 +223,41 @@ static int find_const(const char *name) {
     return -1;
 }
 
+static void remove_const(size_t idx) {
+    free(consts.data[idx]);
+    if (idx + 1 < consts.len) {
+        memmove(&consts.data[idx], &consts.data[idx + 1],
+                (consts.len - idx - 1) * sizeof(ConstSym *));
+    }
+    consts.len--;
+}
+
+static int const_matches_fn(StackType ty, const FuncSig *fn) {
+    return fn->is_defined && !fn->is_extern && fn->in_types.len == 0 &&
+           fn->out_types.len == 1 && fn->out_types.data[0] == ty;
+}
+
+static void emit_const_fn_body(WordIR *w, const ConstSym *cs) {
+    IrInstr *ins;
+    w->ir_start = ir_buf.len;
+    w->ir_len = 0;
+    w->param_cnt = 0;
+    w->locals.len = 0;
+    ins = emit_ir(
+        (cs->type == TY_A) ? IR_PUSH_A
+        : (cs->type == TY_I32) ? IR_PUSH_I32
+        : (cs->type == TY_F) ? IR_PUSH_F
+                             : IR_PUSH_W,
+        w);
+    if (cs->type == TY_A)
+        ins->u.a = cs->a_val;
+    else if (cs->type == TY_F)
+        ins->u.f = cs->f_val;
+    else
+        ins->u.w = cs->w_val;
+    emit_ir(IR_FN_END, w);
+}
+
 size_t ir4_func_addr(size_t idx) {
     if (idx >= funcs.len)
         ir4_die("function index out of bounds");
@@ -1087,16 +1122,54 @@ static void compile_word(int is_default, int is_hot) {
             memset(w, 0, sizeof(WordIR));
         }
     } else {
-        fidx = alloc_func(&sig, &w);
-        sig->name = intern_str(name);
-        sig->is_defined = 1;
-        sig->is_default = (u8)is_default;
-        sig->is_hot = (u8)is_hot;
-        sig->req_group = cur_grp;
-        sig->req_rank = cur_rank;
-        tstack.len = 0;
-        blocks.len = 0;
-        parse_sig_body(sig, &param_cnt, 1);
+        int ex_const = find_const(name);
+        FuncSig fn_sig;
+        if (ex_const >= 0) {
+            ConstSym *cs = consts.data[ex_const];
+            memset(&fn_sig, 0, sizeof(FuncSig));
+            fn_sig.name = intern_str(name);
+            tstack.len = 0;
+            blocks.len = 0;
+            parse_sig_body(&fn_sig, &param_cnt, 1);
+            if (cur_grp == 0 || cs->req_group != cur_grp)
+                ir4_die("function name conflicts with existing constant");
+            if (fn_sig.in_types.len != 0 || fn_sig.out_types.len != 1 ||
+                fn_sig.out_types.data[0] != cs->type) {
+                ir4_die("override signature does not match 'default' declaration");
+            }
+            if (cur_rank == cs->req_rank) {
+                if (is_default && cs->is_default)
+                    ir4_die("duplicate 'default' declaration");
+                if (!is_default && !cs->is_default)
+                    ir4_die("duplicate function definition");
+            }
+            if ((is_default && cur_rank == cs->req_rank) || (cur_rank > cs->req_rank)) {
+                free_sig_vecs(&fn_sig);
+                discard_body = 1;
+                memset(&discard_w, 0, sizeof(WordIR));
+                w = &discard_w;
+            } else {
+                remove_const((size_t)ex_const);
+                fidx = alloc_func(&sig, &w);
+                *sig = fn_sig;
+                sig->is_defined = 1;
+                sig->is_default = (u8)is_default;
+                sig->is_hot = (u8)is_hot;
+                sig->req_group = cur_grp;
+                sig->req_rank = cur_rank;
+            }
+        } else {
+            fidx = alloc_func(&sig, &w);
+            sig->name = intern_str(name);
+            sig->is_defined = 1;
+            sig->is_default = (u8)is_default;
+            sig->is_hot = (u8)is_hot;
+            sig->req_group = cur_grp;
+            sig->req_rank = cur_rank;
+            tstack.len = 0;
+            blocks.len = 0;
+            parse_sig_body(sig, &param_cnt, 1);
+        }
     }
 
     w->param_cnt = param_cnt;
@@ -1222,6 +1295,8 @@ static void compile_code(int is_hot) {
     name = next_tok_intern();
     if (!name)
         ir4_die("expected word name after 'code'");
+    if (find_const(name) >= 0)
+        ir4_die("code word conflicts with existing constant");
     existing = ir4_find_func(name);
     if (existing >= 0) {
         FuncSig code_sig;
@@ -1432,6 +1507,8 @@ static int handle_var_op(const char *tok, WordIR *w) {
             tpush(TY_A);
             return 1;
         }
+        if (find_const(tok) >= 0)
+            ir4_die("cannot take address of 'const'");
         idx = ir4_find_func(tok);
         if (idx >= 0) {
             if (funcs.data[idx]->is_extern)
@@ -2082,6 +2159,8 @@ static void compile_data(void) {
                 cb_emit_data_word(0, be->addr_bytes);
                 cb_add_data_init_reloc(patch_off, buffers.data[idx]->offset, be->addr_bytes, false);
             } else {
+                if (find_const(tok) >= 0)
+                    ir4_die("cannot take address of 'const'");
                 idx = ir4_find_func(tok);
                 if (idx < 0)
                     ir4_die("unknown variable or function in '&' inside 'data'");
@@ -2130,49 +2209,90 @@ static void compile_data(void) {
 static void compile_const(int is_default) {
     const char *name;
     const char *val_tok;
+    const char *ty_tok;
     StackType ty;
     i32 iv = 0;
+    u32 av = 0;
     double fv = 0.0;
-    int is_int;
-    int is_float;
     u16 cur_grp = lex_cur()->req_group;
     u8 cur_rank = lex_cur()->req_rank;
+    int ex_fn;
     int ex_idx;
     ConstSym cs;
 
     name = next_tok_intern();
     if (!name)
         ir4_die("expected constant name after 'const'");
-    if (find_buffer(name) >= 0 || ir4_find_func(name) >= 0)
-        ir4_die("constant name conflicts with existing global or function");
+    if (find_buffer(name) >= 0)
+        ir4_die("constant name conflicts with existing global");
 
-    val_tok = next_tok();
+    val_tok = next_tok_intern();
     if (!val_tok)
         ir4_die("expected literal value after constant name");
-    is_int = parse_int(val_tok, &iv);
-    is_float = !is_int && parse_float(val_tok, &fv);
+    ty_tok = next_tok();
+    if (!ty_tok)
+        ir4_die("expected type token (:i, :i32, :a, :f) after constant value");
+    ty = parse_type_tok(ty_tok);
+    if (ty == TY_NONE)
+        ir4_die("expected type token (:i, :i32, :a, :f) after constant value");
 
     memset(&cs, 0, sizeof(ConstSym));
     cs.name = name;
+    cs.type = ty;
     cs.req_group = cur_grp;
     cs.req_rank = cur_rank;
     cs.is_default = (u8)is_default;
 
-    if (is_int) {
-        ty = TY_W;
+    if (ty == TY_W) {
+        if (!parse_int(val_tok, &iv))
+            ir4_die("expected integer literal for ':i' constant");
         if (be->word_bytes == 2 && (iv < -32768 || iv > 65535))
             ir4_die(":i constant out of 16-bit range");
         if (be->word_bytes == 3 && (iv < -8388608L || iv > 16777215L))
             ir4_die(":i constant out of 24-bit range");
         cs.w_val = iv;
-    } else if (is_float) {
-        ty = TY_F;
-        cs.f_val = fv;
+    } else if (ty == TY_I32) {
+        if (!parse_int(val_tok, &iv))
+            ir4_die("expected integer literal for ':i32' constant");
+        cs.w_val = iv;
+    } else if (ty == TY_A) {
+        if (!parse_addr(val_tok, &av))
+            ir4_die("expected unsigned address literal for ':a' constant");
+        if (be->addr_bytes == 2 && av > 0xFFFFUL)
+            ir4_die(":a constant out of 16-bit range");
+        if (be->addr_bytes == 3 && av > 0xFFFFFFUL)
+            ir4_die(":a constant out of 24-bit range");
+        cs.a_val = av;
     } else {
-        ir4_die("expected integer or float literal after constant name");
-        return;
+        if (parse_float(val_tok, &fv)) {
+            cs.f_val = fv;
+        } else if (parse_int(val_tok, &iv)) {
+            cs.f_val = (double)iv;
+        } else {
+            ir4_die("expected float or integer literal for ':f' constant");
+        }
     }
-    cs.type = ty;
+
+    ex_fn = ir4_find_func(name);
+    if (ex_fn >= 0) {
+        FuncSig *fn = funcs.data[ex_fn];
+        if (!fn->is_defined || fn->is_extern || cur_grp == 0 || fn->req_group != cur_grp)
+            ir4_die("constant name conflicts with existing function");
+        if (!const_matches_fn(ty, fn))
+            ir4_die("override type does not match 'default' declaration");
+        if (cur_rank == fn->req_rank) {
+            if (is_default && fn->is_default)
+                ir4_die("duplicate 'default' declaration");
+            if (!is_default && !fn->is_default)
+                ir4_die("duplicate constant definition");
+        }
+        if ((is_default && cur_rank == fn->req_rank) || (cur_rank > fn->req_rank))
+            return;
+        emit_const_fn_body(words.data[ex_fn], &cs);
+        fn->is_default = (u8)is_default;
+        fn->is_hot = 1;
+        fn->req_rank = cur_rank;
+    }
 
     ex_idx = find_const(name);
     if (ex_idx >= 0) {
@@ -2296,6 +2416,8 @@ static void parse_toplevel(void) {
             const char *name = next_tok_intern();
             if (!name)
                 ir4_die("expected word name after 'fwd'");
+            if (find_const(name) >= 0)
+                ir4_die("forward declaration conflicts with existing constant");
             if (ir4_find_func(name) >= 0)
                 ir4_die("duplicate 'fwd' declaration");
             alloc_func(&sig, NULL);
@@ -2313,6 +2435,8 @@ static void parse_toplevel(void) {
             name = next_tok_intern();
             if (!name)
                 ir4_die("expected word name after 'extern'");
+            if (find_const(name) >= 0)
+                ir4_die("extern conflicts with existing constant");
             memset(&ex_sig, 0, sizeof(FuncSig));
             ex_sig.name = name;
             ex_sig.is_extern = 1;

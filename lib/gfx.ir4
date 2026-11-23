@@ -1,13 +1,14 @@
-\ gfx.ir4 - Pixel graphics (default: ANSI 8-color UTF-8 half-block backend)
+\ gfx.ir4 - Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 \ Platform overrides implement the `default fn` entries below.
 
 require "stdio.ir4"
 require "mem.ir4"
 
-var __gfx_def_modes :bytes 8
+var __gfx_def_modes :bytes 16
 var __gfx_w :i
 var __gfx_h :i
 var __gfx_col :i
+var __gfx_depth :i
 var __gfx_fb :a
 
 \ Returns (addr, count) of :i16 4-tuples: (mode, width, height, depth_bpp)
@@ -15,8 +16,12 @@ default fn gfxmodes ( -> :a :i )
   0 __gfx_def_modes i16!
   termwidth __gfx_def_modes 2 a+ i16!
   termheight 1 << __gfx_def_modes 4 a+ i16!
-  3 __gfx_def_modes 6 a+ i16!
-  __gfx_def_modes 1
+  4 __gfx_def_modes 6 a+ i16!
+  1 __gfx_def_modes 8 a+ i16!
+  termwidth __gfx_def_modes 10 a+ i16!
+  termheight 1 << __gfx_def_modes 12 a+ i16!
+  8 __gfx_def_modes 14 a+ i16!
+  __gfx_def_modes 2
 end
 
 \ Current graphics screen width in pixels
@@ -26,7 +31,7 @@ default fn gfxwidth ( -> :i ) __gfx_w end
 default fn gfxheight ( -> :i ) __gfx_h end
 
 \ Per-pixel color depth in bits (1 on attribute-cell targets like C64/Spectrum, where gfxrgb may still return palette colors per cell)
-default fn gfxdepth ( -> :i ) 3 end
+default fn gfxdepth ( -> :i ) __gfx_depth end
 
 \ Wait for vertical blank / next frame sync (default: no-op)
 default fn gfxvsync ( ) end
@@ -34,15 +39,22 @@ default fn gfxvsync ( ) end
 \ Return platform tick counter (wraps monotonically; default: 0)
 default fn gfxticks ( -> :i ) 0 end
 
-\ Switch to graphics mode index *mode* (default: ANSI half-block buffer)
+\ Switch to graphics mode index *mode* (default: 0 = 16-color ANSI/VGA, 1 = 256-color xterm half-block)
 default fn gfxmode ( mode :i )
-  mode drop
+  mode 1 = if 8 else 4 then -> __gfx_depth
   termwidth -> __gfx_w
   termheight 1 << -> __gfx_h
   __gfx_fb 0 i>a a<> if __gfx_fb heap_free then
-  __gfx_w termheight * heap_alloc -> __gfx_fb
-  __gfx_fb __gfx_w termheight * 0 fillchar
-  7 -> __gfx_col
+  __gfx_w termheight * -> var cells :i
+  __gfx_depth 8 = if
+    cells 1 << heap_alloc -> __gfx_fb
+    __gfx_fb cells 1 << 16 fillchar
+    231 -> __gfx_col
+  else
+    cells heap_alloc -> __gfx_fb
+    __gfx_fb cells 0 fillchar
+    15 -> __gfx_col
+  then
   cls
 end
 
@@ -83,35 +95,83 @@ default fn gfxinit ( w :i h :i depth :i )
   best_mode gfxmode
 end
 
+fn __gfx_cube6 ( v :i -> :i )
+  v 48 < if 0 return then
+  v 115 < if 1 return then
+  v 35 - 40 /
+end
+
 \ Map 8-bit RGB (*r*, *g*, *b* in 0..255) to the platform's native color value for gfxcolor.
 \ On attribute-cell targets (gfxdepth = 1), non-zero colors may still set per-cell attributes.
 default fn gfxrgb ( r :i g :i b :i -> :i )
+  r -> var mx :i  g mx > if g -> mx then  b mx > if b -> mx then
+  r -> var mn :i  g mn < if g -> mn then  b mn < if b -> mn then
+  __gfx_depth 8 = if
+    mx mn - 16 < if
+      r g + b + 3 / -> var v :i
+      v 4 < if 16 return then
+      v 246 > if 231 return then
+      v 3 - 10 / 232 + return
+    then
+    16 r __gfx_cube6 36 * + g __gfx_cube6 6 * + b __gfx_cube6 + return
+  then
+  mx mn - 40 < if
+    mx 42 < if 0 return then
+    mx 110 < if 8 return then
+    mx 224 < if 7 return then
+    15 return
+  then
   0 -> var c :i
-  r 128 >= if c 1 or -> c then
-  g 128 >= if c 2 or -> c then
-  b 128 >= if c 4 or -> c then
+  mx 1 u>> -> var thr :i
+  r thr >= if c 1 or -> c then
+  g thr >= if c 2 or -> c then
+  b thr >= if c 4 or -> c then
+  mx 192 >= if c 8 or -> c then
   c
 end
 
 \ Set current drawing color *c* (value returned by gfxrgb)
 default fn gfxcolor ( c :i )
-  c 7 and -> __gfx_col
+  __gfx_depth 8 = if c 255 and else c 15 and then -> __gfx_col
 end
 
 \ Set hardware border/overscan color *c* (value returned by gfxrgb; no-op if unsupported)
 default fn gfxborder ( c :i ) end
 
-fn __gfx_emit_cell ( cx :i cy :i val :i )
+fn __gfx_sgr_fg ( c :i )
+  __gfx_depth 8 = if
+    27 emit 91 emit 51 emit 56 emit 59 emit 53 emit 59 emit c typeu 109 emit
+  else
+    c fgcolor
+  then
+end
+
+fn __gfx_sgr_bg ( c :i )
+  __gfx_depth 8 = if
+    27 emit 91 emit 52 emit 56 emit 59 emit 53 emit 59 emit c typeu 109 emit
+  else
+    c bgcolor
+  then
+end
+
+fn __gfx_emit_cell ( cx :i cy :i top :i bot :i )
   cx cy gotoxy
-  val 4 u>> fgcolor
-  val 15 and bgcolor
+  top __gfx_sgr_fg
+  bot __gfx_sgr_bg
   226 emit 150 emit 128 emit
 end
 
 \ Plot a pixel at (*x*, *y*) in the current drawing color
 default fn gfxpx ( x :i y :i )
   x 0 < x __gfx_w >= or y 0 < y __gfx_h >= or or if return then
-  __gfx_fb y 1 u>> __gfx_w * x + a+ -> var cell :a
+  y 1 u>> -> var row :i
+  __gfx_depth 8 = if
+    __gfx_fb row __gfx_w * x + 1 << a+ -> var cell :a
+    y 1 and 0 = if __gfx_col cell i8! else __gfx_col cell 1 a+ i8! then
+    x row cell u8@ cell 1 a+ u8@ __gfx_emit_cell
+    return
+  then
+  __gfx_fb row __gfx_w * x + a+ -> cell
   cell u8@ -> var old :i
   0 -> var val :i
   y 1 and 0 = if
@@ -120,7 +180,7 @@ default fn gfxpx ( x :i y :i )
     old 240 and __gfx_col or -> val
   then
   val cell i8!
-  x y 1 u>> val __gfx_emit_cell
+  x row val 4 u>> val 15 and __gfx_emit_cell
 end
 
 \ Draw a horizontal line of width *w* starting at (*x*, *y*) (default: gfxpx loop)
@@ -217,8 +277,13 @@ end
 
 \ Clear the graphics screen to the current drawing color
 default fn gfxclear ( )
-  __gfx_fb __gfx_w termheight * __gfx_col 4 << __gfx_col or fillchar
-  __gfx_col bgcolor
+  __gfx_w termheight * -> var cells :i
+  __gfx_depth 8 = if
+    __gfx_fb cells 1 << __gfx_col fillchar
+  else
+    __gfx_fb cells __gfx_col 4 << __gfx_col or fillchar
+  then
+  __gfx_col __gfx_sgr_bg
   cls
 end
 
@@ -256,7 +321,26 @@ default fn gfxcharh ( -> :i ) 2 end
 \ Draw *len* normalized-ASCII bytes starting at *s* with top-left at pixel (*x*, *y*) in the current drawing color.
 \ Text-cell targets snap (*x*, *y*) to the nearest character cell (default: ANSI `x, y/2`).
 default fn gfxtext ( x :i y :i s :a len :i )
-  __gfx_col fgcolor
-  x y 1 u>> gotoxy
-  s len type
+  y 1 u>> -> var row :i
+  row 0 < row termheight >= or if return then
+  __gfx_col __gfx_sgr_fg
+  -1 -> var last_bg :i
+  0 -> var i :i
+  begin i len < while
+    x i + -> var cx :i
+    cx 0 >= cx __gfx_w < and if
+      __gfx_depth 8 = if
+        __gfx_fb row __gfx_w * cx + 1 << y 1 and + a+ u8@
+      else
+        __gfx_fb row __gfx_w * cx + a+ u8@ y 1 and 0 = if 4 u>> else 15 and then
+      then -> var bg :i
+      bg last_bg <> if
+        bg __gfx_sgr_bg
+        bg -> last_bg
+      then
+      cx row gotoxy
+      s i a+ u8@ emit
+    then
+    1 +-> i
+  repeat
 end

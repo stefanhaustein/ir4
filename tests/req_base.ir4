@@ -1,3 +1,13 @@
 fn inc1 ( n :i -> :i )
   n 1 +
 end
+
+default const uap_c2f 10 :i
+fn uap_c2f ( -> :i )
+  20
+end
+
+default fn uap_f2c ( -> :i )
+  99
+end
+const uap_f2c 22 :i

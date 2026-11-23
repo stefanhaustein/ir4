@@ -76,6 +76,15 @@ fn init_geom ( )
 
   w 1 u>> cw / cw * -> cx
   h 1 u>> ch / ch * -> cy
+  \ On 2px-tall cell-snapping block modes where bar_h = step < 3 * ch (2 rows),
+  \ shift cy by 1px so the black-bar label lands on its own row clear of the cy center line.
+  ch 2 = gfxcharh 2 = and step ch 3 * < and if
+    cy rh 1 u>> - 0 > if
+      -1 +-> cy
+    else cy rh 1 u>> + 2 + h <= if
+      1 +-> cy
+    then then
+  then
   cx rw 1 u>> - -> rx
   cy rh 1 u>> - -> ry
 end

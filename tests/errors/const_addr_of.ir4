@@ -1,0 +1,4 @@
+const X 10 :i
+fn main ( -> :a )
+  & X
+end

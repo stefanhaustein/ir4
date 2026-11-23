@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/gfx.ir4](../../lib/gfx.ir4)
 
-Pixel graphics (default: ANSI 8-color UTF-8 half-block backend)
+Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 Platform overrides implement the `default fn` entries below.
 
 ## Functions
@@ -49,7 +49,7 @@ Platform overrides implement the `default fn` entries below.
 
 - **gfxmode** ( mode :i )
 
-  Switch to graphics mode index *mode* (default: ANSI half-block buffer)
+  Switch to graphics mode index *mode* (default: 0 = 16-color ANSI/VGA, 1 = 256-color xterm half-block)
 
 - **gfxmodes** ( -> :a :i )
 

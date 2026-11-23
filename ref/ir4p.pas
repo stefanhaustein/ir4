@@ -814,6 +814,69 @@ begin
   ParseInt := True;
 end;
 
+{ Parse an unsigned 32-bit address literal (decimal, $hex, 0xhex, 0b binary). }
+function ParseAddr(const s: string; var outVal: Cardinal): Boolean;
+var
+  i, code: Integer;
+  sub: string;
+  u: Int64;
+begin
+  if s = '' then begin ParseAddr := False; Exit; end;
+  if s[1] = '$' then begin
+    sub := Copy(s, 2, Length(s) - 1);
+    if sub = '' then begin ParseAddr := False; Exit; end;
+    for i := 1 to Length(sub) do
+      if not (sub[i] in ['0'..'9', 'a'..'f', 'A'..'F']) then begin
+        ParseAddr := False; Exit;
+      end;
+    Val('$' + sub, u, code);
+    if (code <> 0) or (u < 0) or (u > $FFFFFFFF) then begin
+      ParseAddr := False; Exit;
+    end;
+    outVal := Cardinal(u);
+    ParseAddr := True;
+    Exit;
+  end;
+  if (Length(s) >= 2) and (s[1] = '0') and ((s[2] = 'b') or (s[2] = 'B')) then begin
+    sub := Copy(s, 3, Length(s) - 2);
+    if sub = '' then begin ParseAddr := False; Exit; end;
+    u := 0;
+    for i := 1 to Length(sub) do begin
+      if (sub[i] <> '0') and (sub[i] <> '1') then begin
+        ParseAddr := False; Exit;
+      end;
+      u := (u shl 1) or (Ord(sub[i]) - Ord('0'));
+      if u > $FFFFFFFF then begin ParseAddr := False; Exit; end;
+    end;
+    outVal := Cardinal(u);
+    ParseAddr := True;
+    Exit;
+  end;
+  if (Length(s) >= 2) and (s[1] = '0') and ((s[2] = 'x') or (s[2] = 'X')) then begin
+    sub := Copy(s, 3, Length(s) - 2);
+    if sub = '' then begin ParseAddr := False; Exit; end;
+    for i := 1 to Length(sub) do
+      if not (sub[i] in ['0'..'9', 'a'..'f', 'A'..'F']) then begin
+        ParseAddr := False; Exit;
+      end;
+    Val('$' + sub, u, code);
+    if (code <> 0) or (u < 0) or (u > $FFFFFFFF) then begin
+      ParseAddr := False; Exit;
+    end;
+    outVal := Cardinal(u);
+    ParseAddr := True;
+    Exit;
+  end;
+  for i := 1 to Length(s) do
+    if not (s[i] in ['0'..'9']) then begin ParseAddr := False; Exit; end;
+  Val(s, u, code);
+  if (code <> 0) or (u < 0) or (u > $FFFFFFFF) then begin
+    ParseAddr := False; Exit;
+  end;
+  outVal := Cardinal(u);
+  ParseAddr := True;
+end;
+
 function ParseFloat(const s: string; var outVal: Single): Boolean;
 var
   p, code: Integer;
@@ -1522,6 +1585,8 @@ begin
       TPush(tyA);
       Exit;
     end;
+    if FindConst(ident) >= 0 then
+      Die('cannot take address of constant ''' + ident + '''');
     idx := FindFunc(ident);
     if idx >= 0 then begin
       if funcs[idx].isExtern then Die('cannot take address of ''extern'' function');
@@ -2034,6 +2099,28 @@ begin
   Die('unexpected EOF in raw code (missing ''end'')');
 end;
 
+procedure RemoveConst(idx: Integer);
+begin
+  if (idx < 0) or (idx >= constCount) then Exit;
+  consts[idx] := consts[constCount - 1];
+  Dec(constCount);
+end;
+
+function ConstMatchesFn(const cs: TConstSym; const fnSig: TFuncSig): Boolean;
+begin
+  ConstMatchesFn := (fnSig.inCount = 0) and (fnSig.outCount = 1) and
+                    (fnSig.outTypes[0] = cs.ty) and (not fnSig.isExtern);
+end;
+
+procedure EmitConstFnBody(const cs: TConstSym; fidx: Integer);
+begin
+  funcs[fidx].addr := CodePC;
+  funcs[fidx].hasAddr := True;
+  if cs.ty = tyF then EmitPushW(FloatToBits(cs.fVal))
+  else EmitPushW(cs.wVal);
+  Emit32(EncI(0, RV_RA, 0, RV_ZERO, $67)); { RET }
+end;
+
 { Compile a 'code ... end' machine-code word and append RV32 RET (JALR x0, 0(ra)). }
 procedure CompileCode;
 var
@@ -2045,6 +2132,7 @@ begin
   curGrp := srcStack[srcDepth - 1].reqGroup;
   curRnk := srcStack[srcDepth - 1].reqRank;
   if not NextTok(name) then Die('expected word name after ''code''');
+  if FindConst(name) >= 0 then Die('code name conflicts with constant ''' + name + '''');
   existing := FindFunc(name);
   if existing >= 0 then begin
     if not funcs[existing].isDefined then begin
@@ -2097,7 +2185,7 @@ procedure CompileWord(isDefault: Boolean);
 var
   name, tok: TShortName;
   sig: TFuncSig;
-  fidx, existing, i: Integer;
+  fidx, existing, exConst, i: Integer;
   curGrp, curRnk: Integer;
   discardBody: Boolean;
   savedCodeLen: Cardinal;
@@ -2117,8 +2205,28 @@ begin
   ParseSigBody(sig, True);
 
   discardBody := False;
+  exConst := FindConst(name);
+  if exConst >= 0 then begin
+    if not ConstMatchesFn(consts[exConst], sig) then
+      Die('function signature conflicts with constant ''' + name + '''');
+    if consts[exConst].isDefault and (not isDefault) then
+      RemoveConst(exConst)
+    else if (not consts[exConst].isDefault) and isDefault then
+      discardBody := True
+    else if (curGrp <> 0) and (consts[exConst].reqGroup = curGrp) and
+            (curRnk <> consts[exConst].reqRank) then begin
+      if curRnk < consts[exConst].reqRank then
+        RemoveConst(exConst)
+      else
+        discardBody := True;
+    end else
+      Die('duplicate definition ''' + name + '''');
+  end;
+
   existing := FindFunc(name);
-  if existing >= 0 then begin
+  if discardBody then begin
+    fidx := existing;
+  end else if existing >= 0 then begin
     if not funcs[existing].isDefined then begin
       if not SigsMatch(sig, funcs[existing]) then
         Die('definition signature does not match ''fwd'' declaration');
@@ -2187,41 +2295,100 @@ end;
 
 procedure CompileConst(isDefault: Boolean);
 var
-  name, valTok: TShortName;
+  name, valTok, tyTok: TShortName;
   cs: TConstSym;
   iv: LongInt;
+  uv: Cardinal;
   fv: Single;
-  exIdx: Integer;
+  exIdx, fidx: Integer;
 begin
   if not NextTok(name) then Die('expected constant name after ''const''');
-  if (FindBuffer(name) >= 0) or (FindFunc(name) >= 0) then
-    Die('constant name conflicts with existing global or function');
+  if FindBuffer(name) >= 0 then
+    Die('constant name conflicts with existing global');
   if not NextTok(valTok) then Die('expected value after constant name');
+  if not NextTok(tyTok) then Die('expected type after constant value');
 
   cs.name := name;
   cs.isDefault := isDefault;
   cs.reqGroup := srcStack[srcDepth - 1].reqGroup;
   cs.reqRank := srcStack[srcDepth - 1].reqRank;
-  if ParseInt(valTok, iv) then begin
-    cs.ty := tyW;
+  cs.wVal := 0;
+  cs.fVal := 0;
+  cs.ty := ParseTypeTok(tyTok);
+  if cs.ty = tyNone then Die('expected type (:i, :i32, :a, :f) after constant value');
+
+  if (cs.ty = tyW) or (cs.ty = tyI32) then begin
+    if not ParseInt(valTok, iv) then Die('invalid integer constant value');
     cs.wVal := iv;
-    cs.fVal := 0;
-  end else if ParseFloat(valTok, fv) then begin
-    cs.ty := tyF;
-    cs.wVal := 0;
-    cs.fVal := fv;
-  end else
-    Die('invalid constant value');
+  end else if cs.ty = tyA then begin
+    if not ParseAddr(valTok, uv) then Die('invalid address constant value');
+    cs.wVal := LongInt(uv);
+  end else begin
+    if ParseFloat(valTok, fv) then cs.fVal := fv
+    else if ParseInt(valTok, iv) then cs.fVal := iv
+    else Die('invalid float constant value');
+  end;
 
   exIdx := FindConst(name);
+  fidx := FindFunc(name);
   if exIdx >= 0 then begin
-    if consts[exIdx].isDefault and (not isDefault) then consts[exIdx] := cs
-    else if (not consts[exIdx].isDefault) and isDefault then Exit
-    else if (cs.reqGroup <> 0) and (consts[exIdx].reqGroup = cs.reqGroup) and
-            (cs.reqRank <> consts[exIdx].reqRank) then begin
-      if cs.reqRank < consts[exIdx].reqRank then consts[exIdx] := cs;
+    if consts[exIdx].isDefault and (not isDefault) then begin
+      if consts[exIdx].ty <> cs.ty then
+        Die('override constant type does not match ''default'' constant');
+      consts[exIdx] := cs;
+      if fidx >= 0 then begin
+        funcs[fidx].isDefault := isDefault;
+        funcs[fidx].reqGroup := cs.reqGroup;
+        funcs[fidx].reqRank := cs.reqRank;
+        EmitConstFnBody(cs, fidx);
+      end;
+    end else if (not consts[exIdx].isDefault) and isDefault then begin
+      if consts[exIdx].ty <> cs.ty then
+        Die('''default'' constant type does not match existing constant');
+      Exit;
+    end else if (cs.reqGroup <> 0) and (consts[exIdx].reqGroup = cs.reqGroup) and
+                (cs.reqRank <> consts[exIdx].reqRank) then begin
+      if consts[exIdx].ty <> cs.ty then
+        Die('override constant type does not match');
+      if cs.reqRank < consts[exIdx].reqRank then begin
+        consts[exIdx] := cs;
+        if fidx >= 0 then begin
+          funcs[fidx].isDefault := isDefault;
+          funcs[fidx].reqGroup := cs.reqGroup;
+          funcs[fidx].reqRank := cs.reqRank;
+          EmitConstFnBody(cs, fidx);
+        end;
+      end;
     end else
       Die('duplicate constant ''' + name + '''');
+  end else if fidx >= 0 then begin
+    if not funcs[fidx].isDefined then
+      Die('constant name conflicts with ''fwd'' declaration');
+    if not ConstMatchesFn(cs, funcs[fidx]) then
+      Die('constant type does not match function signature');
+    if funcs[fidx].isDefault and (not isDefault) then begin
+      if constCount >= MAX_CONSTS then Die('too many constants');
+      consts[constCount] := cs;
+      Inc(constCount);
+      funcs[fidx].isDefault := isDefault;
+      funcs[fidx].reqGroup := cs.reqGroup;
+      funcs[fidx].reqRank := cs.reqRank;
+      EmitConstFnBody(cs, fidx);
+    end else if (not funcs[fidx].isDefault) and isDefault then
+      Exit
+    else if (cs.reqGroup <> 0) and (funcs[fidx].reqGroup = cs.reqGroup) and
+            (cs.reqRank <> funcs[fidx].reqRank) then begin
+      if cs.reqRank < funcs[fidx].reqRank then begin
+        if constCount >= MAX_CONSTS then Die('too many constants');
+        consts[constCount] := cs;
+        Inc(constCount);
+        funcs[fidx].isDefault := isDefault;
+        funcs[fidx].reqGroup := cs.reqGroup;
+        funcs[fidx].reqRank := cs.reqRank;
+        EmitConstFnBody(cs, fidx);
+      end;
+    end else
+      Die('constant name conflicts with existing function');
   end else begin
     if constCount >= MAX_CONSTS then Die('too many constants');
     consts[constCount] := cs;
@@ -2238,7 +2405,8 @@ var
   hasPending: Boolean;
 begin
   if not NextTok(name) then Die('expected name after ''data''');
-  if FindBuffer(name) >= 0 then Die('duplicate global/data name');
+  if (FindBuffer(name) >= 0) or (FindConst(name) >= 0) then
+    Die('duplicate global/data/constant name');
   if bufferCount >= MAX_BUFFERS then Die('too many globals/data');
   buffers[bufferCount].name := name;
   buffers[bufferCount].offset := AllocData(0, 4);
@@ -2298,6 +2466,7 @@ begin
         hasPending := False;
       end;
       if not NextTok(s) then Die('expected symbol after ''&'' in ''data''');
+      if FindConst(s) >= 0 then Die('cannot take address of constant in ''data''');
       idx := FindFunc(s);
       if idx >= 0 then begin
         if funcs[idx].isExtern then Die('cannot take address of ''extern'' in ''data''');
@@ -2370,13 +2539,14 @@ begin
       CompileInit
     else if tok = 'fwd' then begin
       if not NextTok(name) then Die('expected word name after ''fwd''');
-      if FindFunc(name) >= 0 then Die('duplicate ''fwd'' declaration');
+      if (FindFunc(name) >= 0) or (FindConst(name) >= 0) then Die('duplicate ''fwd'' declaration');
       if not NextTok(tok) or (tok <> '(') then Die('expected ''('' after ''fwd'' name');
       fidx := AllocFunc;
       funcs[fidx].name := name;
       ParseSigBody(funcs[fidx], False);
     end else if tok = 'extern' then begin
       if not NextTok(name) then Die('expected word name after ''extern''');
+      if FindConst(name) >= 0 then Die('''extern'' conflicts with constant ''' + name + '''');
       FillChar(sig, SizeOf(TFuncSig), 0);
       sig.name := name;
       sig.isExtern := True;
@@ -2412,7 +2582,7 @@ begin
       CompileData
     else if tok = 'var' then begin
       if not NextTok(name) then Die('expected var name after ''var''');
-      if FindBuffer(name) >= 0 then Die('duplicate global/data name');
+      if (FindBuffer(name) >= 0) or (FindConst(name) >= 0) then Die('duplicate global/data/constant name');
       if bufferCount >= MAX_BUFFERS then Die('too many globals/data');
       buffers[bufferCount].name := name;
       if not NextTok(tok) then Die('expected type after var name');
