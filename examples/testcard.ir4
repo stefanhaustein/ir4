@@ -90,8 +90,10 @@ fn init_geom ( )
 end
 
 fn draw_background ( )
-  c_dgray gfxcolor
+  c_white gfxcolor
   gfxclear
+  c_dgray gfxcolor
+  0 0 w h gfxfillrect
 
   w 120 < if return then
 
@@ -106,7 +108,6 @@ fn draw_background ( )
     0 y w gfxhline
     step +-> y
   repeat
-  cx cy r gfxcircle
 end
 
 \ Row 1: 8 EBU color bars
@@ -286,12 +287,11 @@ fn draw_testcard ( )
     rx y0 gh + rw bh gh - draw_gray_grad
   then
 
-  \ Redraw horizontal center line + frame center rectangle with white (skip frame on 1-bpp attribute targets)
+  \ Redraw horizontal center line + frame center rectangle + foreground circle with white
   c_white gfxcolor
   rx cy rw gfxhline
-  gfxdepth 1 > if
-    rx ry rw 1 + rh 1 + gfxrect
-  then
+  rx ry rw 1 + rh 1 + gfxrect
+  cx cy r gfxcircle
 end
 
 fn main ( -> :i )
