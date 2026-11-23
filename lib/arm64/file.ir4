@@ -1,4 +1,4 @@
-\ lib/arm64/file.ir4 - File I/O via C stdio (fopen/fclose/fread/fwrite)
+\ lib/arm64/file.ir4 - File I/O via C stdio
 
 require "mem.ir4"
 
@@ -6,19 +6,50 @@ extern fopen ( path0 :a mode0 :a -> :a )
 extern fclose ( fp :a -> :i )
 extern fread ( ptr :a size :i nmemb :i fp :a -> :i )
 extern fwrite ( ptr :a size :i nmemb :i fp :a -> :i )
+extern fseek ( fp :a offset :i whence :i -> :i )
+extern ftell ( fp :a -> :i )
+extern fflush ( fp :a -> :i )
+extern remove ( path0 :a -> :i )
+extern rename ( old0 :a new0 :a -> :i )
+extern opendir ( name0 :a -> :a )
+extern readdir ( dirp :a -> :a )
+extern closedir ( dirp :a -> :i )
+extern stat ( path0 :a buf :a -> :i )
+extern mkdir ( path0 :a mode :i -> :i )
+extern rmdir ( path0 :a -> :i )
+extern strlen ( s :a -> :i )
 
-data __arm64_fmode_r "rb" 0 :i8 end
-data __arm64_fmode_w "wb" 0 :i8 end
+data __arm64_fmode_r  "rb" 0 :i8 end
+data __arm64_fmode_w  "w+b" 0 :i8 end
+data __arm64_fmode_a  "ab" 0 :i8 end
+data __arm64_fmode_rw "r+b" 0 :i8 end
 
 var __arm64_fps :bytes 128   \ 16 FILE* slots (8 bytes each)
+var __arm64_dirs :bytes 64   \ 8 DIR* slots (8 bytes each)
+var __arm64_dirpaths :bytes 2048
+var __arm64_statbuf :bytes 144
 var __arm64_path :bytes 256
+var __arm64_path2 :bytes 256
 
 fn __arm64_fp_addr ( fd :i -> :a )
   __arm64_fps fd 3 << a+
 end
 
-fn fsopen ( path :a len :i mode :i -> :i )
+fn __arm64_get_fp ( fd :i -> :a )
+  fd 0 < fd 15 > or if 0 i>a return then
+  fd __arm64_fp_addr a@
+end
+
+fn __arm64_copy_path ( dst :a src :a len :i -> :i )
   len 0 < len 255 > or if -1 return then
+  dst src len memcpy
+  dst len a+ 0 swap i8!
+  0
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  mode 0 < mode 3 > or if -1 return then
+  __arm64_path path len __arm64_copy_path 0 <> if -1 return then
   0 -> var fd :i
   begin
     fd 16 < if fd __arm64_fp_addr a@ 0 i>a a<> else false then
@@ -26,36 +57,178 @@ fn fsopen ( path :a len :i mode :i -> :i )
     1 +-> fd
   repeat
   fd 16 >= if -1 return then
-  __arm64_path path len memcpy
-  __arm64_path len a+ 0 swap i8!
-  mode 1 = if __arm64_fmode_w else __arm64_fmode_r then -> var m0 :a
+  __arm64_fmode_r -> var m0 :a
+  mode 1 = if __arm64_fmode_w -> m0 then
+  mode 2 = if __arm64_fmode_a -> m0 then
+  mode 3 = if __arm64_fmode_rw -> m0 then
   __arm64_path m0 fopen -> var fp :a
   fp 0 i>a a= if -1 return then
+  mode 2 = if fp 0 2 fseek drop then
   fp fd __arm64_fp_addr a!
   fd
 end
 
 fn fsclose ( fd :i -> :i )
-  fd 0 < fd 15 > or if -1 return then
-  fd __arm64_fp_addr a@ -> var fp :a
+  fd __arm64_get_fp -> var fp :a
   fp 0 i>a a= if -1 return then
   fp fclose -> var rc :i
   0 i>a fd __arm64_fp_addr a!
-  rc
+  rc 0 <> if -1 else 0 then
 end
 
 fn fsread ( fd :i buf :a len :i -> :i )
-  fd 0 < fd 15 > or len 0 < or if -1 return then
-  fd __arm64_fp_addr a@ -> var fp :a
+  len 0 < if -1 return then
+  fd __arm64_get_fp -> var fp :a
   fp 0 i>a a= if -1 return then
   len 0 = if 0 return then
   buf 1 len fp fread
 end
 
 fn fswrite ( fd :i buf :a len :i -> :i )
-  fd 0 < fd 15 > or len 0 < or if -1 return then
-  fd __arm64_fp_addr a@ -> var fp :a
+  len 0 < if -1 return then
+  fd __arm64_get_fp -> var fp :a
   fp 0 i>a a= if -1 return then
   len 0 = if 0 return then
   buf 1 len fp fwrite
+end
+
+fn fsseek ( fd :i pos :i -> :i )
+  pos 0 < if -1 return then
+  fd __arm64_get_fp -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp pos 0 fseek 0 <> if -1 else 0 then
+end
+
+fn fspos ( fd :i -> :i )
+  fd __arm64_get_fp -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp ftell
+end
+
+fn fssize ( fd :i -> :i )
+  fd __arm64_get_fp -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp ftell -> var cur :i
+  cur 0 < if -1 return then
+  fp 0 2 fseek 0 <> if -1 return then
+  fp ftell -> var sz :i
+  fp cur 0 fseek drop
+  sz
+end
+
+fn fsflush ( fd :i -> :i )
+  fd __arm64_get_fp -> var fp :a
+  fp 0 i>a a= if -1 return then
+  fp fflush 0 <> if -1 else 0 then
+end
+
+fn fsdelete ( path :a len :i -> :i )
+  __arm64_path path len __arm64_copy_path 0 <> if -1 return then
+  __arm64_path remove 0 <> if -1 else 0 then
+end
+
+fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
+  __arm64_path oldp oldlen __arm64_copy_path 0 <> if -1 return then
+  __arm64_path2 newp newlen __arm64_copy_path 0 <> if -1 return then
+  __arm64_path2 __arm64_fmode_r fopen -> var chk :a
+  chk 0 i>a a<> if
+    chk fclose drop
+    -1 return
+  then
+  __arm64_path __arm64_path2 rename 0 <> if -1 else 0 then
+end
+
+fn __arm64_dir_addr ( dd :i -> :a )
+  __arm64_dirs dd 3 << a+
+end
+
+fn __arm64_dir_path ( dd :i -> :a )
+  __arm64_dirpaths dd 8 << a+
+end
+
+fn fsdiropen ( path :a len :i -> :i )
+  len 0 < len 240 > or if -1 return then
+  0 -> var dd :i
+  begin
+    dd 8 < if dd __arm64_dir_addr a@ 0 i>a a<> else false then
+  while
+    1 +-> dd
+  repeat
+  dd 8 >= if -1 return then
+  len 0 = if
+    46 __arm64_path i8!
+    0 __arm64_path 1 a+ i8!
+  else
+    __arm64_path path len __arm64_copy_path 0 <> if -1 return then
+  then
+  __arm64_path opendir -> var dp :a
+  dp 0 i>a a= if -1 return then
+  dp dd __arm64_dir_addr a!
+  dd __arm64_dir_path __arm64_path 256 memcpy
+  dd
+end
+
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+  dd 0 < dd 7 > or max 0 < or if -1 0 0 return then
+  dd __arm64_dir_addr a@ -> var dp :a
+  dp 0 i>a a= if -1 0 0 return then
+  begin
+    -1
+  while
+    dp readdir -> var ent :a
+    ent 0 i>a a= if 0 0 0 return then
+    ent 18 a+ u16@ -> var namelen :i
+    ent 21 a+ -> var namep :a
+    namelen 1 = namep u8@ 46 = and if
+      \ skip "."
+    else namelen 2 = namep u8@ 46 = and namep 1 a+ u8@ 46 = and if
+      \ skip ".."
+    else
+      namelen max > if -1 0 0 return then
+      namelen 0 > if buf namep namelen memcpy then
+      dd __arm64_dir_path -> var base :a
+      base strlen -> var blen :i
+      __arm64_path base blen memcpy
+      47 __arm64_path blen a+ i8!
+      1 +-> blen
+      blen namelen + 255 <= if
+        __arm64_path blen a+ namep namelen memcpy
+        0 __arm64_path blen namelen + a+ i8!
+        __arm64_path __arm64_statbuf stat 0 = if
+          __arm64_statbuf 4 a+ u16@ -> var mode :i
+          0 -> var flags :i
+          0 -> var sz :i
+          mode 0xF000 and 0x4000 = if
+            flags 1 or -> flags
+          else
+            __arm64_statbuf 96 a+ @ -> sz
+          then
+          mode 0x0080 and 0 = if flags 2 or -> flags then
+          namelen flags sz return
+        then
+      then
+      ent 20 a+ u8@ 4 = if 1 else 0 then -> var dflags :i
+      namelen dflags 0 return
+    then then
+  repeat
+  0 0 0
+end
+
+fn fsdirclose ( dd :i -> :i )
+  dd 0 < dd 7 > or if -1 return then
+  dd __arm64_dir_addr a@ -> var dp :a
+  dp 0 i>a a= if -1 return then
+  dp closedir -> var rc :i
+  0 i>a dd __arm64_dir_addr a!
+  rc 0 <> if -1 else 0 then
+end
+
+fn fsmkdir ( path :a len :i -> :i )
+  __arm64_path path len __arm64_copy_path 0 <> if -1 return then
+  __arm64_path 0x1ED mkdir 0 <> if -1 else 0 then
+end
+
+fn fsrmdir ( path :a len :i -> :i )
+  __arm64_path path len __arm64_copy_path 0 <> if -1 return then
+  __arm64_path rmdir 0 <> if -1 else 0 then
 end

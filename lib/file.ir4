@@ -1,9 +1,17 @@
 \ lib/file.ir4 - Portable sequential file I/O (fallback stubs + convenience wrappers)
 
-const fsmode_read  0 :i
-const fsmode_write 1 :i
+const fsmode_read      0 :i
+const fsmode_write     1 :i
+const fsmode_append    2 :i
+const fsmode_readwrite 3 :i
 
-\ Open file at (path, len) with mode (fsmode_read or fsmode_write); returns fd >= 0 or < 0 on error
+const fsattr_dir       1 :i
+const fsattr_readonly  2 :i
+
+\ Byte granularity of fssize (1 on byte-exact filesystems, 128 on CP/M, 254 on C64 1541)
+default const fsgranularity 1 :i
+
+\ Open file at (path, len) with mode (fsmode_read..fsmode_readwrite); returns fd >= 0 or < 0 on error
 default fn fsopen ( path :a len :i mode :i -> :i )
   path drop len drop mode drop
   -1
@@ -27,11 +35,106 @@ default fn fswrite ( fd :i buf :a len :i -> :i )
   -1
 end
 
+\ Seek fd to byte offset pos from start; returns 0 on success or < 0 on error
+default fn fsseek ( fd :i pos :i -> :i )
+  fd drop pos drop
+  -1
+end
+
+\ Return current byte offset in fd or < 0 on error
+default fn fspos ( fd :i -> :i )
+  fd drop
+  -1
+end
+
+\ Return total byte size of open fd or < 0 on error
+default fn fssize ( fd :i -> :i )
+  fd drop
+  -1
+end
+
+\ Flush buffered writes on fd; returns 0 on success or < 0 on error
+default fn fsflush ( fd :i -> :i )
+  fd drop
+  -1
+end
+
+\ Delete file at (path, len); returns 0 on success or < 0 on error
+default fn fsdelete ( path :a len :i -> :i )
+  path drop len drop
+  -1
+end
+
+\ Rename file from (oldp, oldlen) to (newp, newlen); fails if target exists; returns 0 or < 0 on error
+default fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
+  oldp drop oldlen drop newp drop newlen drop
+  -1
+end
+
+fn __fs_strlen0 ( s :a -> :i )
+  s -> var p :a
+  begin p u8@ 0 <> while p 1 a+ -> p repeat
+  p s adiff
+end
+
 \ Open NUL-terminated path0 with mode; returns fd >= 0 or < 0 on error
 fn fsopen0 ( path0 :a mode :i -> :i )
-  path0 -> var p :a
-  begin p u8@ 0 <> while p 1 a+ -> p repeat
-  path0 p path0 adiff mode fsopen
+  path0 path0 __fs_strlen0 mode fsopen
+end
+
+\ Delete file at NUL-terminated path0; returns 0 on success or < 0 on error
+fn fsdelete0 ( path0 :a -> :i )
+  path0 path0 __fs_strlen0 fsdelete
+end
+
+\ Rename NUL-terminated old0 to NUL-terminated new0; returns 0 on success or < 0 on error
+fn fsrename0 ( old0 :a new0 :a -> :i )
+  old0 old0 __fs_strlen0 new0 new0 __fs_strlen0 fsrename
+end
+
+\ Open directory at (path, len) for iteration; returns descriptor dd >= 0 or < 0 on error
+default fn fsdiropen ( path :a len :i -> :i )
+  path drop len drop
+  -1
+end
+
+\ Read next directory entry into buf (up to max bytes); returns (namelen, flags, size) with namelen=0 at end or <0 on error
+default fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+  dd drop buf drop max drop
+  -1 0 0
+end
+
+\ Close directory descriptor dd; returns 0 on success or < 0 on error
+default fn fsdirclose ( dd :i -> :i )
+  dd drop
+  -1
+end
+
+\ Create directory at (path, len); returns 0 on success or < 0 on error
+default fn fsmkdir ( path :a len :i -> :i )
+  path drop len drop
+  -1
+end
+
+\ Remove empty directory at (path, len); returns 0 on success or < 0 on error
+default fn fsrmdir ( path :a len :i -> :i )
+  path drop len drop
+  -1
+end
+
+\ Open directory at NUL-terminated path0; returns dd >= 0 or < 0 on error
+fn fsdiropen0 ( path0 :a -> :i )
+  path0 path0 __fs_strlen0 fsdiropen
+end
+
+\ Create directory at NUL-terminated path0; returns 0 on success or < 0 on error
+fn fsmkdir0 ( path0 :a -> :i )
+  path0 path0 __fs_strlen0 fsmkdir
+end
+
+\ Remove empty directory at NUL-terminated path0; returns 0 on success or < 0 on error
+fn fsrmdir0 ( path0 :a -> :i )
+  path0 path0 __fs_strlen0 fsrmdir
 end
 
 \ Read a single byte from fd; returns 0..255 or -1 on EOF/error

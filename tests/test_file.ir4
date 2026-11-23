@@ -1,45 +1,258 @@
-\ Test lib/file.ir4 (fsopen, fswrite, fsread, fsclose, fsputc, fsgetc)
+\ Test lib/file.ir4 (files, seeking, sizing, renaming, deleting, fsgranularity, directories)
 
 require "file.ir4"
 
-data test_fname "IR4TEST.TMP" end
+data test_fname  "IR4TEST.TMP" 0 :i8 end
+data test_fname2 "IR4TEST2.TMP" 0 :i8 end
+data test_dname  "IR4DIR.TMP" 0 :i8 end
+data test_dsub   "IR4DIR.TMP/SUBDIR" 0 :i8 end
+data test_dfile  "IR4DIR.TMP/SUB.TXT" 0 :i8 end
 data test_payload "Hello, IR4(th) file I/O!" end
+data test_app "END" end
+data test_pat "PAST" end
+data test_subdata "Hello" end
+data str_dot "." end
+data str_dotdot ".." end
+data str_subtxt "SUB.TXT" end
+data str_subdir "SUBDIR" end
+data str_empty "" 0 :i8 end
 var rbuf :bytes 64
 
-fn main ( -> :i )
-  \ Fallback targets without a filesystem return < 0 on fsopen
-  target_arm64 target_cpm or 0 = if 0 return then
+fn __str_eq ( a :a alen :i b :a blen :i -> :i )
+  alen blen <> if 0 return then
+  0 -> var i :i
+  begin i alen < while
+    a i a+ u8@ b i a+ u8@ <> if 0 return then
+    1 +-> i
+  repeat
+  1
+end
 
+fn __test_c64 ( -> :i )
+  fsgranularity 254 <> if 1 return then
+  test_fname fsdelete0 drop
+  test_fname2 fsdelete0 drop
+
+  test_fname fsmode_write fsopen0 -> var fd :i
+  fd 0 < if 2 return then
+  fd test_payload 24 fswrite 24 <> if 3 return then
+  fd fspos 24 <> if 4 return then
+  fd fssize 24 <> if 5 return then
+  fd fsflush 0 <> if 6 return then
+  fd 24 fsseek 0 <> if 7 return then
+  fd 0 fsseek 0 = if 8 return then
+  fd fsclose 0 <> if 9 return then
+
+  test_fname fsmode_append fsopen0 -> fd
+  fd 0 < if 10 return then
+  fd test_app 3 fswrite 3 <> if 11 return then
+  fd fsclose 0 <> if 12 return then
+
+  test_fname fsmode_read fsopen0 -> fd
+  fd 0 < if 13 return then
+  fd fssize 508 <> if 14 return then
+  fd rbuf 64 fsread 27 <> if 15 return then
+  0 -> var i :i
+  begin i 24 < while
+    rbuf i a+ u8@ test_payload i a+ u8@ <> if 16 return then
+    1 +-> i
+  repeat
+  begin i 27 < while
+    rbuf i a+ u8@ test_app i 24 - a+ u8@ <> if 17 return then
+    1 +-> i
+  repeat
+  fd rbuf 8 fsread 0 <> if 18 return then
+  fd fsclose 0 <> if 19 return then
+
+  test_fname test_fname2 fsrename0 0 <> if 20 return then
+  test_fname fsmode_write fsopen0 -> fd
+  fd 0 < if 21 return then
+  fd fsclose 0 <> if 22 return then
+  test_fname test_fname2 fsrename0 0 = if 23 return then
+
+  str_empty 0 fsdiropen -> var dd :i
+  dd 0 < if 24 return then
+  0 -> var seen2 :i
+  begin
+    dd rbuf 64 fsdirread -> var esz :i -> var efl :i -> var en :i
+    en 0 < if 25 return then
+    en 0 >
+  while
+    rbuf en test_fname2 12 __str_eq if
+      1 -> seen2
+      efl 0 <> if 26 return then
+      esz 508 <> if 27 return then
+    then
+  repeat
+  dd fsdirclose 0 <> if 28 return then
+  seen2 1 <> if 29 return then
+
+  test_fname fsdelete0 0 <> if 30 return then
+  test_fname2 fsdelete0 0 <> if 31 return then
+  test_fname2 fsdelete0 0 = if 32 return then
+  0
+end
+
+fn main ( -> :i )
+  target_c64 if __test_c64 return then
+
+  \ Fallback targets without a filesystem return < 0 on fsopen
+  target_arm64 target_cpm or target_agon or target_x16 or 0 = if 0 return then
+
+  \ Ensure clean starting state
+  test_fname fsdelete0 drop
+  test_fname2 fsdelete0 drop
+
+  \ Write 24 bytes, verify fspos/fssize/fsflush/fsseek + readback before close
   test_fname 11 fsmode_write fsopen -> var fd :i
   fd 0 < if 1 return then
   fd test_payload 24 fswrite 24 <> if 2 return then
-  fd fsclose 0 <> if 3 return then
-
-  test_fname 11 fsmode_read fsopen -> fd
-  fd 0 < if 4 return then
-  fd rbuf 64 fsread -> var n :i
-  n 24 < if 5 return then
+  fd fspos 24 <> if 3 return then
+  fd fssize 24 <> if 4 return then
+  fd fsflush 0 <> if 5 return then
+  fd 0 fsseek 0 <> if 6 return then
+  fd fspos 0 <> if 7 return then
+  fd rbuf 24 fsread 24 <> if 8 return then
   0 -> var i :i
   begin i 24 < while
-    rbuf i a+ u8@ test_payload i a+ u8@ <> if 6 return then
+    rbuf i a+ u8@ test_payload i a+ u8@ <> if 9 return then
     1 +-> i
   repeat
-  fd fsclose 0 <> if 7 return then
+  fd fsclose 0 <> if 10 return then
 
-  test_fname 11 fsmode_write fsopen -> fd
-  fd 0 < if 8 return then
-  fd 65 fsputc 0 <> if 9 return then
-  fd 66 fsputc 0 <> if 10 return then
-  fd 67 fsputc 0 <> if 11 return then
-  fd fsclose 0 <> if 12 return then
+  \ Test fsmode_append
+  test_fname 11 fsmode_append fsopen -> fd
+  fd 0 < if 11 return then
+  fd fspos -> var app_off :i
+  app_off 24 < if 12 return then
+  fd test_app 3 fswrite 3 <> if 13 return then
+  fd fspos app_off 3 + <> if 14 return then
+  fd fsclose 0 <> if 15 return then
 
+  \ Re-open read-only and verify appended bytes at app_off
   test_fname 11 fsmode_read fsopen -> fd
-  fd 0 < if 13 return then
-  fd fsgetc 65 <> if 14 return then
-  fd fsgetc 66 <> if 15 return then
-  fd fsgetc 67 <> if 16 return then
-  target_arm64 if fd fsgetc -1 <> if 17 return then then
-  fd fsclose 0 <> if 18 return then
+  fd 0 < if 16 return then
+  fd app_off fsseek 0 <> if 17 return then
+  fd rbuf 3 fsread 3 <> if 18 return then
+  0 -> i
+  begin i 3 < while
+    rbuf i a+ u8@ test_app i a+ u8@ <> if 19 return then
+    1 +-> i
+  repeat
+  fd fsclose 0 <> if 20 return then
+
+  \ Test fsmode_readwrite in-place seek + overwrite
+  test_fname 11 fsmode_readwrite fsopen -> fd
+  fd 0 < if 21 return then
+  fd 7 fsseek 0 <> if 22 return then
+  fd test_pat 4 fswrite 4 <> if 23 return then
+  fd fspos 11 <> if 24 return then
+  fd fsflush 0 <> if 25 return then
+  fd 7 fsseek 0 <> if 26 return then
+  fd rbuf 4 fsread 4 <> if 27 return then
+  0 -> i
+  begin i 4 < while
+    rbuf i a+ u8@ test_pat i a+ u8@ <> if 28 return then
+    1 +-> i
+  repeat
+  fd fsclose 0 <> if 29 return then
+
+  \ Test fsrename and refusal to overwrite existing target
+  test_fname 11 test_fname2 12 fsrename 0 <> if 30 return then
+  test_fname fsdelete0 0 = if 31 return then
+  test_fname 11 fsmode_write fsopen -> fd
+  fd 0 < if 32 return then
+  fd fsclose 0 <> if 33 return then
+  test_fname test_fname2 fsrename0 0 = if 34 return then
+  test_fname fsdelete0 0 <> if 35 return then
+
+  \ Test fsopen0 + fsputc / fsgetc + fsdelete0
+  test_fname2 fsmode_write fsopen0 -> fd
+  fd 0 < if 36 return then
+  fd 65 fsputc 0 <> if 37 return then
+  fd 66 fsputc 0 <> if 38 return then
+  fd 67 fsputc 0 <> if 39 return then
+  fd fsclose 0 <> if 40 return then
+
+  test_fname2 fsmode_read fsopen0 -> fd
+  fd 0 < if 41 return then
+  fd fsgetc 65 <> if 42 return then
+  fd fsgetc 66 <> if 43 return then
+  fd fsgetc 67 <> if 44 return then
+  target_arm64 if fd fsgetc -1 <> if 45 return then then
+  fd fsclose 0 <> if 46 return then
+  test_fname2 fsdelete0 0 <> if 47 return then
+  test_fname2 fsdelete0 0 = if 48 return then
+
+  \ Check fsgranularity constant
+  target_cpm if
+    fsgranularity 128 <> if 49 return then
+  else
+    fsgranularity 1 <> if 50 return then
+  then
+
+  \ Directory lifecycle + 3-int fsdirread
+  target_arm64 target_agon or target_x16 or if
+    test_dfile fsdelete0 drop
+    test_dsub fsrmdir0 drop
+    test_dname fsrmdir0 drop
+
+    test_dname fsrmdir0 0 = if 51 return then
+    test_dname fsmkdir0 0 <> if 52 return then
+    test_dsub fsmkdir0 0 <> if 53 return then
+    test_dfile fsmode_write fsopen0 -> fd
+    fd 0 < if 54 return then
+    fd test_subdata 5 fswrite 5 <> if 55 return then
+    fd fsclose 0 <> if 56 return then
+
+    \ Non-empty rmdir should fail
+    test_dname fsrmdir0 0 = if 57 return then
+
+    \ Small buffer check
+    test_dname fsdiropen0 -> var dd :i
+    dd 0 < if 58 return then
+    dd rbuf 2 fsdirread -> var esz :i -> var efl :i -> var en :i
+    en 0 >= if 59 return then
+    dd fsdirclose 0 <> if 60 return then
+
+    test_dname fsdiropen0 -> dd
+    dd 0 < if 61 return then
+    0 -> var seen_file :i
+    0 -> var seen_dir :i
+    begin
+      dd rbuf 64 fsdirread -> esz -> efl -> en
+      en 0 < if 62 return then
+      en 0 >
+    while
+      \ Must skip "." and ".."
+      rbuf en str_dot 1 __str_eq if 63 return then
+      rbuf en str_dotdot 2 __str_eq if 64 return then
+      rbuf en str_subtxt 7 __str_eq if
+        1 -> seen_file
+        efl fsattr_dir and 0 <> if 65 return then
+        esz 5 <> if 66 return then
+      then
+      rbuf en str_subdir 6 __str_eq if
+        1 -> seen_dir
+        efl fsattr_dir and 0 = if 67 return then
+        esz 0 <> if 68 return then
+      then
+    repeat
+    dd fsdirclose 0 <> if 69 return then
+    seen_file 1 <> if 70 return then
+    seen_dir 1 <> if 71 return then
+
+    test_dfile fsdelete0 0 <> if 72 return then
+    test_dsub fsrmdir0 0 <> if 73 return then
+    test_dname fsrmdir0 0 <> if 74 return then
+  else
+    \ Compile/exercise CP/M fsdiropen/fsdirread/fsdirclose path cleanly
+    str_empty 0 fsdiropen -> var dd2 :i
+    dd2 0 >= if
+      dd2 rbuf 64 fsdirread drop drop drop
+      dd2 fsdirclose drop
+    then
+  then
 
   0
 end

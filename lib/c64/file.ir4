@@ -1,0 +1,484 @@
+\ lib/c64/file.ir4 - Commodore 64 KERNAL / 1541 sequential file & directory I/O
+
+require "mem.ir4"
+
+\ CBM 1541 DOS reports directory sizes in 254-byte blocks
+const fsgranularity 254 :i
+
+extern __c64_readst 0xFFB7 ( -> A :i )
+extern __c64_close  0xFFC3 ( A :i )
+extern __c64_clrchn 0xFFCC ( )
+extern __c64_chrin  0xFFCF ( -> A :i )
+extern __c64_chrout 0xFFD2 ( A :i )
+
+\ __c64_setlfs ( lfn :i dev :i sa :i ) -> SETLFS $FFBA (A=lfn, X=dev, Y=sa)
+code c64 __c64_setlfs ( lfn :i dev :i sa :i )
+  0xBD :i8 0 :as 0xA8 :i8
+  0xBD :i8 2 :as 0x85 :i8 0xFC :i8
+  0xBD :i8 4 :as 0x85 :i8 0xFB :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0xFC :i8
+  0xA5 :i8 0xFB :i8
+  0x20 :i8 0xBA :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ __c64_setnam ( addr :a len :i ) -> SETNAM $FFBD (A=len, X=lo, Y=hi)
+code c64 __c64_setnam ( addr :a len :i )
+  0xBD :i8 0 :as 0x85 :i8 0xFB :i8
+  0xBD :i8 2 :as 0x85 :i8 0xFC :i8
+  0xBD :i8 3 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0xFC :i8
+  0xA5 :i8 0xFB :i8
+  0x20 :i8 0xBD :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ __c64_open ( -> :i ) -> OPEN $FFC0 (0 ok, -1 on C=1)
+code c64 __c64_open ( -> :i )
+  0xCA :i8 0xCA :i8
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xC0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ __c64_chkin ( lfn :i -> :i ) -> CHKIN $FFC6 (0 ok, -1 on C=1)
+code c64 __c64_chkin ( lfn :i -> :i )
+  0xBD :i8 0 :as 0x85 :i8 0xFB :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0xFB :i8
+  0x20 :i8 0xC6 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ __c64_ckout ( lfn :i -> :i ) -> CKOUT $FFC9 (0 ok, -1 on C=1)
+code c64 __c64_ckout ( lfn :i -> :i )
+  0xBD :i8 0 :as 0x85 :i8 0xFB :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0xFB :i8
+  0x20 :i8 0xC9 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ 4 open file slots (LFNs 2..5, SA 2..5) + 1 directory slot (LFN 6, SA 0)
+var __c64_fmode   :bytes 4
+var __c64_feof    :bytes 4
+var __c64_fpos    :bytes 8
+var __c64_fsize   :bytes 8
+var __c64_diropen :bytes 1
+var __c64_cmdopen :bytes 1
+var __c64_name    :bytes 64
+var __c64_status  :bytes 48
+
+fn __c64_to_petscii ( dst :a src :a len :i )
+  0 -> var i :i
+  begin i len < while
+    src i a+ u8@ -> var c :i
+    c 97 >= c 122 <= and if c 32 - -> c then
+    c dst i a+ i8!
+    1 +-> i
+  repeat
+end
+
+fn __c64_ensure_cmd ( -> :i )
+  __c64_cmdopen u8@ 0 <> if 0 return then
+  15 8 15 __c64_setlfs
+  0 i>a 0 __c64_setnam
+  __c64_open 0 <> if -1 return then
+  1 __c64_cmdopen i8!
+  0
+end
+
+\ Send optional DOS command over persistent LFN 15 and read status code (0..99) or -1;
+\ also stores comma-field #3 (e.g. scratch count) into scount if non-NULL
+fn __c64_read_dos_status ( cmd :a clen :i scount :a -> :i )
+  __c64_ensure_cmd 0 <> if -1 return then
+  clen 0 > if
+    15 __c64_ckout 0 <> if __c64_clrchn -1 return then
+    0 -> var j :i
+    begin j clen < while
+      cmd j a+ u8@ __c64_chrout
+      1 +-> j
+    repeat
+    13 __c64_chrout
+    __c64_clrchn
+  then
+  15 __c64_chkin 0 <> if __c64_clrchn -1 return then
+  0 -> var n :i
+  1 -> var running :i
+  begin running while
+    __c64_chrin -> var ch :i
+    __c64_readst -> var st :i
+    ch 13 = st 191 and 0 <> or if
+      0 -> running
+    else
+      n 47 < if
+        ch __c64_status n a+ i8!
+        1 +-> n
+      then
+      st 64 and 0 <> if 0 -> running then
+    then
+  repeat
+  __c64_clrchn
+  n 2 < if -1 return then
+  __c64_status u8@ 48 - 10 * __c64_status 1 a+ u8@ 48 - + -> var code :i
+  scount 0 i>a a<> if
+    0 -> var commas :i
+    0 -> var val :i
+    0 -> var i :i
+    begin i n < while
+      __c64_status i a+ u8@ -> var c :i
+      c 44 = if
+        1 +-> commas
+      else commas 2 = c 48 >= and c 57 <= and if
+        val 10 * c 48 - + -> val
+      then then
+      1 +-> i
+    repeat
+    val scount !
+  then
+  code
+end
+
+fn __c64_dos_ok ( -> :i )
+  0 i>a 0 0 i>a __c64_read_dos_status -> var code :i
+  code 0 < code 20 >= or if -1 else 0 then
+end
+
+fn __c64_dos_cmd ( cmd :a clen :i -> :i )
+  cmd clen 0 i>a __c64_read_dos_status -> var code :i
+  code 0 < code 20 >= or if -1 else 0 then
+end
+
+fn __c64_blocks_to_bytes ( blk :i -> :i )
+  blk 0 <= if 0 return then
+  blk 128 > if 32512 return then
+  blk 254 *
+end
+
+\ Parse next CBM "$" directory entry from active CHKIN stream (LFN 6).
+\ Returns (namelen, flags, size) or (0, 0, 0) on end or (-1, 0, 0) on error.
+fn __c64_dir_next ( buf :a max :i -> :i :i :i )
+  6 __c64_chkin 0 <> if __c64_clrchn -1 0 0 return then
+  begin
+    -1
+  while
+    __c64_chrin -> var lo :i
+    __c64_readst 131 and 0 <> if __c64_clrchn 0 0 0 return then
+    __c64_chrin -> var hi :i
+    lo 0 = hi 0 = and if __c64_clrchn 0 0 0 return then
+    __c64_chrin -> var blo :i
+    __c64_chrin -> var bhi :i
+    blo bhi 8 << + -> var blocks :i
+    0 -> var got_quote :i
+    0 -> var is_hdr :i
+    0 -> var nlen :i
+    0 -> var overflow :i
+    0 -> var flags :i
+    0 -> var state :i
+    begin
+      __c64_chrin -> var c :i
+      __c64_readst 195 and 0 <> c 0 = or -> var eol :i
+      c 0 <> if
+        state 0 = if
+          c 18 = if 1 -> is_hdr then
+          c 34 = if 1 -> got_quote 1 -> state then
+        else state 1 = if
+          c 34 = if
+            2 -> state
+          else
+            nlen max < if
+              c buf nlen a+ i8!
+              1 +-> nlen
+            else
+              1 -> overflow
+            then
+          then
+        else state 2 = if
+          c 32 <> c 42 <> and if
+            c 68 = if flags 1 or -> flags then
+            3 -> state
+          then
+        else
+          c 60 = if flags 2 or -> flags then
+        then then then
+      then
+      eol 0 =
+    while repeat
+    is_hdr 0 = got_quote 0 <> and nlen 0 > and if
+      __c64_clrchn
+      overflow 0 <> if -1 0 0 return then
+      flags 1 and 0 <> if
+        0 -> var sz :i
+      else
+        blocks __c64_blocks_to_bytes -> sz
+      then
+      nlen flags sz return
+    then
+  repeat
+  __c64_clrchn
+  0 0 0
+end
+
+\ Look up byte size of single file via "$0:NAME"; returns size or 0 if not listed
+fn __c64_lookup_size ( name :a nlen :i -> :i )
+  nlen 1 < nlen 40 > or if 0 return then
+  36 __c64_name i8!
+  48 __c64_name 1 a+ i8!
+  58 __c64_name 2 a+ i8!
+  __c64_name 3 a+ name nlen __c64_to_petscii
+  7 8 0 __c64_setlfs
+  __c64_name nlen 3 + __c64_setnam
+  __c64_open 0 <> if 0 return then
+  7 __c64_chkin 0 <> if __c64_clrchn 7 __c64_close 0 return then
+  __c64_chrin drop
+  __c64_chrin drop
+  0 -> var found_sz :i
+  begin
+    __c64_chrin -> var lo :i
+    __c64_readst 131 and 0 <> if
+      0
+    else
+      __c64_chrin -> var hi :i
+      lo 0 = hi 0 = and if
+        0
+      else
+        __c64_chrin -> var blo :i
+        __c64_chrin -> var bhi :i
+        blo bhi 8 << + -> var blocks :i
+        0 -> var is_hdr :i
+        0 -> var got_q :i
+        begin
+          __c64_chrin -> var c :i
+          c 18 = if 1 -> is_hdr then
+          c 34 = if 1 -> got_q then
+          c 0 <> __c64_readst 195 and 0 = and
+        while repeat
+        is_hdr 0 = got_q 0 <> and if
+          blocks __c64_blocks_to_bytes -> found_sz
+          0
+        else
+          1
+        then
+      then
+    then
+  while repeat
+  __c64_clrchn
+  7 __c64_close
+  found_sz
+end
+
+fn __c64_open_lfn ( lfn :i path :a len :i suffix1 :i -> :i )
+  len 1 < len 53 > or if -1 return then
+  48 __c64_name i8!
+  58 __c64_name 1 a+ i8!
+  __c64_name 2 a+ path len __c64_to_petscii
+  44 __c64_name len 2 + a+ i8!
+  83 __c64_name len 3 + a+ i8!
+  44 __c64_name len 4 + a+ i8!
+  suffix1 __c64_name len 5 + a+ i8!
+  lfn 8 lfn __c64_setlfs
+  __c64_name len 6 + __c64_setnam
+  __c64_open 0 <> if -1 return then
+  __c64_dos_ok 0 <> if
+    lfn __c64_close
+    -1 return
+  then
+  0
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  mode 0 < mode 2 > or len 1 < or len 53 > or if -1 return then
+  0 -> var fd :i
+  begin
+    fd 4 < if __c64_fmode fd a+ u8@ 0 <> else false then
+  while
+    1 +-> fd
+  repeat
+  fd 4 >= if -1 return then
+  fd 2 + -> var lfn :i
+  0 -> var smode :i
+  0 -> var sz :i
+  0 -> var pos :i
+  mode 1 = if
+    83 __c64_name i8!
+    48 __c64_name 1 a+ i8!
+    58 __c64_name 2 a+ i8!
+    __c64_name 3 a+ path len __c64_to_petscii
+    __c64_name len 3 + __c64_dos_cmd drop
+    lfn path len 87 __c64_open_lfn 0 <> if -1 return then
+    2 -> smode
+  else mode 2 = if
+    lfn path len 65 __c64_open_lfn 0 <> if
+      lfn path len 87 __c64_open_lfn 0 <> if -1 return then
+      0 -> sz
+    else
+      path len __c64_lookup_size -> sz
+    then
+    sz -> pos
+    2 -> smode
+  else
+    path len __c64_lookup_size -> sz
+    lfn path len 82 __c64_open_lfn 0 <> if -1 return then
+    1 -> smode
+  then then
+  smode __c64_fmode fd a+ i8!
+  0 __c64_feof fd a+ i8!
+  pos __c64_fpos fd 1 << a+ !
+  sz __c64_fsize fd 1 << a+ !
+  fd
+end
+
+fn fsclose ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __c64_fmode fd a+ u8@ 0 = if -1 return then
+  __c64_clrchn
+  fd 2 + __c64_close
+  0 __c64_fmode fd a+ i8!
+  0 __c64_feof fd a+ i8!
+  0
+end
+
+fn fsread ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  __c64_fmode fd a+ u8@ 1 <> if -1 return then
+  len 0 = if 0 return then
+  __c64_feof fd a+ u8@ 0 <> if 0 return then
+  fd 2 + __c64_chkin 0 <> if __c64_clrchn -1 return then
+  0 -> var total :i
+  begin
+    total len < if __c64_feof fd a+ u8@ 0 = else false then
+  while
+    __c64_chrin -> var b :i
+    __c64_readst -> var st :i
+    st 131 and 0 <> if
+      1 __c64_feof fd a+ i8!
+      __c64_clrchn
+      total 0 > if total else -1 then return
+    then
+    st 64 and 0 <> if 1 __c64_feof fd a+ i8! then
+    b buf total a+ i8!
+    1 +-> total
+  repeat
+  __c64_clrchn
+  __c64_fpos fd 1 << a+ @ total + __c64_fpos fd 1 << a+ !
+  total
+end
+
+fn fswrite ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  __c64_fmode fd a+ u8@ 2 <> if -1 return then
+  len 0 = if 0 return then
+  fd 2 + __c64_ckout 0 <> if __c64_clrchn -1 return then
+  0 -> var total :i
+  begin total len < while
+    buf total a+ u8@ __c64_chrout
+    __c64_readst 131 and 0 <> if
+      __c64_clrchn
+      -1 return
+    then
+    1 +-> total
+  repeat
+  __c64_clrchn
+  __c64_fpos fd 1 << a+ @ total + -> var npos :i
+  npos __c64_fpos fd 1 << a+ !
+  npos __c64_fsize fd 1 << a+ @ > if
+    npos __c64_fsize fd 1 << a+ !
+  then
+  total
+end
+
+fn fsseek ( fd :i pos :i -> :i )
+  fd 0 < fd 3 > or pos 0 < or if -1 return then
+  __c64_fmode fd a+ u8@ 0 = if -1 return then
+  __c64_fpos fd 1 << a+ @ pos = if 0 else -1 then
+end
+
+fn fspos ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __c64_fmode fd a+ u8@ 0 = if -1 return then
+  __c64_fpos fd 1 << a+ @
+end
+
+fn fssize ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __c64_fmode fd a+ u8@ 0 = if -1 return then
+  __c64_fsize fd 1 << a+ @
+end
+
+fn fsflush ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __c64_fmode fd a+ u8@ 0 = if -1 return then
+  0
+end
+
+fn fsdelete ( path :a len :i -> :i )
+  var scount :bytes 2
+  len 1 < len 56 > or if -1 return then
+  83 __c64_name i8!
+  48 __c64_name 1 a+ i8!
+  58 __c64_name 2 a+ i8!
+  __c64_name 3 a+ path len __c64_to_petscii
+  0 scount !
+  __c64_name len 3 + scount __c64_read_dos_status -> var code :i
+  code 0 < code 20 >= or if -1 return then
+  code 1 = scount @ 0 = and if -1 return then
+  0
+end
+
+fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
+  oldlen 1 < newlen 1 < or oldlen newlen + 54 > or if -1 return then
+  82 __c64_name i8!
+  48 __c64_name 1 a+ i8!
+  58 __c64_name 2 a+ i8!
+  __c64_name 3 a+ newp newlen __c64_to_petscii
+  61 __c64_name 3 newlen + a+ i8!
+  __c64_name 4 newlen + a+ oldp oldlen __c64_to_petscii
+  __c64_name 4 newlen + oldlen + __c64_dos_cmd
+end
+
+fn fsdiropen ( path :a len :i -> :i )
+  __c64_diropen u8@ 0 <> if -1 return then
+  len 0 = if
+    36 __c64_name i8!
+    1 -> len
+  else len 1 = path u8@ 46 = and if
+    36 __c64_name i8!
+  else
+    -1 return
+  then then
+  6 8 0 __c64_setlfs
+  __c64_name len __c64_setnam
+  __c64_open 0 <> if -1 return then
+  6 __c64_chkin 0 <> if __c64_clrchn 6 __c64_close -1 return then
+  __c64_chrin drop
+  __c64_chrin drop
+  __c64_clrchn
+  1 __c64_diropen i8!
+  0
+end
+
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+  dd 0 <> __c64_diropen u8@ 0 = or max 0 < or if -1 0 0 return then
+  buf max __c64_dir_next
+end
+
+fn fsdirclose ( dd :i -> :i )
+  dd 0 <> __c64_diropen u8@ 0 = or if -1 return then
+  __c64_clrchn
+  6 __c64_close
+  0 __c64_diropen i8!
+  0
+end

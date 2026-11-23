@@ -1,0 +1,660 @@
+\ lib/x16/file.ir4 - Commander X16 KERNAL / CMDR-DOS file & directory I/O
+
+require "mem.ir4"
+
+\ CMDR-DOS $=L provides exact 1-byte file sizes
+const fsgranularity 1 :i
+
+extern __x16_readst 0xFFB7 ( -> A :i )
+extern __x16_close  0xFFC3 ( A :i )
+extern __x16_clrchn 0xFFCC ( )
+extern __x16_chrin  0xFFCF ( -> A :i )
+extern __x16_chrout 0xFFD2 ( A :i )
+
+\ __x16_setlfs ( lfn :i dev :i sa :i ) -> SETLFS $FFBA (A=lfn, X=dev, Y=sa)
+code x16 __x16_setlfs ( lfn :i dev :i sa :i )
+  0xBD :i8 0 :as 0xA8 :i8
+  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
+  0xBD :i8 4 :as 0x85 :i8 0x02 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x03 :i8
+  0xA5 :i8 0x02 :i8
+  0x20 :i8 0xBA :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ __x16_setnam ( addr :a len :i ) -> SETNAM $FFBD (A=len, X=lo, Y=hi)
+code x16 __x16_setnam ( addr :a len :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
+  0xBD :i8 3 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x03 :i8
+  0xA5 :i8 0x02 :i8
+  0x20 :i8 0xBD :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ __x16_open ( -> :i ) -> OPEN $FFC0 (0 ok, -1 on C=1)
+code x16 __x16_open ( -> :i )
+  0xCA :i8 0xCA :i8
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xC0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ __x16_chkin ( lfn :i -> :i ) -> CHKIN $FFC6 (0 ok, -1 on C=1)
+code x16 __x16_chkin ( lfn :i -> :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x20 :i8 0xC6 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ __x16_ckout ( lfn :i -> :i ) -> CKOUT $FFC9 (0 ok, -1 on C=1)
+code x16 __x16_ckout ( lfn :i -> :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x20 :i8 0xC9 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+\ 4 open file slots (LFNs 2..5, SA 2..5) + 1 directory slot (LFN 6, SA 0)
+var __x16_fmode   :bytes 4
+var __x16_feof    :bytes 4
+var __x16_fpos    :bytes 8
+var __x16_fsize   :bytes 8
+var __x16_diropen :bytes 1
+var __x16_dircd   :bytes 1
+var __x16_cmdopen :bytes 1
+var __x16_name    :bytes 96
+var __x16_status  :bytes 64
+var __x16_cwd     :bytes 100
+var __x16_cwd_off :i
+var __x16_cwd_len :i
+
+fn __x16_copy_name ( dst :a src :a len :i )
+  dst src len memcpy
+end
+
+fn __x16_ensure_cmd ( -> :i )
+  __x16_cmdopen u8@ 0 <> if 0 return then
+  15 8 15 __x16_setlfs
+  0 i>a 0 __x16_setnam
+  __x16_open 0 <> if -1 return then
+  1 __x16_cmdopen i8!
+  0
+end
+
+fn __x16_read_dos_status ( cmd :a clen :i scount :a -> :i )
+  __x16_ensure_cmd 0 <> if -1 return then
+  clen 0 > if
+    15 __x16_ckout 0 <> if __x16_clrchn -1 return then
+    0 -> var j :i
+    begin j clen < while
+      cmd j a+ u8@ __x16_chrout
+      1 +-> j
+    repeat
+    __x16_clrchn
+  then
+  15 __x16_chkin 0 <> if __x16_clrchn -1 return then
+  0 -> var n :i
+  1 -> var running :i
+  begin running while
+    __x16_chrin -> var ch :i
+    __x16_readst -> var st :i
+    ch 13 = st 191 and 0 <> or if
+      0 -> running
+    else
+      n 63 < if
+        ch __x16_status n a+ i8!
+        1 +-> n
+      then
+      st 64 and 0 <> if 0 -> running then
+    then
+  repeat
+  __x16_clrchn
+  n 2 < if -1 return then
+  __x16_status u8@ 48 - 10 * __x16_status 1 a+ u8@ 48 - + -> var code :i
+  scount 0 i>a a<> if
+    0 -> var commas :i
+    0 -> var val :i
+    0 -> var i :i
+    begin i n < while
+      __x16_status i a+ u8@ -> var c :i
+      c 44 = if
+        1 +-> commas
+      else commas 2 = c 48 >= and c 57 <= and if
+        val 10 * c 48 - + -> val
+      then then
+      1 +-> i
+    repeat
+    val scount !
+  then
+  code
+end
+
+fn __x16_dos_ok ( -> :i )
+  0 i>a 0 0 i>a __x16_read_dos_status -> var code :i
+  code 0 < code 20 >= or if -1 else 0 then
+end
+
+fn __x16_dos_cmd ( cmd :a clen :i -> :i )
+  cmd clen 0 i>a __x16_read_dos_status -> var code :i
+  code 0 < code 20 >= or if -1 else 0 then
+end
+
+fn __x16_hex_val ( c :i -> :i )
+  c 48 >= c 57 <= and if c 48 - return then
+  c 65 >= c 70 <= and if c 55 - return then
+  c 97 >= c 102 <= and if c 87 - return then
+  -1
+end
+
+\ Parse next entry from active "$=L" stream (LFN 6 or 7).
+\ Returns (namelen, flags, size) or (0, 0, 0) on end or (-1, 0, 0) on error.
+fn __x16_dir_next_lfn ( lfn :i buf :a max :i -> :i :i :i )
+  lfn __x16_chkin 0 <> if __x16_clrchn -1 0 0 return then
+  begin
+    -1
+  while
+    __x16_chrin -> var lo :i
+    __x16_readst 131 and 0 <> if __x16_clrchn 0 0 0 return then
+    __x16_chrin -> var hi :i
+    lo 0 = hi 0 = and if __x16_clrchn 0 0 0 return then
+    __x16_chrin drop
+    __x16_chrin drop
+    0 -> var got_quote :i
+    0 -> var is_hdr :i
+    0 -> var nlen :i
+    0 -> var non_dot :i
+    0 -> var overflow :i
+    0 -> var state :i
+    0 -> var in_tok :i
+    0 -> var tok_prev :i
+    0 -> var tok_cur :i
+    0 -> var sz_clamp :i
+    begin
+      __x16_chrin -> var c :i
+      __x16_readst 195 and 0 <> c 0 = or -> var eol :i
+      c 0 <> if
+        state 0 = if
+          c 18 = if 1 -> is_hdr then
+          c 34 = if 1 -> got_quote 1 -> state then
+        else state 1 = if
+          c 34 = if
+            2 -> state
+          else
+            c 46 <> if 1 -> non_dot then
+            nlen max < if
+              buf 0 i>a a<> if c buf nlen a+ i8! then
+              1 +-> nlen
+            else
+              1 -> overflow
+            then
+          then
+        else
+          c 32 = if
+            0 -> in_tok
+          else
+            in_tok 0 = if
+              tok_cur -> tok_prev
+              0 -> tok_cur
+              0 -> sz_clamp
+              1 -> in_tok
+            then
+            c __x16_hex_val -> var hv :i
+            hv 0 >= if
+              tok_cur 2048 >= if 1 -> sz_clamp then
+              tok_cur 4 << hv or -> tok_cur
+            then
+          then
+        then then
+      then
+      eol 0 =
+    while repeat
+    non_dot 0 = nlen 2 <= and if 1 -> is_hdr then
+    is_hdr 0 = got_quote 0 <> and nlen 0 > and if
+      __x16_clrchn
+      overflow 0 <> if -1 0 0 return then
+      0 -> var flags :i
+      0 -> var sz :i
+      tok_prev 16 and 0 <> if
+        1 -> flags
+      else
+        sz_clamp 0 <> if 32767 -> sz else tok_cur -> sz then
+      then
+      tok_prev 1 and 0 <> if flags 2 or -> flags then
+      nlen flags sz return
+    then
+  repeat
+  __x16_clrchn
+  0 0 0
+end
+
+fn __x16_dir_next ( buf :a max :i -> :i :i :i )
+  6 buf max __x16_dir_next_lfn
+end
+
+fwd __x16_save_cwd ( )
+fwd __x16_restore_cwd ( )
+
+fn __x16_lookup_entry ( name :a nlen :i -> :i :i )
+  nlen 1 < nlen 78 > or if 0 0 return then
+  -1 -> var slash :i
+  0 -> var i :i
+  begin i nlen < while
+    name i a+ u8@ 47 = if i -> slash then
+    1 +-> i
+  repeat
+  name -> var base :a
+  nlen -> var blen :i
+  0 -> var did_cd :i
+  slash 0 >= if
+    nlen slash - 1 - -> blen
+    blen 1 < if 0 0 return then
+    name slash 1 + a+ -> base
+    __x16_save_cwd
+    67 __x16_name i8!
+    68 __x16_name 1 a+ i8!
+    58 __x16_name 2 a+ i8!
+    slash 0 = if
+      47 __x16_name 3 a+ i8!
+      __x16_name 4 __x16_dos_cmd 0 <> if 0 0 return then
+    else
+      __x16_name 3 a+ name slash __x16_copy_name
+      __x16_name slash 3 + __x16_dos_cmd 0 <> if 0 0 return then
+    then
+    1 -> did_cd
+  then
+  36 __x16_name i8!
+  61 __x16_name 1 a+ i8!
+  76 __x16_name 2 a+ i8!
+  58 __x16_name 3 a+ i8!
+  __x16_name 4 a+ base blen __x16_copy_name
+  7 8 0 __x16_setlfs
+  __x16_name blen 4 + __x16_setnam
+  __x16_open 0 <> if
+    did_cd 0 <> if __x16_restore_cwd then
+    0 0 return
+  then
+  7 __x16_chkin 0 <> if
+    __x16_clrchn
+    7 __x16_close
+    did_cd 0 <> if __x16_restore_cwd then
+    0 0 return
+  then
+  __x16_chrin drop
+  __x16_chrin drop
+  __x16_clrchn
+  7 0 i>a 128 __x16_dir_next_lfn -> var sz :i -> var fl :i -> var ln :i
+  fl drop
+  __x16_clrchn
+  7 __x16_close
+  did_cd 0 <> if __x16_restore_cwd then
+  ln 0 > sz 0 < if 0 else sz then
+end
+
+fn __x16_lookup_size ( name :a nlen :i -> :i )
+  name nlen __x16_lookup_entry -> var sz :i -> var found :i
+  found 0 <> if sz else 0 then
+end
+
+fn __x16_exists ( name :a nlen :i -> :i )
+  name nlen __x16_lookup_entry -> var sz :i -> var found :i
+  sz drop
+  found
+end
+
+fn __x16_open_lfn ( lfn :i path :a len :i suffix1 :i -> :i )
+  len 1 < len 80 > or if -1 return then
+  __x16_name path len __x16_copy_name
+  44 __x16_name len a+ i8!
+  83 __x16_name len 1 + a+ i8!
+  44 __x16_name len 2 + a+ i8!
+  suffix1 __x16_name len 3 + a+ i8!
+  lfn 8 lfn __x16_setlfs
+  __x16_name len 4 + __x16_setnam
+  __x16_open 0 <> if -1 return then
+  __x16_dos_ok 0 <> if
+    lfn __x16_close
+    -1 return
+  then
+  0
+end
+
+fn __x16_seek_sa ( sa :i pos :i -> :i )
+  80 __x16_name i8!
+  sa __x16_name 1 a+ i8!
+  pos 255 and __x16_name 2 a+ i8!
+  pos 8 >> 255 and __x16_name 3 a+ i8!
+  0 __x16_name 4 a+ i8!
+  0 __x16_name 5 a+ i8!
+  __x16_name 6 __x16_dos_cmd
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  mode 0 < mode 3 > or len 1 < or len 80 > or if -1 return then
+  0 -> var fd :i
+  begin
+    fd 4 < if __x16_fmode fd a+ u8@ 0 <> else false then
+  while
+    1 +-> fd
+  repeat
+  fd 4 >= if -1 return then
+  fd 2 + -> var lfn :i
+  0 -> var smode :i
+  0 -> var sz :i
+  0 -> var pos :i
+  mode 1 = if
+    83 __x16_name i8!
+    58 __x16_name 1 a+ i8!
+    __x16_name 2 a+ path len __x16_copy_name
+    __x16_name len 2 + __x16_dos_cmd drop
+    lfn path len 87 __x16_open_lfn 0 <> if -1 return then
+    lfn __x16_close
+    lfn path len 77 __x16_open_lfn 0 <> if -1 return then
+    3 -> smode
+  else mode 2 = if
+    lfn path len 65 __x16_open_lfn 0 <> if
+      lfn path len 87 __x16_open_lfn 0 <> if -1 return then
+      0 -> sz
+    else
+      path len __x16_lookup_size -> sz
+    then
+    sz -> pos
+    2 -> smode
+  else mode 3 = if
+    path len __x16_lookup_size -> sz
+    lfn path len 77 __x16_open_lfn 0 <> if -1 return then
+    3 -> smode
+  else
+    path len __x16_lookup_size -> sz
+    lfn path len 82 __x16_open_lfn 0 <> if -1 return then
+    1 -> smode
+  then then then
+  smode __x16_fmode fd a+ i8!
+  0 __x16_feof fd a+ i8!
+  pos __x16_fpos fd 1 << a+ !
+  sz __x16_fsize fd 1 << a+ !
+  fd
+end
+
+fn fsclose ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __x16_fmode fd a+ u8@ 0 = if -1 return then
+  __x16_clrchn
+  fd 2 + __x16_close
+  0 __x16_fmode fd a+ i8!
+  0 __x16_feof fd a+ i8!
+  0
+end
+
+fn fsread ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  __x16_fmode fd a+ u8@ -> var fm :i
+  fm 0 = fm 2 = or if -1 return then
+  len 0 = if 0 return then
+  __x16_feof fd a+ u8@ 0 <> if 0 return then
+  fd 2 + __x16_chkin 0 <> if __x16_clrchn -1 return then
+  0 -> var total :i
+  begin
+    total len < if __x16_feof fd a+ u8@ 0 = else false then
+  while
+    __x16_chrin -> var b :i
+    __x16_readst -> var st :i
+    st 131 and 0 <> if
+      1 __x16_feof fd a+ i8!
+      __x16_clrchn
+      total 0 > if total else -1 then return
+    then
+    st 64 and 0 <> if 1 __x16_feof fd a+ i8! then
+    b buf total a+ i8!
+    1 +-> total
+  repeat
+  __x16_clrchn
+  __x16_fpos fd 1 << a+ @ total + __x16_fpos fd 1 << a+ !
+  total
+end
+
+fn fswrite ( fd :i buf :a len :i -> :i )
+  fd 0 < fd 3 > or len 0 < or if -1 return then
+  __x16_fmode fd a+ u8@ -> var fm :i
+  fm 0 = fm 1 = or if -1 return then
+  len 0 = if 0 return then
+  fd 2 + __x16_ckout 0 <> if __x16_clrchn -1 return then
+  0 -> var total :i
+  begin total len < while
+    buf total a+ u8@ __x16_chrout
+    __x16_readst 131 and 0 <> if
+      __x16_clrchn
+      -1 return
+    then
+    1 +-> total
+  repeat
+  __x16_clrchn
+  __x16_fpos fd 1 << a+ @ total + -> var npos :i
+  npos __x16_fpos fd 1 << a+ !
+  npos __x16_fsize fd 1 << a+ @ > if
+    npos __x16_fsize fd 1 << a+ !
+  then
+  total
+end
+
+fn fsseek ( fd :i pos :i -> :i )
+  fd 0 < fd 3 > or pos 0 < or if -1 return then
+  __x16_fmode fd a+ u8@ 0 = if -1 return then
+  fd 2 + pos __x16_seek_sa 0 <> if -1 return then
+  pos __x16_fpos fd 1 << a+ !
+  0 __x16_feof fd a+ i8!
+  0
+end
+
+fn fspos ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __x16_fmode fd a+ u8@ 0 = if -1 return then
+  __x16_fpos fd 1 << a+ @
+end
+
+fn fssize ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __x16_fmode fd a+ u8@ 0 = if -1 return then
+  __x16_fsize fd 1 << a+ @
+end
+
+fn fsflush ( fd :i -> :i )
+  fd 0 < fd 3 > or if -1 return then
+  __x16_fmode fd a+ u8@ 0 = if -1 return then
+  0
+end
+
+fn fsdelete ( path :a len :i -> :i )
+  len 1 < len 80 > or if -1 return then
+  path len __x16_exists 0 = if -1 return then
+  83 __x16_name i8!
+  58 __x16_name 1 a+ i8!
+  __x16_name 2 a+ path len __x16_copy_name
+  __x16_name len 2 + __x16_dos_cmd
+end
+
+fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
+  oldlen 1 < newlen 1 < or oldlen newlen + 80 > or if -1 return then
+  newp newlen __x16_exists 0 <> if -1 return then
+  82 __x16_name i8!
+  58 __x16_name 1 a+ i8!
+  __x16_name 2 a+ newp newlen __x16_copy_name
+  61 __x16_name 2 newlen + a+ i8!
+  __x16_name 3 newlen + a+ oldp oldlen __x16_copy_name
+  __x16_name 3 newlen + oldlen + __x16_dos_cmd
+end
+
+fn __x16_restore_cwd ( )
+  __x16_cwd __x16_cwd_off a+ __x16_cwd_len __x16_dos_cmd drop
+end
+
+fn __x16_save_cwd ( )
+  100 -> var p :i
+  36 __x16_name i8!
+  61 __x16_name 1 a+ i8!
+  67 __x16_name 2 a+ i8!
+  7 8 0 __x16_setlfs
+  __x16_name 3 __x16_setnam
+  __x16_open 0 = if
+    7 __x16_chkin 0 = if
+      __x16_chrin drop
+      __x16_chrin drop
+      0 -> var line :i
+      begin
+        __x16_chrin -> var lo :i
+        __x16_readst 131 and 0 <> if
+          0
+        else
+          __x16_chrin -> var hi :i
+          lo 0 = hi 0 = and if
+            0
+          else
+            __x16_chrin drop
+            __x16_chrin drop
+            0 -> var n :i
+            0 -> var st :i
+            0 -> var is_hdr :i
+            begin
+              __x16_chrin -> var c :i
+              __x16_readst 195 and 0 <> c 0 = or -> var eol :i
+              c 0 <> if
+                st 0 = if
+                  c 18 = if 1 -> is_hdr then
+                  c 34 = if 1 -> st then
+                else st 1 = if
+                  c 34 = if
+                    2 -> st
+                  else
+                    n 60 < if c __x16_status n a+ i8! 1 +-> n then
+                  then
+                then then
+              then
+              eol 0 =
+            while repeat
+            is_hdr 0 = line 0 > and n 0 > and if
+              n 1 = __x16_status u8@ 47 = and if
+                0
+              else
+                p n 1 + - -> var np :i
+                np 3 >= if
+                  np -> p
+                  47 __x16_cwd p a+ i8!
+                  __x16_cwd p 1 + a+ __x16_status n memcpy
+                then
+                1
+              then
+            else
+              1 +-> line
+              1
+            then
+          then
+        then
+      while repeat
+      __x16_clrchn
+    then
+    7 __x16_close
+  then
+  p 100 = if
+    99 -> p
+    47 __x16_cwd p a+ i8!
+  then
+  p 3 - -> p
+  67 __x16_cwd p a+ i8!
+  68 __x16_cwd p 1 + a+ i8!
+  58 __x16_cwd p 2 + a+ i8!
+  p -> __x16_cwd_off
+  100 p - -> __x16_cwd_len
+end
+
+fn fsdiropen ( path :a len :i -> :i )
+  __x16_diropen u8@ 0 <> if -1 return then
+  len 80 > len 0 < or if -1 return then
+  0 -> var used_cd :i
+  len 0 > if len 1 = path u8@ 46 = and 0 = if
+    __x16_save_cwd
+    67 __x16_name i8!
+    68 __x16_name 1 a+ i8!
+    58 __x16_name 2 a+ i8!
+    __x16_name 3 a+ path len __x16_copy_name
+    __x16_name len 3 + __x16_dos_cmd 0 <> if -1 return then
+    1 -> used_cd
+  then then
+  36 __x16_name i8!
+  61 __x16_name 1 a+ i8!
+  76 __x16_name 2 a+ i8!
+  6 8 0 __x16_setlfs
+  __x16_name 3 __x16_setnam
+  __x16_open 0 <> if
+    used_cd 0 <> if __x16_restore_cwd then
+    -1 return
+  then
+  __x16_dos_ok 0 <> if
+    6 __x16_close
+    used_cd 0 <> if __x16_restore_cwd then
+    -1 return
+  then
+  6 __x16_chkin 0 <> if
+    __x16_clrchn
+    6 __x16_close
+    used_cd 0 <> if __x16_restore_cwd then
+    -1 return
+  then
+  __x16_chrin drop
+  __x16_chrin drop
+  __x16_clrchn
+  1 __x16_diropen i8!
+  used_cd __x16_dircd i8!
+  0
+end
+
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+  dd 0 <> __x16_diropen u8@ 0 = or max 0 < or if -1 0 0 return then
+  buf max __x16_dir_next
+end
+
+fn fsdirclose ( dd :i -> :i )
+  dd 0 <> __x16_diropen u8@ 0 = or if -1 return then
+  __x16_clrchn
+  6 __x16_close
+  0 __x16_diropen i8!
+  __x16_dircd u8@ 0 <> if
+    0 __x16_dircd i8!
+    __x16_restore_cwd
+  then
+  0
+end
+
+fn fsmkdir ( path :a len :i -> :i )
+  len 1 < len 80 > or if -1 return then
+  77 __x16_name i8!
+  68 __x16_name 1 a+ i8!
+  58 __x16_name 2 a+ i8!
+  __x16_name 3 a+ path len __x16_copy_name
+  __x16_name len 3 + __x16_dos_cmd
+end
+
+fn fsrmdir ( path :a len :i -> :i )
+  len 1 < len 80 > or if -1 return then
+  82 __x16_name i8!
+  68 __x16_name 1 a+ i8!
+  58 __x16_name 2 a+ i8!
+  __x16_name 3 a+ path len __x16_copy_name
+  __x16_name len 3 + __x16_dos_cmd
+end

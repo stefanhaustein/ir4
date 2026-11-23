@@ -1,0 +1,321 @@
+\ lib/agon/file.ir4 - Agon Light MOS file I/O (8 open file slots via RST.LIL $08)
+
+require "mem.ir4"
+
+\ __mos_del ( path0 :a -> :i )  MOS $05: HL=path0 -> A=status (0=ok)
+code agon __mos_del ( path0 :a -> :i )
+  0xD1 :i8 0xE1 :i8 0xD5 :i8
+  0x3E :i8 0x05 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_ren ( old0 :a new0 :a -> :i )  MOS $06: HL=old0, DE=new0 -> A=status (0=ok)
+code agon __mos_ren ( old0 :a new0 :a -> :i )
+  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
+  0x3E :i8 0x06 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_fopen ( path0 :a mode :i -> :i )  MOS $0A: HL=path0, C=mode -> A=handle (0=err)
+code agon __mos_fopen ( path0 :a mode :i -> :i )
+  0xD1 :i8 0xC1 :i8 0xE1 :i8 0xD5 :i8
+  0x3E :i8 0x0A :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_fclose ( handle :i -> :i )  MOS $0B: C=handle -> A=remaining open handles
+code agon __mos_fclose ( handle :i -> :i )
+  0xD1 :i8 0xC1 :i8 0xD5 :i8
+  0x3E :i8 0x0B :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_getfil ( handle :i -> :a )  MOS $19: C=handle -> HLU=FIL*
+code agon __mos_getfil ( handle :i -> :a )
+  0xD1 :i8 0xC1 :i8 0xD5 :i8
+  0x3E :i8 0x19 :i8 0x5B :i8 0xCF :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_fread ( handle :i buf :a count :i -> :i )  MOS $1A: C=handle, HL=buf, DE=count -> DE=read
+code agon __mos_fread ( handle :i buf :a count :i -> :i )
+  0xFD :i8 0xE1 :i8 0xD1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
+  0x3E :i8 0x1A :i8 0x5B :i8 0xCF :i8
+  0xE1 :i8 0xD5 :i8 0xE5 :i8
+end
+
+\ __mos_fwrite ( handle :i buf :a count :i -> :i )  MOS $1B: C=handle, HL=buf, DE=count -> DE=written
+code agon __mos_fwrite ( handle :i buf :a count :i -> :i )
+  0xFD :i8 0xE1 :i8 0xD1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
+  0x3E :i8 0x1B :i8 0x5B :i8 0xCF :i8
+  0xE1 :i8 0xD5 :i8 0xE5 :i8
+end
+
+\ __mos_flseek ( handle :i pos :i -> :i )  MOS $1C: C=handle, HLU=pos, E=0 -> A=status
+code agon __mos_flseek ( handle :i pos :i -> :i )
+  0xFD :i8 0xE1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
+  0x1E :i8 0x00 :i8 0x3E :i8 0x1C :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __mos_mkdir ( path0 :a -> :i )  MOS $07: HL=path0 -> A=status (0=ok)
+code agon __mos_mkdir ( path0 :a -> :i )
+  0xD1 :i8 0xE1 :i8 0xD5 :i8
+  0x3E :i8 0x07 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __ffs_dopen ( dir :a path0 :a -> :i )  MOS $91: HL=dir, DE=path0 -> A=FRESULT
+code agon __ffs_dopen ( dir :a path0 :a -> :i )
+  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
+  0x3E :i8 0x91 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __ffs_dclose ( dir :a -> :i )  MOS $92: HL=dir -> A=FRESULT
+code agon __ffs_dclose ( dir :a -> :i )
+  0xD1 :i8 0xE1 :i8 0xD5 :i8
+  0x3E :i8 0x92 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __ffs_dread ( dir :a filinfo :a -> :i )  MOS $93: HL=dir, DE=filinfo -> A=FRESULT
+code agon __ffs_dread ( dir :a filinfo :a -> :i )
+  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
+  0x3E :i8 0x93 :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+var __agon_handles :bytes 8
+var __agon_modes   :bytes 8
+var __agon_pos     :bytes 24
+var __agon_size    :bytes 24
+var __agon_path    :bytes 256
+var __agon_path2   :bytes 256
+
+fn __agon_cell ( base :a fd :i -> :a )
+  base fd 3 * a+
+end
+
+fn __agon_valid_fd ( fd :i -> :i )
+  fd 0 < fd 7 > or if 0 return then
+  __agon_handles fd a+ u8@ 0 <>
+end
+
+fn __agon_copy_path ( dst :a src :a len :i -> :i )
+  len 0 <= len 255 > or if -1 return then
+  dst src len memcpy
+  dst len a+ 0 swap i8!
+  0
+end
+
+fn fsopen ( path :a len :i mode :i -> :i )
+  mode 0 < mode 3 > or if -1 return then
+  __agon_path path len __agon_copy_path 0 <> if -1 return then
+  0 -> var fd :i
+  begin
+    fd 8 < if __agon_handles fd a+ u8@ 0 <> else false then
+  while
+    1 +-> fd
+  repeat
+  fd 8 >= if -1 return then
+  0 -> var h :i
+  0 -> var smode :i
+  mode 0 = if
+    __agon_path 1 __mos_fopen -> h
+    1 -> smode
+  else mode 1 = if
+    __agon_path 11 __mos_fopen -> h
+    3 -> smode
+  else mode 2 = if
+    __agon_path 3 __mos_fopen -> h
+    h 0 = if __agon_path 11 __mos_fopen -> h then
+    2 -> smode
+  else
+    __agon_path 3 __mos_fopen -> h
+    3 -> smode
+  then then then
+  h 0 = if -1 return then
+  h __mos_getfil 11 a+ @ -> var sz :i
+  0 -> var pos :i
+  mode 2 = if
+    sz 0 > if
+      h sz __mos_flseek drop
+      sz -> pos
+    then
+  then
+  h __agon_handles fd a+ i8!
+  smode __agon_modes fd a+ i8!
+  pos __agon_pos fd __agon_cell !
+  sz __agon_size fd __agon_cell !
+  fd
+end
+
+fn fsclose ( fd :i -> :i )
+  fd __agon_valid_fd 0 = if -1 return then
+  __agon_handles fd a+ u8@ __mos_fclose drop
+  0 __agon_handles fd a+ i8!
+  0 __agon_modes fd a+ i8!
+  0
+end
+
+fn fsread ( fd :i buf :a len :i -> :i )
+  len 0 < fd __agon_valid_fd 0 = or if -1 return then
+  __agon_modes fd a+ u8@ 2 = if -1 return then
+  len 0 = if 0 return then
+  __agon_handles fd a+ u8@ buf len __mos_fread -> var got :i
+  __agon_pos fd __agon_cell @ got + __agon_pos fd __agon_cell !
+  got
+end
+
+fn fswrite ( fd :i buf :a len :i -> :i )
+  len 0 < fd __agon_valid_fd 0 = or if -1 return then
+  __agon_modes fd a+ u8@ 1 = if -1 return then
+  len 0 = if 0 return then
+  __agon_handles fd a+ u8@ buf len __mos_fwrite -> var put :i
+  __agon_pos fd __agon_cell @ put + -> var npos :i
+  npos __agon_pos fd __agon_cell !
+  npos __agon_size fd __agon_cell @ > if
+    npos __agon_size fd __agon_cell !
+  then
+  put
+end
+
+fn fsseek ( fd :i pos :i -> :i )
+  pos 0 < fd __agon_valid_fd 0 = or if -1 return then
+  __agon_handles fd a+ u8@ pos __mos_flseek 0 <> if -1 return then
+  pos __agon_pos fd __agon_cell !
+  0
+end
+
+fn fspos ( fd :i -> :i )
+  fd __agon_valid_fd 0 = if -1 return then
+  __agon_pos fd __agon_cell @
+end
+
+fn fssize ( fd :i -> :i )
+  fd __agon_valid_fd 0 = if -1 return then
+  __agon_size fd __agon_cell @
+end
+
+fn fsflush ( fd :i -> :i )
+  fd __agon_valid_fd 0 = if -1 return then
+  0
+end
+
+fn fsdelete ( path :a len :i -> :i )
+  __agon_path path len __agon_copy_path 0 <> if -1 return then
+  __agon_path __mos_del 0 <> if -1 else 0 then
+end
+
+fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
+  __agon_path oldp oldlen __agon_copy_path 0 <> if -1 return then
+  __agon_path2 newp newlen __agon_copy_path 0 <> if -1 return then
+  __agon_path2 1 __mos_fopen -> var chk :i
+  chk 0 <> if
+    chk __mos_fclose drop
+    -1 return
+  then
+  __agon_path __agon_path2 __mos_ren 0 <> if -1 else 0 then
+end
+
+var __agon_dirs    :bytes 256
+var __agon_diropen :bytes 4
+var __agon_filinfo :bytes 280
+
+fn __agon_strlen0 ( s :a -> :i )
+  s -> var p :a
+  begin p u8@ 0 <> while p 1 a+ -> p repeat
+  p s adiff
+end
+
+fn __agon_dir_ptr ( dd :i -> :a )
+  __agon_dirs dd 6 << a+
+end
+
+fn fsdiropen ( path :a len :i -> :i )
+  len 0 < len 255 > or if -1 return then
+  0 -> var dd :i
+  begin
+    dd 4 < if __agon_diropen dd a+ u8@ 0 <> else false then
+  while
+    1 +-> dd
+  repeat
+  dd 4 >= if -1 return then
+  len 0 = if
+    46 __agon_path i8!
+    0 __agon_path 1 a+ i8!
+  else
+    __agon_path path len __agon_copy_path 0 <> if -1 return then
+  then
+  dd __agon_dir_ptr -> var dp :a
+  dp 64 0 memfill
+  dp __agon_path __ffs_dopen 0 <> if -1 return then
+  1 __agon_diropen dd a+ i8!
+  dd
+end
+
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+  dd 0 < dd 3 > or max 0 < or if -1 0 0 return then
+  __agon_diropen dd a+ u8@ 0 = if -1 0 0 return then
+  dd __agon_dir_ptr -> var dp :a
+  begin
+    -1
+  while
+    dp __agon_filinfo __ffs_dread 0 <> if -1 0 0 return then
+    __agon_filinfo 22 a+ -> var namep :a
+    namep u8@ 0 = if 0 0 0 return then
+    namep __agon_strlen0 -> var namelen :i
+    namelen 1 = namep u8@ 46 = and if
+      \ skip "."
+    else namelen 2 = namep u8@ 46 = and namep 1 a+ u8@ 46 = and if
+      \ skip ".."
+    else
+      namelen max > if -1 0 0 return then
+      buf namep namelen memcpy
+      __agon_filinfo 8 a+ u8@ -> var attr :i
+      0 -> var flags :i
+      0 -> var sz :i
+      attr 16 and 0 <> if
+        flags 1 or -> flags
+      else
+        __agon_filinfo 3 a+ u8@ 0 <> if
+          8388607 -> sz
+        else
+          __agon_filinfo @ -> sz
+          sz 0 < if 8388607 -> sz then
+        then
+      then
+      attr 1 and 0 <> if flags 2 or -> flags then
+      namelen flags sz return
+    then then
+  repeat
+  0 0 0
+end
+
+fn fsdirclose ( dd :i -> :i )
+  dd 0 < dd 3 > or if -1 return then
+  __agon_diropen dd a+ u8@ 0 = if -1 return then
+  dd __agon_dir_ptr __ffs_dclose drop
+  0 __agon_diropen dd a+ i8!
+  0
+end
+
+fn fsmkdir ( path :a len :i -> :i )
+  __agon_path path len __agon_copy_path 0 <> if -1 return then
+  __agon_path __mos_mkdir 0 <> if -1 else 0 then
+end
+
+fn fsrmdir ( path :a len :i -> :i )
+  __agon_path path len __agon_copy_path 0 <> if -1 return then
+  __agon_path __mos_del 0 <> if -1 else 0 then
+end
