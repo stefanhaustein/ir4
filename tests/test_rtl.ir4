@@ -34,8 +34,8 @@ fn main ( -> :i )
   0xBEEF 4 typehw
   32 emit
 
-  \ mem.ir4: fillchar, memcpy, memcmp
-  buf1 8 65 fillchar
+  \ mem.ir4: memfill, memcpy, memcmp
+  buf1 8 65 memfill
   buf1 u8@ 65 1 assert_eq
   dup 0 <> if return then drop
   buf1 7 a+ u8@ 65 2 assert_eq

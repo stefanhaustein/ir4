@@ -1,6 +1,6 @@
 \ Auto-generated from tools/6502/mem.asm by tools/asm2ir4.py (do not edit manually).
 
-code 6502 fillchar ( dst :a len :i val :i )
+code 6502 memfill ( dst :a len :i val :i )
   0xBD :i8 0 :as 0x85 :i8 0x08 :i8 0xE8 :i8 0xE8 :i8 0xBD :i8 0 :as
   0x85 :i8 0x06 :i8 0xBD :i8 1 :as 0x85 :i8 0x07 :i8 0xE8 :i8 0xE8 :i8
   0xBD :i8 0 :as 0x85 :i8 0x02 :i8 0xBD :i8 1 :as 0x85 :i8 0x03 :i8

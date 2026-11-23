@@ -4,7 +4,7 @@ var __heap_ptr :a
 var __heap_free :a
 
 \ Fill *len* bytes starting at *dst* with byte value *val*
-default fn fillchar ( dst :a len :i val :i )
+default fn memfill ( dst :a len :i val :i )
   begin
     len 0 >
   while

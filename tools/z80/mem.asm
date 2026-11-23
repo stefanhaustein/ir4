@@ -1,7 +1,7 @@
 ; Z80 memory primitives for IR4th (converted via tools/asm2ir4.py).
 ; Uses IY for return address; zero relocations.
 
-; @code fillchar ( dst :a len :i val :i )
+; @code memfill ( dst :a len :i val :i )
     POP IY
     POP DE              ; E = val
     POP BC              ; BC = len

@@ -87,7 +87,7 @@ fn init_sprites ( )
   6  -> var ph :i
   pw sprmaxw > if sprmaxw -> pw then
   ph sprmaxh > if sprmaxh -> ph then
-  pad_pix pw ph * 0 fillchar
+  pad_pix pw ph * 0 memfill
   \ Fancy 24x6 multicolor paddle: rounded corners, red endcaps (1), silver body (2), white highlight (3)
   0 -> var y :i
   begin y ph < while
@@ -103,7 +103,7 @@ fn init_sprites ( )
     repeat
     1 +-> y
   repeat
-  ball_pix 36 0 fillchar
+  ball_pix 36 0 memfill
   \ 6x6 rounded ball with specular hole at (1, 1)
   0 -> y
   begin y 6 < while
@@ -281,7 +281,7 @@ fn main ( )
   3 -> lives
   0 -> score
   -1 -> old_lives
-  old_score 4 0 fillchar
+  old_score 4 0 memfill
   draw_hud
   reset_bricks
   reset_ball

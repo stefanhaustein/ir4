@@ -23,8 +23,8 @@ end
 
 fn __cpm_parse_fcb ( fcb :a path :a len :i -> :i )
   var ch :i
-  fcb 36 0 fillchar
-  fcb 1 a+ 11 32 fillchar
+  fcb 36 0 memfill
+  fcb 1 a+ 11 32 memfill
   0 -> var i :i
   0 -> var drv :i
   len 2 >= if
@@ -103,7 +103,7 @@ fn fsclose ( fd :i -> :i )
     s 165 a+ u8@ -> var pos :i
     pos 0 > if
       pos 128 < if
-        s 36 a+ pos a+ 128 pos - 26 fillchar
+        s 36 a+ pos a+ 128 pos - 26 memfill
       then
       26 s 36 a+ a>i bdos drop
       21 s a>i bdos 0 <> if -1 -> rc then

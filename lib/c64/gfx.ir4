@@ -97,9 +97,9 @@ fn gfxborder ( c :i )
 end
 
 fn gfxclear ( )
-  0xE000 i>a 8000 0 fillchar
+  0xE000 i>a 8000 0 memfill
   __c64_col 15 and -> __c64_bg
-  0xCC00 i>a 1000 __c64_bg fillchar
+  0xCC00 i>a 1000 __c64_bg memfill
 end
 
 \ Clear cnt interior 8-pixel horizontal cells (*8 bytes apart) starting at p; returns updated p.

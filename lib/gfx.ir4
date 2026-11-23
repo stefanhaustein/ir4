@@ -48,11 +48,11 @@ default fn gfxmode ( mode :i )
   __gfx_w termheight * -> var cells :i
   __gfx_depth 8 = if
     cells 1 << heap_alloc -> __gfx_fb
-    __gfx_fb cells 1 << 16 fillchar
+    __gfx_fb cells 1 << 16 memfill
     231 -> __gfx_col
   else
     cells heap_alloc -> __gfx_fb
-    __gfx_fb cells 0 fillchar
+    __gfx_fb cells 0 memfill
     15 -> __gfx_col
   then
   cls
@@ -279,9 +279,9 @@ end
 default fn gfxclear ( )
   __gfx_w termheight * -> var cells :i
   __gfx_depth 8 = if
-    __gfx_fb cells 1 << __gfx_col fillchar
+    __gfx_fb cells 1 << __gfx_col memfill
   else
-    __gfx_fb cells __gfx_col 4 << __gfx_col or fillchar
+    __gfx_fb cells __gfx_col 4 << __gfx_col or memfill
   then
   __gfx_col __gfx_sgr_bg
   cls

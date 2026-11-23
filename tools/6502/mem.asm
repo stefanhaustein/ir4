@@ -9,7 +9,7 @@ L0 = $06
 L1 = $07
 T0 = $08
 
-; @code fillchar ( dst :a len :i val :i )
+; @code memfill ( dst :a len :i val :i )
     LDA STACK+0,X
     STA T0
     INX
