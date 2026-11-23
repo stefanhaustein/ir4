@@ -1,8 +1,9 @@
-\ test_rtl.ir4 - Portable RTL tests (stdio.ir4, mem.ir4)
+\ test_rtl.ir4 - Portable RTL tests (stdio.ir4, mem.ir4, heap.ir4)
 \ Expected main() output ends with 0 (return code)
 
 require "stdio.ir4"
 require "mem.ir4"
+require "heap.ir4"
 
 data s_exp "HiWorld" 0 :i8 end
 data c_msg "RTL:" 0 :i8 end
@@ -57,19 +58,19 @@ fn main ( -> :i )
   buf2 6 a+ u8@ 114 16 assert_eq
   dup 0 <> if return then drop
 
-  \ heap_alloc / heap_free (with coalescing) / heap_reset
-  10 heap_alloc -> p1
-  4 heap_alloc -> p2
+  \ heap.ir4: heapalloc / heapfree (with coalescing) / heapreset
+  10 heapalloc -> p1
+  4 heapalloc -> p2
   p2 p1 adiff 24 5 assert_eq
   dup 0 <> if return then drop
   p1 __heap_start 8 a+ a= -1 6 assert_eq
   dup 0 <> if return then drop
-  p1 heap_free
-  p2 heap_free
-  32 heap_alloc p1 a= -1 7 assert_eq
+  p1 heapfree
+  p2 heapfree
+  32 heapalloc p1 a= -1 7 assert_eq
   dup 0 <> if return then drop
-  heap_reset
-  8 heap_alloc p1 a= -1 14 assert_eq
+  heapreset
+  8 heapalloc p1 a= -1 14 assert_eq
   dup 0 <> if return then drop
 
   cr

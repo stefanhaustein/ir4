@@ -12,6 +12,7 @@ OUT_PATH = DOCS_DIR / "README.md"
 ORDER = [
     "stdio.ir4",
     "mem.ir4",
+    "heap.ir4",
     "math.ir4",
     "i32.ir4",
     "gfx.ir4",

@@ -1,7 +1,4 @@
-\ mem.ir4 - Memory operations and first-fit heap allocator starting at __heap_start
-
-var __heap_ptr :a
-var __heap_free :a
+\ mem.ir4 - Portable byte-slice memory operations
 
 \ Fill *len* bytes starting at *dst* with byte value *val*
 default fn memfill ( dst :a len :i val :i )
@@ -51,71 +48,4 @@ default fn memcmp ( a :a b :a len :i -> :i )
     -1 +-> len
   repeat
   0
-end
-
-\ Reset the heap to empty (invalidates all prior allocations)
-fn heap_reset ( )
-  __heap_start -> __heap_ptr
-  0 i>a -> __heap_free
-end
-
-\ Allocate at least *bytes* bytes on the heap; returns block address
-fn heap_alloc ( bytes :i -> :a )
-  __heap_ptr 0 i>a a= if __heap_start -> __heap_ptr then
-  bytes 8 < if 8 -> bytes then
-  bytes 7 + -8 and 8 + -> var need :i
-  0 i>a -> var prev :a
-  __heap_free -> var cur :a
-  begin
-    cur 0 i>a a<>
-  while
-    cur @ -> var bsz :i
-    bsz need >= if
-      cur 8 a+ a@ -> var nxt :a
-      bsz need - -> var rem :i
-      rem 16 >= if
-        cur need a+ -> var split :a
-        rem split !
-        nxt split 8 a+ a!
-        need cur !
-        split -> nxt
-      then
-      prev 0 i>a a= if nxt -> __heap_free else nxt prev 8 a+ a! then
-      cur 8 a+ return
-    then
-    cur -> prev
-    cur 8 a+ a@ -> cur
-  repeat
-  __heap_ptr -> cur
-  need cur !
-  cur need a+ -> __heap_ptr
-  cur 8 a+
-end
-
-\ Free block *p* previously returned by heap_alloc (coalesces adjacent free blocks)
-fn heap_free ( p :a )
-  p 0 i>a a= if return then
-  p 8 a- -> var blk :a
-  0 i>a -> var prev :a
-  __heap_free -> var cur :a
-  begin
-    cur 0 i>a a<> if cur blk a< else 0 then
-  while
-    cur -> prev
-    cur 8 a+ a@ -> cur
-  repeat
-  cur blk 8 a+ a!
-  prev 0 i>a a= if blk -> __heap_free else blk prev 8 a+ a! then
-  cur 0 i>a a<> if
-    blk blk @ a+ cur a= if
-      blk @ cur @ + blk !
-      cur 8 a+ a@ blk 8 a+ a!
-    then
-  then
-  prev 0 i>a a<> if
-    prev prev @ a+ blk a= if
-      prev @ blk @ + prev !
-      blk 8 a+ a@ prev 8 a+ a!
-    then
-  then
 end

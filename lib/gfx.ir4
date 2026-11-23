@@ -3,6 +3,7 @@
 
 require "stdio.ir4"
 require "mem.ir4"
+require "heap.ir4"
 
 var __gfx_def_modes :bytes 16
 var __gfx_w :i
@@ -44,14 +45,14 @@ default fn gfxmode ( mode :i )
   mode 1 = if 8 else 4 then -> __gfx_depth
   termwidth -> __gfx_w
   termheight 1 << -> __gfx_h
-  __gfx_fb 0 i>a a<> if __gfx_fb heap_free then
+  __gfx_fb 0 i>a a<> if __gfx_fb heapfree then
   __gfx_w termheight * -> var cells :i
   __gfx_depth 8 = if
-    cells 1 << heap_alloc -> __gfx_fb
+    cells 1 << heapalloc -> __gfx_fb
     __gfx_fb cells 1 << 16 memfill
     231 -> __gfx_col
   else
-    cells heap_alloc -> __gfx_fb
+    cells heapalloc -> __gfx_fb
     __gfx_fb cells 0 memfill
     15 -> __gfx_col
   then
@@ -61,7 +62,7 @@ end
 \ Restore text mode and release graphics resources
 default fn gfxdone ( )
   __gfx_fb 0 i>a a<> if
-    __gfx_fb heap_free
+    __gfx_fb heapfree
     0 i>a -> __gfx_fb
   then
   27 emit 91 emit 48 emit 109 emit
