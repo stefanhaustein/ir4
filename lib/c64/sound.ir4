@@ -3,15 +3,6 @@
 var __c64_sfx_tmr  :bytes 6
 var __c64_sfx_ctrl :bytes 3
 
-init
-  0 -> var ch :i
-  begin ch 3 < while
-    0 __c64_sfx_tmr ch 1 << a+ i16!
-    0 __c64_sfx_ctrl ch a+ i8!
-    1 +-> ch
-  repeat
-end
-
 data __c64_sfx_waves
   0x41 :i8 0x21 :i8 0x11 :i8 0x81 :i8
 end

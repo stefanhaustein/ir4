@@ -91,8 +91,12 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
 
     cb_patch16(c64_jmp_pc, entry_addr);
 
-    /* CLD; LDX #init_x (initialize IR4th data stack without clobbering hardware SP) */
+    /* CLD; zero BSS; LDX #init_x (initialize IR4th data stack without clobbering hardware SP) */
     cb_emit8(M6502_CLD);
+    if (sig->out_types.len == 1 && be_6502_stack_zp_base() == 0) {
+        (void)be_6502_stack_data_off();
+    }
+    be_6502_emit_zero_bss(tmp_lo, tmp_hi);
     cb_emit8_8(M6502_LDX_IMM, be_6502_stack_zp_init_x());
 
     /* JSR main */

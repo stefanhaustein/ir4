@@ -24,6 +24,7 @@ static void cpm_end(int main_idx) {
     }
 
     cb_patch16(1, entry_addr);
+    be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
 
     if (sig->out_types.len == 1) {

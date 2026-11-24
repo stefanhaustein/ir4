@@ -5,15 +5,6 @@ require "graphics.ir4"
 var __agon_spr_init :i
 var __agon_spr_vis :bytes 64
 
-init
-  0 -> __agon_spr_init
-  0 -> var i :i
-  begin i 64 < while
-    0 __agon_spr_vis i a+ i8!
-    1 +-> i
-  repeat
-end
-
 data __agon_spr_pal
   0   :i8   0 :i8   0 :i8 255 :i8
   170 :i8   0 :i8   0 :i8 255 :i8

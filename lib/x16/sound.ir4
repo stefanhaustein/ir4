@@ -2,14 +2,6 @@
 
 var __x16_sfx_tmr :bytes 32
 
-init
-  0 -> var ch :i
-  begin ch 16 < while
-    0 __x16_sfx_tmr ch 1 << a+ i16!
-    1 +-> ch
-  repeat
-end
-
 data __x16_sfx_waves
   0x3F :i8 0x7F :i8 0xBF :i8 0xFF :i8
 end

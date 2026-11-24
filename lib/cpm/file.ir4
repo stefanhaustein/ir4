@@ -278,15 +278,6 @@ var __cpm_dirfcb :bytes 36
 var __cpm_dirbuf :bytes 128
 var __cpm_diropen :bytes 1
 
-init
-  0 -> var i :i
-  begin i 4 < while
-    0 i __cpm_slot 164 a+ i8!
-    1 +-> i
-  repeat
-  0 __cpm_diropen i8!
-end
-
 fn fsdiropen ( path :a len :i -> :i )
   __cpm_diropen u8@ 0 <> if -1 return then
   0 -> var drv :i

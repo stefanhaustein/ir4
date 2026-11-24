@@ -3231,6 +3231,50 @@ static void ensure_6502_vm(void) {
     m6502_compact = 1;
 }
 
+void be_6502_emit_zero_bss(u8 zp_lo, u8 zp_hi) {
+    size_t bss_off;
+    size_t bss_sz;
+    u16 lo_off, hi_off, loop_pc;
+
+    (void)cb_alloc_data(0, 2);
+    bss_off = cb_init_data_size();
+    bss_sz = cb_data_size() - bss_off;
+    if (bss_sz == 0) {
+        return;
+    }
+
+    cb_emit8(M6502_LDA_IMM);
+    lo_off = (u16)cb_pc();
+    cb_emit8(0x00);
+    cb_emit8_8(M6502_STA_ZP, zp_lo);
+    cb_emit8(M6502_LDA_IMM);
+    hi_off = (u16)cb_pc();
+    cb_emit8(0x00);
+    cb_emit8_8(M6502_STA_ZP, zp_hi);
+    cb_add_data_reloc_split(lo_off, hi_off, bss_off);
+
+    cb_emit8_8(M6502_LDA_IMM, 0x00);
+    if ((bss_sz >> 8) > 0) {
+        cb_emit8_8(M6502_LDX_IMM, (u8)(bss_sz >> 8));
+        cb_emit8_8(M6502_LDY_IMM, 0x00);
+        loop_pc = (u16)cb_pc();
+        cb_emit8_8(M6502_STA_INDY, zp_lo);
+        cb_emit8(M6502_INY);
+        cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+        cb_emit8_8(M6502_INC_ZP, zp_hi);
+        cb_emit8(M6502_DEX);
+        cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+    }
+    if ((bss_sz & 0xFF) > 0) {
+        cb_emit8_8(M6502_LDY_IMM, 0x00);
+        loop_pc = (u16)cb_pc();
+        cb_emit8_8(M6502_STA_INDY, zp_lo);
+        cb_emit8(M6502_INY);
+        cb_emit8_8(0xC0, (u8)(bss_sz & 0xFF)); /* CPY #imm */
+        cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
+    }
+}
+
 const Backend be_6502 = {"6502",
                          2,
                          2,

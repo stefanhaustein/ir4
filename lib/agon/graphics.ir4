@@ -20,13 +20,6 @@ var __gh :i
 var __gd :i
 var __agon_spr_active :i
 
-init
-  0 -> __gw
-  0 -> __gh
-  0 -> __gd
-  0 -> __agon_spr_active
-end
-
 fn __vdu16 ( v :i )
   v 255 and emit
   v 8 >> 255 and emit

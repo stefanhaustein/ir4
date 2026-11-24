@@ -20,6 +20,7 @@ static void zx81_end(int main_idx) {
     }
 
     cb_patch16(1, entry_addr);
+    be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
     if (sig->out_types.len == 1) {
         cb_emit8(0xC1); /* POP BC (return value for RAND USR) */
@@ -108,7 +109,11 @@ static int zx81_write(FILE *fp, size_t base) {
     if (!cb_write_raw(fp, 1)) {
         return 0;
     }
-    (void)bss_sz;
+    while (bss_sz-- > 0) {
+        if (fputc(0x00, fp) == EOF) {
+            return 0;
+        }
+    }
 
     /* Expanded 32x24 D_FILE (793 bytes) */
     memset(dfile, 0x00, sizeof(dfile));

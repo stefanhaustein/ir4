@@ -14,9 +14,6 @@ var __cpm_h :i
 var __cpm_col :i
 
 init
-  __cpm_fb 2048 0 memfill
-  0 -> __cpm_w
-  0 -> __cpm_h
   7 -> __cpm_col
 end
 

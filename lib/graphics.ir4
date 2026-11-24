@@ -13,11 +13,8 @@ var __gfx_depth :i
 var __gfx_fb :a
 
 init
-  0 -> __gfx_w
-  0 -> __gfx_h
   15 -> __gfx_col
   4 -> __gfx_depth
-  0 i>a -> __gfx_fb
 end
 
 \ Returns (addr, count) of :i16 4-tuples: (mode, width, height, depth_bpp)

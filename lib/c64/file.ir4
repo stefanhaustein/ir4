@@ -82,12 +82,6 @@ var __c64_cmdopen :bytes 1
 var __c64_name    :bytes 64
 var __c64_status  :bytes 48
 
-init
-  __c64_fmode 4 0 memfill
-  0 __c64_diropen i8!
-  0 __c64_cmdopen i8!
-end
-
 fn __c64_to_petscii ( dst :a src :a len :i )
   0 -> var i :i
   begin i len < while

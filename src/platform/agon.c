@@ -46,6 +46,30 @@ static void agon_end(int main_idx) {
     cb_emit8(0x43);
     cb_emit24((u32)(agon_base + 0x3D));
 
+    /* Zero BSS segment before setting return stack pointer */
+    {
+        size_t bss_off;
+        size_t bss_sz;
+        (void)cb_alloc_data(0, 3);
+        bss_off = cb_init_data_size();
+        bss_sz = cb_data_size() - bss_off;
+        if (bss_sz > 0) {
+            cb_emit8(EZ80_LD_HL_N24);
+            cb_add_data_reloc24(cb_pc(), bss_off);
+            cb_emit24(0);
+            cb_emit8_8(0x36, 0x00); /* LD (HL), 0 */
+            if (bss_sz > 1) {
+                cb_emit8(EZ80_LD_DE_N24);
+                cb_add_data_reloc24(cb_pc(), bss_off + 1);
+                cb_emit24(0);
+                cb_emit8(EZ80_LD_BC_N24);
+                cb_emit24((u32)(bss_sz - 1));
+                cb_emit8(EZ80_ED);
+                cb_emit8(EZ80_ED_LDIR);
+            }
+        }
+    }
+
     /* Initialize BSS return stack pointer */
     cb_emit8(EZ80_LD_HL_N24);
     cb_add_data_reloc24(cb_pc(), rtop_off);

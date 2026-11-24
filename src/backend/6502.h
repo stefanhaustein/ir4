@@ -71,6 +71,7 @@ enum {
 void be_6502_set_ram_top(u16 top);
 void be_6502_set_default_stack_zp(u8 base, u8 init_x);
 u8 be_6502_stack_zp_init_x(void);
+void be_6502_emit_zero_bss(u8 zp_lo, u8 zp_hi);
 
 void be_6502_cbm_begin(size_t base, int is_x16);
 void be_6502_cbm_end(int main_idx, int is_x16);

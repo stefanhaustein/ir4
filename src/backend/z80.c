@@ -1891,6 +1891,32 @@ static void z80_icall(void) {
     z80_call(rt_icall_addr);
 }
 
+void be_z80_emit_zero_bss(void) {
+    size_t bss_off;
+    size_t bss_sz;
+
+    (void)cb_alloc_data(0, 2);
+    bss_off = cb_init_data_size();
+    bss_sz = cb_data_size() - bss_off;
+    if (bss_sz == 0) {
+        return;
+    }
+
+    cb_emit8(Z80_LD_HL_NN);
+    cb_add_data_reloc(cb_pc(), bss_off);
+    cb_emit16(0x0000);
+    cb_emit8_8(0x36, 0x00); /* LD (HL), 0 */
+    if (bss_sz > 1) {
+        cb_emit8(Z80_LD_DE_NN);
+        cb_add_data_reloc(cb_pc(), bss_off + 1);
+        cb_emit16(0x0000);
+        cb_emit8(Z80_LD_BC_NN);
+        cb_emit16((u16)(bss_sz - 1));
+        cb_emit8(0xED);
+        cb_emit8(0xB0); /* LDIR */
+    }
+}
+
 const Backend be_z80 = {"z80",
                         2,
                         2,

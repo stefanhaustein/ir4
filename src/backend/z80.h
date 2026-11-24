@@ -99,4 +99,6 @@ enum {
     Z80_RET = 0xC9
 };
 
+void be_z80_emit_zero_bss(void);
+
 #endif /* BE_Z80_H */

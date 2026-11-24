@@ -3,11 +3,6 @@
 var __heap_ptr :a
 var __heap_free :a
 
-init
-  __heap_start -> __heap_ptr
-  0 i>a -> __heap_free
-end
-
 \ Reset the heap to empty (invalidates all prior allocations)
 default fn heapreset ( )
   __heap_start -> __heap_ptr

@@ -31,7 +31,6 @@ var __c64_bg :i
 
 init
   1 -> __c64_col
-  0 -> __c64_bg
 end
 
 \ Map RAM underneath KERNAL ROM ($E000-$FFFF) with IRQs disabled

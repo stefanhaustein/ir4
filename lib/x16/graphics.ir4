@@ -13,8 +13,6 @@ var __x16_h :i
 
 init
   15 -> __x16_col
-  0 -> __x16_w
-  0 -> __x16_h
 end
 
 code x16 __x16_mode_gfx ( )

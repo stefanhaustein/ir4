@@ -51,10 +51,14 @@ static void sim_end(int main_idx) {
     /* Patch the initial JMP 0x0000 at offset 0 (base + 1) to jump here */
     cb_patch16(1, entry_addr);
 
-    /* CLD; LDX #$FF; TXS; LDX #init_x */
+    /* CLD; LDX #$FF; TXS; zero BSS; LDX #init_x */
     cb_emit8(M6502_CLD);
+    if (sig->out_types.len == 1) {
+        (void)be_6502_stack_data_off();
+    }
     cb_emit8_8(M6502_LDX_IMM, 0xFF);
     cb_emit8(M6502_TXS);
+    be_6502_emit_zero_bss(0x04, 0x05);
     cb_emit8_8(M6502_LDX_IMM, be_6502_stack_zp_init_x());
 
     /* JSR main */
