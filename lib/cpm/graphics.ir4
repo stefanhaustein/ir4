@@ -1,4 +1,4 @@
-\ cpm/gfx.ir4 - CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
+\ cpm/graphics.ir4 - CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
 
 require "stdio.ir4"
 

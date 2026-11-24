@@ -1,4 +1,4 @@
-\ lib/agon/joy.ir4 - Agon Light keyboard-mapped joystick (via MOS sysvars inkey)
+\ lib/agon/joystick.ir4 - Agon Light keyboard-mapped joystick (via MOS sysvars inkey)
 
 require "stdio.ir4"
 

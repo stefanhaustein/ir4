@@ -1,4 +1,4 @@
-\ c64/gfx.ir4 - Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 (`$C000-$FFFF`)
+\ c64/graphics.ir4 - Commodore 64 VIC-II Hires Bitmap (320x200) in VIC Bank 3 (`$C000-$FFFF`)
 \
 \ Memory layout:
 \ - `$0801-$CBFF` (~49 KB): Unbroken Code + BSS + Heap + bfp frame stack (`ram_top = $CC00`)
@@ -15,7 +15,7 @@
 \ gfxcolor <> bg sets bitmap bits and updates the 8x8 cell's foreground (high) nibble in
 \ `$CC00` while preserving its background nibble (ZX Spectrum-style attribute clash).
 
-require "mem.ir4"
+require "memory.ir4"
 require "stdio.ir4"
 
 data __c64_modes

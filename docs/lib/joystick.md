@@ -1,6 +1,6 @@
-# joy
+# joystick
 
-[← Library Index](README.md) · Source: [lib/joy.ir4](../../lib/joy.ir4)
+[← Library Index](README.md) · Source: [lib/joystick.ir4](../../lib/joystick.ir4)
 
 Joystick and gamepad input (optional override per platform)
 Bitmask returned by joystate:

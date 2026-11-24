@@ -1,6 +1,6 @@
-# gfx
+# graphics
 
-[← Library Index](README.md) · Source: [lib/gfx.ir4](../../lib/gfx.ir4)
+[← Library Index](README.md) · Source: [lib/graphics.ir4](../../lib/graphics.ir4)
 
 Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 Platform overrides implement the `default fn` entries below.

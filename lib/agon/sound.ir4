@@ -1,4 +1,4 @@
-\ lib/agon/sfx.ir4 - Agon VDP sound effects (VDU 23, 0, &85)
+\ lib/agon/sound.ir4 - Agon VDP sound effects (VDU 23, 0, &85)
 
 require "stdio.ir4"
 

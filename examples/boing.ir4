@@ -1,10 +1,10 @@
-\ Amiga Boing Ball demo using portable gfx.ir4 + sprite.ir4 (Agon Light & Commander X16)
+\ Amiga Boing Ball demo using portable graphics.ir4 + sprite.ir4 (Agon Light & Commander X16)
 \ Procedurally generates 8 rotation frames of a 64x64 tilted checkered sphere
 \ using 16-bit integer isqrt + atan LUT, uploads them via sprimg/sprset, and bounces at 60 fps.
 
 require "stdio.ir4"
 require "sprite.ir4"
-require "sfx.ir4"
+require "sound.ir4"
 
 var ilat_buf :bytes 4096
 var ilon_buf :bytes 4096

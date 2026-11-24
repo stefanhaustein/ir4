@@ -1,9 +1,9 @@
-\ Telefunken FuBK-inspired TV test card using gfx.ir4
+\ Telefunken FuBK-inspired TV test card using graphics.ir4
 \ Centered grid, overlapping outer gfxcircle, 8 EBU bars, 7-step gray,
 \ center black bar + frequency grating + amber + pointer, and RGB/gray gradients.
 
 require "stdio.ir4"
-require "gfx.ir4"
+require "graphics.ir4"
 
 var w :i
 var h :i

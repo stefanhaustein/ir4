@@ -1,4 +1,4 @@
-\ lib/arm64/sys.ir4 - macOS ARM64 JIT system, CLI args, environment, CWD, and clock
+\ lib/arm64/system.ir4 - macOS ARM64 JIT system, CLI args, environment, CWD, and clock
 
 require "i32.ir4"
 

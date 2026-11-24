@@ -1,8 +1,8 @@
-\ Cross-platform 6-bit fixed-point Mandelbrot set using gfx.ir4
+\ Cross-platform 6-bit fixed-point Mandelbrot set using graphics.ir4
 \ 1.0 = 64 (fits safely in 16-bit :i on 6502/Z80 as well as 24/32/64-bit targets)
 
 require "stdio.ir4"
-require "gfx.ir4"
+require "graphics.ir4"
 
 var pal :bytes 64
 

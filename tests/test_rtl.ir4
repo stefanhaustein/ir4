@@ -1,8 +1,8 @@
-\ test_rtl.ir4 - Portable RTL tests (stdio.ir4, mem.ir4, heap.ir4)
+\ test_rtl.ir4 - Portable RTL tests (stdio.ir4, memory.ir4, heap.ir4)
 \ Expected main() output ends with 0 (return code)
 
 require "stdio.ir4"
-require "mem.ir4"
+require "memory.ir4"
 require "heap.ir4"
 
 data s_exp "HiWorld" 0 :i8 end
@@ -35,7 +35,7 @@ fn main ( -> :i )
   0xBEEF 4 typehw
   32 emit
 
-  \ mem.ir4: memfill, memcpy, memcmp
+  \ memory.ir4: memfill, memcpy, memcmp
   buf1 8 65 memfill
   buf1 u8@ 65 1 assert_eq
   dup 0 <> if return then drop

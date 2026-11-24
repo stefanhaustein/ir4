@@ -20,7 +20,7 @@
 ## Assumptions & Notes
 
 - **Terminal (`lib/cpm/stdio.ir4`):** VT52 cursor/screen control on `80×24`.
-- **Graphics (`lib/cpm/gfx.ir4`):** `80×24` VT52 ASCII luminance (`" .:+*%#@"`, 8 shades, `gfxdepth = 3`).
+- **Graphics (`lib/cpm/graphics.ir4`):** `80×24` VT52 ASCII luminance (`" .:+*%#@"`, 8 shades, `gfxdepth = 3`).
 - **Running in `tnylpo`:**
   ```sh
   tnylpo out.com

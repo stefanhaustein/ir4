@@ -1,4 +1,4 @@
-\ lib/c64/sfx.ir4 - Commodore 64 SID sound effects (3 voices at $D400)
+\ lib/c64/sound.ir4 - Commodore 64 SID sound effects (3 voices at $D400)
 
 var __c64_sfx_tmr  :bytes 6
 var __c64_sfx_ctrl :bytes 3

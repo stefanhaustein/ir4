@@ -1,6 +1,6 @@
 \ lib/c64/sprite.ir4 - Commodore 64 VIC-II hardware sprites (hires 24x21 or multicolor 12x21, 1x scale)
 
-require "gfx.ir4"
+require "graphics.ir4"
 
 var __c64_spr_vis :i
 var __c64_img_mc  :bytes 48

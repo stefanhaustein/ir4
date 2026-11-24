@@ -1,6 +1,6 @@
-\ Test lib/sfx.ir4 (sfxcount, sfxplay, sfxtick, sfxstop, bounds guards)
+\ Test lib/sound.ir4 (sfxcount, sfxplay, sfxtick, sfxstop, bounds guards)
 
-require "sfx.ir4"
+require "sound.ir4"
 
 fn main ( -> :i )
   sfxcount -> var cnt :i

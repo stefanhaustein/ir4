@@ -1,6 +1,6 @@
-\ Test lib/gfx.ir4 (modes, init, colors, pixels, lines, shapes, text, sync)
+\ Test lib/graphics.ir4 (modes, init, colors, pixels, lines, shapes, text, sync)
 
-require "gfx.ir4"
+require "graphics.ir4"
 
 data s_gfx "GFX" end
 

@@ -1,6 +1,6 @@
 \ lib/cpm/file.ir4 - CP/M BDOS random/sequential file I/O (4 static FCB + 128-byte slots)
 
-require "mem.ir4"
+require "memory.ir4"
 require "stdio.ir4"
 
 \ CP/M BDOS stores file lengths in 128-byte records

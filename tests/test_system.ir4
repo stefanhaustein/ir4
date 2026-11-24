@@ -1,6 +1,6 @@
-\ Test lib/sys.ir4 (sysargc, sysargv, sysenv, sysenv0, syscwd, sysmillis, syssleep)
+\ Test lib/system.ir4 (sysargc, sysargv, sysenv, sysenv0, syscwd, sysmillis, syssleep)
 
-require "sys.ir4"
+require "system.ir4"
 
 data str_alpha    "ALPHA" end
 data str_beta     "BETA"  end

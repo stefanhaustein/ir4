@@ -1,6 +1,6 @@
 \ lib/sprite.ir4 - Hardware sprites (optional override per platform)
 
-require "gfx.ir4"
+require "graphics.ir4"
 
 \ Number of hardware sprite slots (0 = hardware sprites unsupported)
 default const sprcount 0 :i

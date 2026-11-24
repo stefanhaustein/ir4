@@ -1,4 +1,4 @@
-\ lib/cpm/sys.ir4 - CP/M BDOS CLI arguments and current drive letter
+\ lib/cpm/system.ir4 - CP/M BDOS CLI arguments and current drive letter
 
 require "i32.ir4"
 

@@ -1,6 +1,6 @@
 \ lib/x16/file.ir4 - Commander X16 KERNAL / CMDR-DOS file & directory I/O
 
-require "mem.ir4"
+require "memory.ir4"
 
 \ CMDR-DOS $=L provides exact 1-byte file sizes
 const fsgranularity 1 :i

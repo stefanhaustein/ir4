@@ -11,14 +11,16 @@ OUT_PATH = DOCS_DIR / "README.md"
 
 ORDER = [
     "stdio.ir4",
-    "mem.ir4",
+    "memory.ir4",
     "heap.ir4",
     "math.ir4",
     "i32.ir4",
-    "gfx.ir4",
+    "graphics.ir4",
     "sprite.ir4",
-    "sfx.ir4",
-    "joy.ir4",
+    "sound.ir4",
+    "joystick.ir4",
+    "file.ir4",
+    "system.ir4",
 ]
 
 PLATFORMS = sorted(["c64", "x16", "agon", "zx81", "cpm"])

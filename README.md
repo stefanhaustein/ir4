@@ -28,7 +28,7 @@ fn main ( -> :i )
 end
 ```
 
-Typed memory loop & recursion ([tests/test_fib.ir4](tests/test_fib.ir4), [lib/mem.ir4](lib/mem.ir4)):
+Typed memory loop & recursion ([tests/test_fib.ir4](tests/test_fib.ir4), [lib/memory.ir4](lib/memory.ir4)):
 
 ```forth
 fn fib ( n :i -> :i )

@@ -1,4 +1,4 @@
-\ lib/zx81/gfx.ir4 - Sinclair ZX81 64x48 block-mosaic pixel graphics in D_FILE
+\ lib/zx81/graphics.ir4 - Sinclair ZX81 64x48 block-mosaic pixel graphics in D_FILE
 
 require "stdio.ir4"
 

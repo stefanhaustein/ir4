@@ -1,7 +1,7 @@
-\ lib/x16/sys.ir4 - Commander X16 KERNAL system clock, sleep, and CMDR-DOS CWD
+\ lib/x16/system.ir4 - Commander X16 KERNAL system clock, sleep, and CMDR-DOS CWD
 
 require "i32.ir4"
-require "mem.ir4"
+require "memory.ir4"
 
 \ __x16sys_rdtim32 ( -> :i32 )  RDTIM $FFDE: A=LSB, X=mid, Y=MSB -> 4-byte :i32
 code x16 __x16sys_rdtim32 ( -> :i32 )

@@ -1,8 +1,8 @@
-\ gfx.ir4 - Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
+\ graphics.ir4 - Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 \ Platform overrides implement the `default fn` entries below.
 
 require "stdio.ir4"
-require "mem.ir4"
+require "memory.ir4"
 require "heap.ir4"
 
 var __gfx_def_modes :bytes 16

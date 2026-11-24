@@ -1,6 +1,6 @@
 \ lib/agon/file.ir4 - Agon Light MOS file I/O (8 open file slots via RST.LIL $08)
 
-require "mem.ir4"
+require "memory.ir4"
 
 \ __mos_del ( path0 :a -> :i )  MOS $05: HL=path0 -> A=status (0=ok)
 code agon __mos_del ( path0 :a -> :i )

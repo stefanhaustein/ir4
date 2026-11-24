@@ -1,4 +1,4 @@
-\ agon/gfx.ir4 - Agon VDP stateful graphics
+\ agon/graphics.ir4 - Agon VDP stateful graphics
 
 require "stdio.ir4"
 

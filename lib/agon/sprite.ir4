@@ -1,6 +1,6 @@
 \ lib/agon/sprite.ir4 - Agon VDP hardware sprites
 
-require "gfx.ir4"
+require "graphics.ir4"
 
 var __agon_spr_init :i
 var __agon_spr_vis :bytes 64

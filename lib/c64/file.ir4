@@ -1,6 +1,6 @@
 \ lib/c64/file.ir4 - Commodore 64 KERNAL / 1541 sequential file & directory I/O
 
-require "mem.ir4"
+require "memory.ir4"
 
 \ CBM 1541 DOS reports directory sizes in 254-byte blocks
 const fsgranularity 254 :i

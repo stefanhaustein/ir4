@@ -1,6 +1,6 @@
-\ Test lib/joy.ir4 (joycount, joystate, out-of-range ports, keyboard port -1)
+\ Test lib/joystick.ir4 (joycount, joystate, out-of-range ports, keyboard port -1)
 
-require "joy.ir4"
+require "joystick.ir4"
 
 fn main ( -> :i )
   joycount -> var cnt :i

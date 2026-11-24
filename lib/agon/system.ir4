@@ -1,4 +1,4 @@
-\ lib/agon/sys.ir4 - Agon Light MOS system, CLI args, CWD, and millisecond clock
+\ lib/agon/system.ir4 - Agon Light MOS system, CLI args, CWD, and millisecond clock
 
 require "i32.ir4"
 

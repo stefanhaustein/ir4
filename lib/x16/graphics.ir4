@@ -1,4 +1,4 @@
-\ x16/gfx.ir4 - Commander X16 VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
+\ x16/graphics.ir4 - Commander X16 VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
 
 require "stdio.ir4"
 

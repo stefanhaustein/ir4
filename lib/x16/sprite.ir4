@@ -1,6 +1,6 @@
 \ lib/x16/sprite.ir4 - Commander X16 VERA 8-bpp hardware sprites
 
-require "gfx.ir4"
+require "graphics.ir4"
 
 data __x16_spr_u_buf
   0 :i16

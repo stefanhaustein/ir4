@@ -1,10 +1,10 @@
-\ Brick Breaker game using portable gfx.ir4, sprite.ir4, sfx.ir4, and joy.ir4
+\ Brick Breaker game using portable graphics.ir4, sprite.ir4, sound.ir4, and joystick.ir4
 \ Controls: Left/Right to move paddle, Fire/Button 1 (Space/Z on Agon) to launch.
 
 require "stdio.ir4"
 require "sprite.ir4"
-require "sfx.ir4"
-require "joy.ir4"
+require "sound.ir4"
+require "joystick.ir4"
 
 var bricks     :bytes 50
 var pad_pal    :bytes 3

@@ -1,4 +1,4 @@
-\ lib/c64/sys.ir4 - Commodore 64 KERNAL system clock and sleep
+\ lib/c64/system.ir4 - Commodore 64 KERNAL system clock and sleep
 
 require "i32.ir4"
 

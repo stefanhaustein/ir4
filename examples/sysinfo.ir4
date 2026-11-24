@@ -1,10 +1,10 @@
 \ System & Input Diagnostics — prints all queryable capabilities, charset, colors, and live state
 
 require "stdio.ir4"
-require "gfx.ir4"
+require "graphics.ir4"
 require "sprite.ir4"
-require "sfx.ir4"
-require "joy.ir4"
+require "sound.ir4"
+require "joystick.ir4"
 
 data s_title  "IR4th Diagnostics (" 0 :i8 end
 data s_quit   ":quit)" 0 :i8 end

@@ -1,6 +1,6 @@
-# sys
+# system
 
-[← Library Index](README.md) · Source: [lib/sys.ir4](../../lib/sys.ir4)
+[← Library Index](README.md) · Source: [lib/system.ir4](../../lib/system.ir4)
 
 Portable system, CLI arguments, environment, CWD, and clock API
 

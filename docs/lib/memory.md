@@ -1,6 +1,6 @@
-# mem
+# memory
 
-[← Library Index](README.md) · Source: [lib/mem.ir4](../../lib/mem.ir4)
+[← Library Index](README.md) · Source: [lib/memory.ir4](../../lib/memory.ir4)
 
 Portable byte-slice memory operations
 

@@ -1,6 +1,6 @@
 \ lib/arm64/file.ir4 - File I/O via C stdio
 
-require "mem.ir4"
+require "memory.ir4"
 
 extern fopen ( path0 :a mode0 :a -> :a )
 extern fclose ( fp :a -> :i )

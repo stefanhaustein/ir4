@@ -128,8 +128,8 @@ require "<filename>"
 
 * `<filename>` is resolved by searching roots in order: the directory of the file containing `require`, any `-I <dir>` directories in CLI order, and finally the compiler's `lib/` roots.
 * Within the **first root** that contains at least one match, all matching specificity levels are loaded under a shared `require` group (most-specific parsed first):
-  1. `<root>/<platform>/<filename>` (e.g. `c64/stdio.ir4`, `x16/gfx.ir4`, `agon/stdio.ir4`)
-  2. `<root>/<cpu>/<filename>` (e.g. `6502/i32.ir4`, `z80/mem.ir4`, `ez80/...`)
+  1. `<root>/<platform>/<filename>` (e.g. `c64/stdio.ir4`, `x16/graphics.ir4`, `agon/stdio.ir4`)
+  2. `<root>/<cpu>/<filename>` (e.g. `6502/i32.ir4`, `z80/memory.ir4`, `ez80/...`)
   3. `<root>/<filename>` (portable fallback)
 * Functions declared with `default fn` and constants declared with `default const` may be overridden within the same `require` group by a non-default definition with a matching signature or type (including 1:1 `default const` ↔ `fn ( -> :<type> )` overrides). Overrides outside that `require` group, duplicate `default` declarations, and duplicate non-default definitions are rejected.
 * Repeated `require` directives for an already-loaded file path are ignored.

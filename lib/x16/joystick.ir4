@@ -1,4 +1,4 @@
-\ lib/x16/joy.ir4 - Commander X16 KERNAL joystick (ports 0..4) + KEYHDL keyboard-as-joystick (port -1)
+\ lib/x16/joystick.ir4 - Commander X16 KERNAL joystick (ports 0..4) + KEYHDL keyboard-as-joystick (port -1)
 
 data __x16_bit_tbl
   1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8

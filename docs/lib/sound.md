@@ -1,6 +1,6 @@
-# sfx
+# sound
 
-[← Library Index](README.md) · Source: [lib/sfx.ir4](../../lib/sfx.ir4)
+[← Library Index](README.md) · Source: [lib/sound.ir4](../../lib/sound.ir4)
 
 Sound effects (optional override per platform)
 Waveforms: 0 = pulse/square, 1 = sawtooth, 2 = triangle, 3 = noise.
