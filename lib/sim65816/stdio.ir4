@@ -1,0 +1,5 @@
+\ lib/sim65816/stdio.ir4 - sim65816 paravirtual console output ($00FFF0)
+
+fn emit ( c :i )
+  c 0xFFF0 i>a i8!
+end

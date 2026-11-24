@@ -19,6 +19,9 @@ static const Platform *const platforms[] = {
 #if IR4_ENABLE_SIM65
     &plat_6502_sim,
 #endif
+#if IR4_ENABLE_SIM65816
+    &plat_65816_sim,
+#endif
 #if IR4_ENABLE_C64
     &plat_6502_c64,
 #endif
@@ -92,6 +95,12 @@ int main(int argc, char **argv) {
                 be = &be_6502;
                 if (!base_set)
                     base = 0x0801;
+#endif
+#if IR4_ENABLE_65816
+            } else if (strcmp(argv[i], "65816") == 0) {
+                be = &be_65816;
+                if (!base_set)
+                    base = 0x010000UL;
 #endif
 #if IR4_ENABLE_ARM64
             } else if (strcmp(argv[i], "arm64") == 0) {

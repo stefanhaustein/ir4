@@ -63,8 +63,8 @@ static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     if (!ir4_get_opt_level() || !cw->is_code || !sig->is_hot || cw->ir_len == 0 ||
         cw->ir_len > HOT_CODE_INLINE_MAX)
         return 0;
-    if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "z80") != 0 &&
-        strcmp(be->name, "ez80") != 0)
+    if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "65816") != 0 &&
+        strcmp(be->name, "z80") != 0 && strcmp(be->name, "ez80") != 0)
         return 0;
     *out_len = cw->ir_len;
     return 1;
@@ -178,6 +178,8 @@ static void emit_word(size_t fidx) {
         emit_raw_code_block(w->ir_start, w->ir_len, w->reloc_start, w->reloc_cnt);
         if (strcmp(be->name, "6502") == 0)
             cb_emit8(0x60); /* RTS */
+        else if (strcmp(be->name, "65816") == 0)
+            cb_emit8(0x6B); /* RTL */
         else if (strcmp(be->name, "z80") == 0 || strcmp(be->name, "ez80") == 0)
             cb_emit8(0xC9); /* RET */
         else if (strcmp(be->name, "rv32") == 0)

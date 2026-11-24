@@ -48,6 +48,9 @@ typedef signed long i32;
 #ifndef IR4_ENABLE_6502
 #define IR4_ENABLE_6502 IR4_DEF_OPT
 #endif
+#ifndef IR4_ENABLE_65816
+#define IR4_ENABLE_65816 IR4_DEF_OPT
+#endif
 #ifndef IR4_ENABLE_ARM64
 #define IR4_ENABLE_ARM64 IR4_DEF_OPT
 #endif
@@ -69,6 +72,9 @@ typedef signed long i32;
 #endif
 #ifndef IR4_ENABLE_SIM65
 #define IR4_ENABLE_SIM65 IR4_ENABLE_6502
+#endif
+#ifndef IR4_ENABLE_SIM65816
+#define IR4_ENABLE_SIM65816 IR4_ENABLE_65816
 #endif
 #ifndef IR4_ENABLE_C64
 #define IR4_ENABLE_C64 IR4_ENABLE_6502
@@ -295,6 +301,7 @@ typedef struct {
 extern const Backend be_z80;
 extern const Backend be_ez80;
 extern const Backend be_6502;
+extern const Backend be_65816;
 extern const Backend be_arm64;
 extern const Backend be_rv32;
 
@@ -302,6 +309,7 @@ extern const Platform plat_z80_cpm;
 extern const Platform plat_z80_zx81;
 extern const Platform plat_ez80_agon;
 extern const Platform plat_6502_sim;
+extern const Platform plat_65816_sim;
 extern const Platform plat_6502_c64;
 extern const Platform plat_6502_x16;
 extern const Platform plat_6502_x16_cart;

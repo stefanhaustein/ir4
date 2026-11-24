@@ -4,14 +4,14 @@ CFLAGS  = -std=c89 -Wall -Wextra -O2 -Isrc
 BUILD   = build
 TARGET  = $(BUILD)/ir4c
 SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
-          src/backend/z80.c src/backend/ez80.c src/backend/6502.c src/backend/arm64.c src/backend/rv32.c src/backend/bc.c \
-          src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/c64.c src/platform/x16.c \
+          src/backend/z80.c src/backend/ez80.c src/backend/6502.c src/backend/65816.c src/backend/arm64.c src/backend/rv32.c src/backend/bc.c \
+          src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/sim65816.c src/platform/c64.c src/platform/x16.c \
           src/platform/jit.c src/platform/elf.c src/platform/bc.c
 OBJS    = $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 
 AGON_EMU ?= $(HOME)/opt/fab-agon-emulator/fab-agon-emulator
 
-.PHONY: all test test-err test-z80 test-ez80 test-6502 test-rv32 rt rt-z80 rt-ez80 rt-6502 rt-rv32 clean
+.PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 rt rt-z80 rt-ez80 rt-6502 rt-rv32 clean
 
 all: $(TARGET)
 
@@ -249,6 +249,18 @@ test-6502: $(TARGET) tests/test_*.ir4
 	else \
 		echo "sim65 not found; skipping 6502 execution"; \
 	fi
+
+test-65816: $(TARGET) tests/test_*.ir4
+	@for name in fib core muldiv mem float req data math i32 fnptr peephole file system joystick sound; do \
+		out=$$(./$(TARGET) -t sim65816 -o $(BUILD)/$${name}_65816.bin tests/test_$${name}.ir4 | tr -d '\r' | tail -n 1); \
+		echo "sim65816 test_$${name}.ir4 -> $$out"; \
+		test "$$out" = "0" || exit 1; \
+	done
+	@for name in rtl stdio; do \
+		out=$$(./$(TARGET) -t sim65816 -o $(BUILD)/$${name}_65816.bin tests/test_$${name}.ir4 | tr -d '\r' | grep . | tail -n 1); \
+		echo "sim65816 test_$${name}.ir4 -> $$out"; \
+		test "$$out" = "0" || exit 1; \
+	done
 
 test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/fib_rv32.elf      tests/test_fib.ir4

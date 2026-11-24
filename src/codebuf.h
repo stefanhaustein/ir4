@@ -43,6 +43,7 @@ size_t cb_init_data_size(void);
 
 void cb_add_data_reloc(size_t patch_offset, size_t data_offset);
 void cb_add_data_reloc24(size_t patch_offset, size_t data_offset);
+void cb_add_data_reloc_bank(size_t patch_offset, size_t data_offset);
 void cb_add_data_reloc_split(size_t lo_offset, size_t hi_offset, size_t data_offset);
 void cb_patch_data_relocs(size_t data_base);
 

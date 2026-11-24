@@ -242,6 +242,15 @@ void cb_add_data_reloc24(size_t patch_offset, size_t data_offset) {
     r->data_offset = data_offset;
 }
 
+void cb_add_data_reloc_bank(size_t patch_offset, size_t data_offset) {
+    DataReloc *r = VEC_ADD(relocs);
+    r->split = false;
+    r->width = 1;
+    r->off1 = patch_offset;
+    r->off2 = 0;
+    r->data_offset = data_offset;
+}
+
 void cb_add_data_reloc_split(size_t lo_offset, size_t hi_offset, size_t data_offset) {
     DataReloc *r = VEC_ADD(relocs);
     r->split = true;
@@ -275,6 +284,8 @@ void cb_patch_data_relocs(size_t data_base) {
         if (relocs.data[i].split) {
             code_buf.data[relocs.data[i].off1] = (u8)(addr & 0xFF);
             code_buf.data[relocs.data[i].off2] = (u8)((addr >> 8) & 0xFF);
+        } else if (relocs.data[i].width == 1) {
+            code_buf.data[relocs.data[i].off1] = (u8)((addr >> 16) & 0xFF);
         } else if (relocs.data[i].width == 3) {
             cb_patch24(relocs.data[i].off1, (u32)addr);
         } else {
