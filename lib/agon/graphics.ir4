@@ -2,7 +2,7 @@
 
 require "stdio.ir4"
 
-data __agon_modes
+data __agon_gfx_modes
   8  :i16 320 :i16 240 :i16 6 :i16
   9  :i16 320 :i16 240 :i16 4 :i16
   10 :i16 320 :i16 240 :i16 2 :i16
@@ -30,7 +30,7 @@ fn __vdu_plot ( m :i x :i y :i )
 end
 
 fn gfxmodes ( -> :a :i )
-  __agon_modes 10
+  __agon_gfx_modes 10
 end
 
 fn gfxwidth ( -> :i ) __gw end
@@ -41,7 +41,7 @@ fn gfxmode ( mode :i )
   320 -> __gw
   240 -> __gh
   6 -> __gd
-  __agon_modes -> var p :a
+  __agon_gfx_modes -> var p :a
   10 -> var n :i
   begin n 0 > while
     p i16@ mode = if
@@ -162,6 +162,12 @@ end
 
 fn gfxclear ( )
   0 0 __gw __gh gfxfillrect
+end
+
+\ Native VDP scanline flood fill (`VDU 25, $85`) until non-background pixel
+fn gfxfill ( x :i y :i )
+  x 0 < x __gw >= or y 0 < y __gh >= or or if return then
+  0x85 x y __vdu_plot
 end
 
 fn gfxcharw ( -> :i ) 8 end

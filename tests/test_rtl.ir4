@@ -4,8 +4,10 @@
 require "stdio.ir4"
 require "memory.ir4"
 require "heap.ir4"
+require "string.ir4"
 
 data s_exp "HiWorld" 0 :i8 end
+data s_empty 0 :i8 end
 data c_msg "RTL:" 0 :i8 end
 
 var buf1 :bytes 16
@@ -80,6 +82,22 @@ fn main ( -> :i )
   buf1 mutate_copy 99 17 assert_eq
   dup 0 <> if return then drop
   buf1 u8@ 2 18 assert_eq
+  dup 0 <> if return then drop
+
+  \ string.ir4: strlen0, str0>str
+  s_exp strlen0 7 19 assert_eq
+  dup 0 <> if return then drop
+  s_empty strlen0 0 20 assert_eq
+  dup 0 <> if return then drop
+  s_exp str0>str -> var slen :i -> p1
+  slen 7 21 assert_eq
+  dup 0 <> if return then drop
+  p1 s_exp a= -1 22 assert_eq
+  dup 0 <> if return then drop
+  s_empty str0>str -> slen -> p1
+  slen 0 23 assert_eq
+  dup 0 <> if return then drop
+  p1 s_empty a= -1 24 assert_eq
   dup 0 <> if return then drop
   0
 end

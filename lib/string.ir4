@@ -1,0 +1,13 @@
+\ string.ir4 - String operations
+
+\ Return length in bytes of NUL-terminated string *s0*
+fn strlen0 ( s0 :a -> :i )
+  s0 -> var p :a
+  begin p u8@ 0 <> while p 1 a+ -> p repeat
+  p s0 adiff
+end
+
+\ Unpack NUL-terminated string *s0* to (addr, len)
+fn str0>str ( s0 :a -> :a :i )
+  s0 s0 strlen0
+end

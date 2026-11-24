@@ -1,6 +1,8 @@
 \ stdio.ir4 - Console I/O, formatting, and screen control
 \ Platform overrides implement raw `emit` (and optionally the `default fn` entries below).
 
+require "string.ir4"
+
 \ Native boot/symbol-oriented character set (`setcharset`/`getcharset`)
 const charset_native 0 :i
 \ Text-oriented character set with lowercase support (`setcharset`/`getcharset`)
@@ -29,13 +31,7 @@ end
 
 \ Print NUL-terminated string at *s*
 fn type0 ( s :a )
-  begin
-    s u8@ -> var c :i
-    c 0 <>
-  while
-    c xemit
-    1 +-> s
-  repeat
+  s str0>str type
 end
 
 \ Print *n* as minimal unsigned decimal

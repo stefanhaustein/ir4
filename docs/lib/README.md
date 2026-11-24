@@ -21,5 +21,6 @@
 - [sound](sound.md) — Sound effects
 - [sprite](sprite.md) — Hardware sprites
 - [stdio](stdio.md) — Console I/O, formatting, and screen control
+- [string](string.md) — String operations
 - [system](system.md) — System, CLI arguments, environment, CWD, and clock API
 - [terminal](terminal.md) — Text screen & cursor control (ANSI defaults)

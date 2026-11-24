@@ -1,5 +1,7 @@
 \ lib/file.ir4 - Sequential file I/O (fallback stubs + convenience wrappers)
 
+require "string.ir4"
+
 const fsmode_read      0 :i
 const fsmode_write     1 :i
 const fsmode_append    2 :i
@@ -71,25 +73,19 @@ default fn fsrename ( oldp :a oldlen :i newp :a newlen :i -> :i )
   -1
 end
 
-fn __fs_strlen0 ( s :a -> :i )
-  s -> var p :a
-  begin p u8@ 0 <> while p 1 a+ -> p repeat
-  p s adiff
-end
-
 \ Open NUL-terminated path0 with mode; returns fd >= 0 or < 0 on error
 fn fsopen0 ( path0 :a mode :i -> :i )
-  path0 path0 __fs_strlen0 mode fsopen
+  path0 str0>str mode fsopen
 end
 
 \ Delete file at NUL-terminated path0; returns 0 on success or < 0 on error
 fn fsdelete0 ( path0 :a -> :i )
-  path0 path0 __fs_strlen0 fsdelete
+  path0 str0>str fsdelete
 end
 
 \ Rename NUL-terminated old0 to NUL-terminated new0; returns 0 on success or < 0 on error
 fn fsrename0 ( old0 :a new0 :a -> :i )
-  old0 old0 __fs_strlen0 new0 new0 __fs_strlen0 fsrename
+  old0 str0>str new0 str0>str fsrename
 end
 
 \ Open directory at (path, len) for iteration; returns descriptor dd >= 0 or < 0 on error
@@ -124,17 +120,17 @@ end
 
 \ Open directory at NUL-terminated path0; returns dd >= 0 or < 0 on error
 fn fsdiropen0 ( path0 :a -> :i )
-  path0 path0 __fs_strlen0 fsdiropen
+  path0 str0>str fsdiropen
 end
 
 \ Create directory at NUL-terminated path0; returns 0 on success or < 0 on error
 fn fsmkdir0 ( path0 :a -> :i )
-  path0 path0 __fs_strlen0 fsmkdir
+  path0 str0>str fsmkdir
 end
 
 \ Remove empty directory at NUL-terminated path0; returns 0 on success or < 0 on error
 fn fsrmdir0 ( path0 :a -> :i )
-  path0 path0 __fs_strlen0 fsrmdir
+  path0 str0>str fsrmdir
 end
 
 \ Read a single byte from fd; returns 0..255 or -1 on EOF/error

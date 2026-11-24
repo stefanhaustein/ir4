@@ -57,6 +57,14 @@ fn main ( -> :i )
   c_green gfxcolor
   4 4 6 4 gfxfillrect
   10 10 5 gfxcircle
+  c_white gfxcolor
+  16 16 16 16 gfxrect
+  c_green gfxcolor
+  20 20 gfxfill
+  25 25 gfxgetpx -> var px4 :i
+  px4 0 >= px4 c_green <> and if 16 return then
+  15 20 gfxgetpx -> var px5 :i
+  px5 0 >= px5 c_bg <> and if 17 return then
   1 1 s_gfx 3 gfxtext
 
   \ Repeated draw + sync loop (50x catches stack leaks)

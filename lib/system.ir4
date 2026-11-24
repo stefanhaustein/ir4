@@ -1,6 +1,7 @@
 \ lib/system.ir4 - System, CLI arguments, environment, CWD, and clock API
 
 require "i32.ir4"
+require "string.ir4"
 
 \ Return number of command-line arguments (including index 0); 0 if unavailable
 default fn sysargc ( -> :i )
@@ -37,9 +38,5 @@ end
 
 \ Look up NUL-terminated environment variable name0; copy up to max bytes into buf; return length or < 0
 fn sysenv0 ( name0 :a buf :a max :i -> :i )
-  0 -> var nlen :i
-  begin name0 nlen a+ u8@ 0 <> while
-    1 +-> nlen
-  repeat
-  name0 nlen buf max sysenv
+  name0 str0>str buf max sysenv
 end

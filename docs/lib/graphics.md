@@ -30,6 +30,11 @@ Platform overrides implement the `default fn` entries below.
   Per-pixel color depth in bits (1 on attribute-cell targets like C64/Spectrum, where gfxrgb may still return palette colors per cell)
 
 - **gfxdone** ( ) — Restore text mode and release graphics resources
+- **gfxfill** ( x :i y :i )
+
+  Flood-fill 4-connected pixels matching the seed pixel color at (*x*, *y*) with the active drawing color
+  - *agon:* Native VDP scanline flood fill (`VDU 25, $85`) until non-background pixel
+
 - **gfxfillrect** ( x :i y :i w :i h :i )
 
   Draw a filled rectangle at (*x*, *y*) with size *w* x *h* (default: gfxhline loop)

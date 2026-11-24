@@ -332,6 +332,74 @@ default fn gfxcircle ( cx :i cy :i r :i )
   repeat
 end
 
+\ Scan row *y* across [*lx*..*rx*] pushing start of each contiguous *target* run onto seed stack *stk*
+fn __gfx_fill_scan ( stk :a sp :i cap :i lx :i rx :i y :i target :i -> :i )
+  1 -> var need_seed :i
+  begin lx rx <= while
+    lx y gfxgetpx target = if
+      need_seed 0 <> if
+        sp cap < if
+          stk sp 2 << a+ -> var p :a
+          lx p i16!
+          y p 2 a+ i16!
+          1 +-> sp
+        then
+        0 -> need_seed
+      then
+    else
+      1 -> need_seed
+    then
+    1 +-> lx
+  repeat
+  sp
+end
+
+\ Flood-fill 4-connected pixels matching the seed pixel color at (*x*, *y*) with the active drawing color
+default fn gfxfill ( x :i y :i )
+  gfxwidth -> var w :i
+  gfxheight -> var h :i
+  x 0 < x w >= or y 0 < y h >= or or if return then
+  x y gfxgetpx -> var target :i
+  target 0 < if return then
+  x y gfxpx
+  x y gfxgetpx -> var paint :i
+  paint 0 < paint target = or if return then
+  256 -> var cap :i
+  cap 2 << heapalloc -> var stk :a
+  x -> var lx :i
+  begin lx 0 > if lx 1 - y gfxgetpx target = else 0 then while
+    -1 +-> lx
+  repeat
+  x -> var rx :i
+  begin rx 1 + w < if rx 1 + y gfxgetpx target = else 0 then while
+    1 +-> rx
+  repeat
+  lx y rx lx - 1 + gfxhline
+  0 -> var sp :i
+  y 0 > if stk sp cap lx rx y 1 - target __gfx_fill_scan -> sp then
+  y 1 + h < if stk sp cap lx rx y 1 + target __gfx_fill_scan -> sp then
+  begin sp 0 > while
+    -1 +-> sp
+    stk sp 2 << a+ -> var p :a
+    p i16@ -> var sx :i
+    p 2 a+ i16@ -> var sy :i
+    sx sy gfxgetpx target = if
+      sx -> lx
+      begin lx 0 > if lx 1 - sy gfxgetpx target = else 0 then while
+        -1 +-> lx
+      repeat
+      sx -> rx
+      begin rx 1 + w < if rx 1 + sy gfxgetpx target = else 0 then while
+        1 +-> rx
+      repeat
+      lx sy rx lx - 1 + gfxhline
+      sy 0 > if stk sp cap lx rx sy 1 - target __gfx_fill_scan -> sp then
+      sy 1 + h < if stk sp cap lx rx sy 1 + target __gfx_fill_scan -> sp then
+    then
+  repeat
+  stk heapfree
+end
+
 \ Character cell width in pixels (default: 1 in ANSI half-block mode)
 default fn gfxcharw ( -> :i ) 1 end
 

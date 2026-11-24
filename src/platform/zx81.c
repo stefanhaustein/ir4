@@ -11,7 +11,7 @@ static void zx81_begin(size_t base) {
 }
 
 static void zx81_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((u8)main_idx);
+    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
     u16 entry_addr = cb_cur_addr();
 
     if (sig->in_types.len != 0 || sig->out_types.len > 1) {

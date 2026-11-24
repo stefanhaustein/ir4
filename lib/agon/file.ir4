@@ -1,6 +1,7 @@
 \ lib/agon/file.ir4 - Agon Light MOS file I/O (8 open file slots via RST.LIL $08)
 
 require "memory.ir4"
+require "string.ir4"
 
 \ __mos_del ( path0 :a -> :i )  MOS $05: HL=path0 -> A=status (0=ok)
 code agon __mos_del ( path0 :a -> :i )
@@ -232,12 +233,6 @@ var __agon_dirs    :bytes 256
 var __agon_diropen :bytes 4
 var __agon_filinfo :bytes 280
 
-fn __agon_strlen0 ( s :a -> :i )
-  s -> var p :a
-  begin p u8@ 0 <> while p 1 a+ -> p repeat
-  p s adiff
-end
-
 fn __agon_dir_ptr ( dd :i -> :a )
   __agon_dirs dd 6 << a+
 end
@@ -274,7 +269,7 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
     dp __agon_filinfo __ffs_dread 0 <> if -1 0 0 return then
     __agon_filinfo 22 a+ -> var namep :a
     namep u8@ 0 = if 0 0 0 return then
-    namep __agon_strlen0 -> var namelen :i
+    namep strlen0 -> var namelen :i
     namelen 1 = namep u8@ 46 = and if
       \ skip "."
     else namelen 2 = namep u8@ 46 = and namep 1 a+ u8@ 46 = and if

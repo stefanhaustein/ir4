@@ -68,7 +68,7 @@ static int virt_write(FILE *fp, size_t base) {
 }
 
 static void virt_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((u8)main_idx);
+    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
     u16 entry_off = cb_pc();
     u16 db_patch_off;
     u32 data_addr;
@@ -197,7 +197,7 @@ static void obj_end(int main_idx) {
         return;
 
     {
-        const FuncSig *sig = ir4_func_sig((u8)main_idx);
+        const FuncSig *sig = ir4_func_sig((size_t)main_idx);
         if (sig->in_types.len != 0 || sig->out_types.len > 1) {
             fprintf(stderr, "--obj requires 'main' with 0 inputs and at most 1 output\n");
             exit(1);
