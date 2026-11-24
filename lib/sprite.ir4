@@ -1,4 +1,4 @@
-\ lib/sprite.ir4 - Hardware sprites (optional override per platform)
+\ lib/sprite.ir4 - Hardware sprites
 
 require "graphics.ir4"
 

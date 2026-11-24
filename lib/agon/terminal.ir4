@@ -1,0 +1,111 @@
+\ lib/agon/terminal.ir4 - Agon Light VDP text screen & cursor control
+
+require "stdio.ir4"
+
+\ __agon_term_sysvars ( -> :a )  MOS $08: returns IX -> HLU
+code agon __agon_term_sysvars ( -> :a )
+  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
+  0xDD :i8 0xE5 :i8 0xE1 :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+fn __agon_term_query ( flag :i vdu :i -> :a )
+  __agon_term_sysvars -> var sv :a
+  sv 4 a+ -> var pf :a
+  pf u8@ 255 flag - and pf i8!
+  23 emit 0 emit vdu emit
+  20000 -> var spin :i
+  begin spin 0 > pf u8@ flag and 0 = and while
+    -1 +-> spin
+  repeat
+  pf u8@ flag and 0 = if 0 i>a return then
+  sv
+end
+
+fn termwidth ( -> :i )
+  16 0x86 __agon_term_query -> var sv :a
+  sv 0 i>a a<> if
+    sv 0x13 a+ u8@ -> var w :i
+    w 0 > if w return then
+  then
+  80
+end
+
+fn termheight ( -> :i )
+  16 0x86 __agon_term_query -> var sv :a
+  sv 0 i>a a<> if
+    sv 0x14 a+ u8@ -> var h :i
+    h 0 > if h return then
+  then
+  24
+end
+
+fn termx ( -> :i )
+  1 0x82 __agon_term_query -> var sv :a
+  sv 0 i>a a= if -1 return then
+  sv 7 a+ u8@
+end
+
+fn termy ( -> :i )
+  1 0x82 __agon_term_query -> var sv :a
+  sv 0 i>a a= if -1 return then
+  sv 8 a+ u8@
+end
+
+fn termclear ( )
+  12 emit
+end
+
+fn termgoto ( x :i y :i )
+  x 0 < if 0 -> x then
+  y 0 < if 0 -> y then
+  31 emit x emit y emit
+end
+
+fn __agon_clr_span ( to_end :i )
+  termx -> var x :i
+  x 0 < if return then
+  termy -> var y :i
+  y 0 < if return then
+  termwidth -> var w :i
+  termheight -> var h :i
+  to_end if h else y 1 + then -> var endy :i
+  y -> var r :i
+  begin r endy < while
+    r y = if x else 0 then -> var cx :i
+    cx r termgoto
+    w cx - -> var cnt :i
+    r h 1 - = if cnt 1 - -> cnt then
+    begin cnt 0 > while
+      32 emit
+      -1 +-> cnt
+    repeat
+    1 +-> r
+  repeat
+  x y termgoto
+end
+
+fn termcleareol ( )
+  0 __agon_clr_span
+end
+
+fn termcleareos ( )
+  1 __agon_clr_span
+end
+
+fn termcursor ( visible :i )
+  23 emit 1 emit visible 0 <> if 1 else 0 then emit
+end
+
+fn termfg ( c :i )
+  17 emit c emit
+end
+
+fn termbg ( c :i )
+  17 emit c 128 + emit
+end
+
+fn termreset ( )
+  7 termfg
+  0 termbg
+end

@@ -7,12 +7,6 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 
 ## Functions
 
-- **bgcolor** ( c :i )
-
-  Set background text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
-  - *c64:* Records background color for the next cls (`$D021`; standard text mode has no per-character background).
-  - *zx81:* No-op on ZX81 (monochrome display).
-
 - **charset_native** ( -> :i )
 
   Native boot/symbol-oriented character set (`setcharset`/`getcharset`)
@@ -21,24 +15,11 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 
   Text-oriented character set with lowercase support (`setcharset`/`getcharset`)
 
-- **cls** ( )
-
-  Clear screen (using active background color where supported) and home cursor (ANSI default)
-  - *c64:* Applies saved bgcolor (`$D021`) and clears the text screen.
-
 - **cr** ( ) — Emit a newline
-- **fgcolor** ( c :i )
-
-  Set foreground text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
-  - *zx81:* No-op on ZX81 (monochrome display).
-
 - **getcharset** ( -> :i )
 
   Return active effective character set (`charset_text` when lowercase is supported, `charset_native` otherwise)
   - *zx81:* Always returns `charset_native` (`0`: ZX81 ROM has uppercase and block symbols only).
-
-- **gotoxy** ( x :i y :i ) — Move text cursor to 0-based column *x*, row *y* (ANSI default)
-  - *zx81:* Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
 
 - **inkey** ( -> :i )
 
@@ -55,8 +36,6 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
   - *c64:* Switch between `charset_native` (`0`, `142 emit`) and `charset_text` (`1`, `14 emit`).
   - *x16:* Switch between `charset_native` (`0`, `143 emit 142 emit`) and `charset_text` (`1`, `15 emit` ISO-8859-15).
 
-- **termheight** ( -> :i ) — Return terminal height in rows (default: 24)
-- **termwidth** ( -> :i ) — Return terminal width in columns (default: 80)
 - **type** ( s :a len :i ) — Print *len* bytes starting at *s*
 - **type0** ( s :a ) — Print NUL-terminated string at *s*
 - **typeb** ( n :i ) — Print *n* as minimal binary
@@ -95,6 +74,10 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 
 Agon MOS console I/O (RST $10 = print char in A)
 ADL mode: POP DE (ret), POP HL (c), PUSH DE, LD A, L, RST $10, RET
+
+### bc
+
+Host I/O for bytecode VM
 
 ### c64
 

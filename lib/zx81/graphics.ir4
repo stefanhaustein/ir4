@@ -1,6 +1,6 @@
 \ lib/zx81/graphics.ir4 - Sinclair ZX81 64x48 block-mosaic pixel graphics in D_FILE
 
-require "stdio.ir4"
+require "terminal.ir4"
 
 var __zx81_col :i
 
@@ -18,7 +18,7 @@ fn gfxdepth ( -> :i ) 1 end
 
 fn gfxmode ( mode :i )
   1 -> __zx81_col
-  cls
+  termclear
 end
 
 fn gfxdone ( )
@@ -79,6 +79,6 @@ fn gfxcharh ( -> :i ) 2 end
 
 \ Snaps (*x*, *y*) to the nearest 2x2 cell (`x/2, y/2`) in `D_FILE` via `type`.
 fn gfxtext ( x :i y :i s :a len :i )
-  x 1 u>> y 1 u>> gotoxy
+  x 1 u>> y 1 u>> termgoto
   s len type
 end

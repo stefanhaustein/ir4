@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/sound.ir4](../../lib/sound.ir4)
 
-Sound effects (optional override per platform)
+Sound effects
 Waveforms: 0 = pulse/square, 1 = sawtooth, 2 = triangle, 3 = noise.
 
 ## Functions

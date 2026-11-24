@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/file.ir4](../../lib/file.ir4)
 
-Portable sequential file I/O (fallback stubs + convenience wrappers)
+Sequential file I/O (fallback stubs + convenience wrappers)
 
 ## Functions
 
@@ -113,6 +113,10 @@ Portable sequential file I/O (fallback stubs + convenience wrappers)
 ### agon
 
 Agon Light MOS file I/O (8 open file slots via RST.LIL $08)
+
+### arm64
+
+File I/O via C stdio
 
 ### c64
 

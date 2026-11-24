@@ -1,6 +1,7 @@
 \ System & Input Diagnostics — prints all queryable capabilities, charset, colors, and live state
 
 require "stdio.ir4"
+require "terminal.ir4"
 require "graphics.ir4"
 require "sprite.ir4"
 require "sound.ir4"
@@ -38,34 +39,34 @@ data s_txt    ":txt" 0 :i8 end
 data s_colk   ":" 0 :i8 end
 
 fn print_key ( ch :i )
-  3 fgcolor ch xemit 7 fgcolor
+  3 termfg ch xemit 7 termfg
 end
 
 fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
   termwidth 36 < -> var narrow :i
-  7 fgcolor sb bgcolor
-  0 2 gotoxy
+  7 termfg sb termbg
+  0 2 termgoto
   termwidth typei 120 xemit termheight typei 32 emit
-  70 print_key s_colk type0 6 fgcolor fg 2 typehw 7 fgcolor 32 emit
-  66 print_key s_colk type0 6 fgcolor cb 2 typehw 7 fgcolor 32 emit
-  83 print_key s_colk type0 6 fgcolor sb 2 typehw 7 fgcolor 32 emit
-  79 print_key s_colk type0 6 fgcolor bd 2 typehw 7 fgcolor 32 emit
-  67 print_key 6 fgcolor
+  70 print_key s_colk type0 6 termfg fg 2 typehw 7 termfg 32 emit
+  66 print_key s_colk type0 6 termfg cb 2 typehw 7 termfg 32 emit
+  83 print_key s_colk type0 6 termfg sb 2 typehw 7 termfg 32 emit
+  79 print_key s_colk type0 6 termfg bd 2 typehw 7 termfg 32 emit
+  67 print_key 6 termfg
   getcharset charset_text = if s_txt else s_nat then type0
-  7 fgcolor 32 emit
+  7 termfg 32 emit
   88 print_key
-  6 fgcolor
+  6 termfg
   use_x if s_xplat else s_raw then type0
-  7 fgcolor
-  0 r0 gotoxy
+  7 termfg
+  0 r0 termgoto
   narrow if s_chdr_n else s_chdr then type0
   0 -> var row_i :i
   0x20 -> var base :i
   begin row_i 3 < while
-    0 r0 1 + row_i + gotoxy
-    7 fgcolor sb bgcolor
+    0 r0 1 + row_i + termgoto
+    7 termfg sb termbg
     narrow 0 = if base 2 typehw 58 emit then
-    fg fgcolor cb bgcolor
+    fg termfg cb termbg
     0 -> var col :i
     begin col 32 < while
       narrow 0 = col 16 = and if 32 emit then
@@ -78,36 +79,36 @@ fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
     32 +-> base
     1 +-> row_i
     13 emit
-    7 fgcolor sb bgcolor
+    7 termfg sb termbg
   repeat
-  7 fgcolor sb bgcolor
+  7 termfg sb termbg
 end
 
 fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
   bd gfxborder
-  7 fgcolor sb bgcolor
-  cls
-  0 0 gotoxy
+  7 termfg sb termbg
+  termclear
+  0 0 termgoto
   s_title type0 81 print_key s_quit type0
 
   4 use_x fg cb sb bd draw_charset
 
-  0 10 gotoxy
+  0 10 termgoto
   s_sfx type0 sfxcount typei
   s_joy type0 joycount typei
 
-  0 11 gotoxy
+  0 11 termgoto
   s_spr type0 sprcount typei s_slots type0
   sprmaxw typei 120 xemit sprmaxh typei 32 emit
   sprdepth typei s_bpp type0
 
   gfxmodes -> var nmodes :i -> var mptr :a
-  0 13 gotoxy
+  0 13 termgoto
   s_modes type0 nmodes typei s_rpar type0
   14 -> var row :i
   0 -> var i :i
   begin i nmodes < i 4 < and while
-    0 row gotoxy
+    0 row termgoto
     s_hash type0 i typei s_colon type0
     mptr i 3 << a+ -> var ent :a
     ent 2 a+ i16@ typei 120 xemit
@@ -119,8 +120,8 @@ fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
   repeat
 
   row 1 + -> var r_joy :i
-  0 r_joy gotoxy
-  7 fgcolor
+  0 r_joy termgoto
+  7 termfg
   s_jhdr type0
   r_joy
 end
@@ -152,13 +153,13 @@ fn main ( )
 
   begin 1 while
     gfxticks -> var t :i
-    16 10 gotoxy
-    7 fgcolor s_tick type0 6 fgcolor t typei 7 fgcolor
+    16 10 termgoto
+    7 termfg s_tick type0 6 termfg t typei 7 termfg
 
     use_x if xinkey else inkey then -> var k :i
     k 0 <> k prev_k <> and if
       k 113 = k 81 = or if
-        0 r_joy jc 2 + + gotoxy
+        0 r_joy jc 2 + + termgoto
         return
       then
       k 120 = k 88 = or if
@@ -190,26 +191,26 @@ fn main ( )
       1 +-> key_cnt
     then
     k -> prev_k
-    0 9 gotoxy
+    0 9 termgoto
     use_x if s_xinkey else s_inkey then type0
-    6 fgcolor last_k 2 typehw 32 emit 40 emit
+    6 termfg last_k 2 typehw 32 emit 40 emit
     last_k 32 >= last_k 126 <= and if last_k xemit else 46 emit then
     41 emit s_cnt type0 key_cnt typei
     13 emit
-    7 fgcolor
+    7 termfg
 
     -1 -> var p :i
     begin p jc < while
-      0 r_joy p 2 + + gotoxy
+      0 r_joy p 2 + + termgoto
       p -1 = if
         s_jkbd type0
       else
         s_jhw type0 p typei s_jcol type0
       then
       p joystate -> var j :i
-      6 fgcolor
+      6 termfg
       j 8 typebw s_hexp type0 j 2 typehw 41 emit
-      7 fgcolor
+      7 termfg
       1 +-> p
     repeat
 

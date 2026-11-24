@@ -3,6 +3,7 @@
 \ center black bar + frequency grating + amber + pointer, and RGB/gray gradients.
 
 require "stdio.ir4"
+require "terminal.ir4"
 require "graphics.ir4"
 
 var w :i

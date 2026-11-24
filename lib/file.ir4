@@ -1,4 +1,4 @@
-\ lib/file.ir4 - Portable sequential file I/O (fallback stubs + convenience wrappers)
+\ lib/file.ir4 - Sequential file I/O (fallback stubs + convenience wrappers)
 
 const fsmode_read      0 :i
 const fsmode_write     1 :i

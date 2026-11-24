@@ -97,6 +97,9 @@ test: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t c64   -o $(BUILD)/stdio_c64.prg      tests/test_stdio.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/stdio_x16.prg      tests/test_stdio.ir4
 	./$(TARGET) -t arm64 -o $(BUILD)/stdio_arm64.bin    --run tests/test_stdio.ir4 >/dev/null
+	./$(TARGET) -t c64   -o $(BUILD)/terminal_c64.prg   tests/test_terminal.ir4
+	./$(TARGET) -t x16   -o $(BUILD)/terminal_x16.prg   tests/test_terminal.ir4
+	./$(TARGET) -t arm64 -o $(BUILD)/terminal_arm64.bin --run tests/test_terminal.ir4 >/dev/null
 	./$(TARGET) -t c64   -o $(BUILD)/graphics_c64.prg   tests/test_graphics.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/graphics_x16.prg   tests/test_graphics.ir4
 	./$(TARGET) -t arm64 -o $(BUILD)/graphics_arm64.bin --run tests/test_graphics.ir4 >/dev/null
@@ -146,6 +149,7 @@ test-z80: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t cpm -o build/system.com   tests/test_system.ir4
 	./$(TARGET) -t cpm -o build/rtl.com      tests/test_rtl.ir4
 	./$(TARGET) -t cpm -o build/stdio.com    tests/test_stdio.ir4
+	./$(TARGET) -t cpm -o build/terminal.com tests/test_terminal.ir4
 	./$(TARGET) -t cpm -o build/graphics.com tests/test_graphics.ir4
 	./$(TARGET) -t cpm -o build/joystick.com tests/test_joystick.ir4
 	./$(TARGET) -t cpm -o build/sound.com    tests/test_sound.ir4
@@ -161,7 +165,7 @@ test-z80: $(TARGET) tests/test_*.ir4
 		echo "tnylpo system.com ALPHA BETA -> $$out"; \
 		test "$$out" = "0" || exit 1; \
 		rm -f $(BUILD)/IR4TEST.TMP; \
-		for f in rtl.com stdio.com graphics.com sprite.com; do \
+		for f in rtl.com stdio.com terminal.com graphics.com sprite.com; do \
 			out=$$(cd $(BUILD) && tnylpo $$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "tnylpo $$f -> $$out"; \
 			test "$$out" = "0" || exit 1; \
@@ -187,6 +191,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t agon -o $(BUILD)/system_agon.bin   tests/test_system.ir4
 	./$(TARGET) -t agon -o $(BUILD)/rtl_agon.bin      tests/test_rtl.ir4
 	./$(TARGET) -t agon -o $(BUILD)/stdio_agon.bin    tests/test_stdio.ir4
+	./$(TARGET) -t agon -o $(BUILD)/terminal_agon.bin tests/test_terminal.ir4
 	./$(TARGET) -t agon -o $(BUILD)/graphics_agon.bin tests/test_graphics.ir4
 	./$(TARGET) -t agon -o $(BUILD)/joystick_agon.bin tests/test_joystick.ir4
 	./$(TARGET) -t agon -o $(BUILD)/sound_agon.bin    tests/test_sound.ir4
@@ -195,7 +200,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 	if [ -n "$$emu" ] && [ -x "$$emu" ]; then \
 		sd="$$(pwd)/$(BUILD)/agon-sd"; \
 		mkdir -p "$$sd"; \
-		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000" "peephole_agon.bin:000000" "file_agon.bin:000000" "system_agon.bin:000000" "rtl_agon.bin:000000" "stdio_agon.bin:000000" "graphics_agon.bin:000000" "joystick_agon.bin:000000" "sound_agon.bin:000000" "sprite_agon.bin:000000"; do \
+		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000" "peephole_agon.bin:000000" "file_agon.bin:000000" "system_agon.bin:000000" "rtl_agon.bin:000000" "stdio_agon.bin:000000" "terminal_agon.bin:000000" "graphics_agon.bin:000000" "joystick_agon.bin:000000" "sound_agon.bin:000000" "sprite_agon.bin:000000"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			cp $(BUILD)/$$f "$$sd/test.bin"; \
 			printf "load test.bin\nrun\n" > "$$sd/autoexec.txt"; \
@@ -224,6 +229,7 @@ test-6502: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/system_sim65.bin   tests/test_system.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/rtl_sim65.bin      tests/test_rtl.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/stdio_sim65.bin    tests/test_stdio.ir4
+	./$(TARGET) -t sim65 -o $(BUILD)/terminal_sim65.bin tests/test_terminal.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/graphics_sim65.bin tests/test_graphics.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/joystick_sim65.bin tests/test_joystick.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/sound_sim65.bin    tests/test_sound.ir4
@@ -235,7 +241,7 @@ test-6502: $(TARGET) tests/test_*.ir4
 			echo "sim65 $$f -> $$out"; \
 			test "$$out" = "$$exp"; \
 		done; \
-		for f in rtl_sim65.bin stdio_sim65.bin graphics_sim65.bin sprite_sim65.bin; do \
+		for f in rtl_sim65.bin stdio_sim65.bin terminal_sim65.bin graphics_sim65.bin sprite_sim65.bin; do \
 			out=$$(sim65 $(BUILD)/$$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "sim65 $$f -> $$out"; \
 			test "$$out" = "0"; \
@@ -261,6 +267,7 @@ test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/system_rv32.elf   tests/test_system.ir4
 	./$(TARGET) -t virt -o $(BUILD)/rtl_rv32.elf      tests/test_rtl.ir4
 	./$(TARGET) -t virt -o $(BUILD)/stdio_rv32.elf    tests/test_stdio.ir4
+	./$(TARGET) -t virt -o $(BUILD)/terminal_rv32.elf tests/test_terminal.ir4
 	./$(TARGET) -t virt -o $(BUILD)/graphics_rv32.elf tests/test_graphics.ir4
 	./$(TARGET) -t virt -o $(BUILD)/joystick_rv32.elf tests/test_joystick.ir4
 	./$(TARGET) -t virt -o $(BUILD)/sound_rv32.elf    tests/test_sound.ir4
@@ -272,7 +279,7 @@ test-rv32: $(TARGET) tests/test_*.ir4
 			echo "qemu-system-riscv32 $$f -> $$out"; \
 			test "$$out" = "$$exp"; \
 		done; \
-		for f in rtl_rv32.elf stdio_rv32.elf graphics_rv32.elf sprite_rv32.elf; do \
+		for f in rtl_rv32.elf stdio_rv32.elf terminal_rv32.elf graphics_rv32.elf sprite_rv32.elf; do \
 			out=$$(qemu-system-riscv32 -machine virt -cpu rv32 -bios none -nographic -kernel $(BUILD)/$$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "qemu-system-riscv32 $$f -> $$out"; \
 			test "$$out" = "0"; \

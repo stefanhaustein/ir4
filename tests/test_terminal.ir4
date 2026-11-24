@@ -1,0 +1,50 @@
+\ Test lib/terminal.ir4 (dimensions, cursor move/query, clear, cursor visibility, colors)
+
+require "terminal.ir4"
+
+data s_ok "TERM" 0 :i8 end
+
+fn main ( -> :i )
+  termwidth 0 <= if 1 return then
+  termheight 0 <= if 2 return then
+
+  7 termfg 0 termbg
+  termclear
+  0 0 termgoto
+  0 termcursor
+  1 termcursor
+
+  5 3 termgoto
+  termx -> var cx :i
+  termy -> var cy :i
+  cx 0 >= if
+    cx 5 <> if 3 return then
+    cy 3 <> if 4 return then
+  then
+
+  s_ok type0
+  termcleareol
+  cx 0 >= if
+    termx 9 <> if 5 return then
+    termy 3 <> if 6 return then
+  then
+  termcleareos
+  cx 0 >= if
+    termx 9 <> if 7 return then
+    termy 3 <> if 8 return then
+  then
+
+  \ Repeated color + cursor loop (50x catches stack leaks on 6502 ZP stack)
+  0 -> var i :i
+  begin i 50 < while
+    i 15 and termfg
+    i 7 and termbg
+    i 7 and i 3 and termgoto
+    s_ok type0
+    1 +-> i
+  repeat
+
+  termreset
+  cr
+  0
+end

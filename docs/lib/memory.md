@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/memory.ir4](../../lib/memory.ir4)
 
-Portable byte-slice memory operations
+Byte-slice memory operations
 
 ## Functions
 
@@ -14,3 +14,13 @@ Portable byte-slice memory operations
 - **memfill** ( dst :a len :i val :i )
 
   Fill *len* bytes starting at *dst* with byte value *val*
+
+## Platforms
+
+### 6502
+
+Auto-generated from tools/6502/mem.asm by tools/asm2ir4.py (do not edit manually).
+
+### z80
+
+Auto-generated from tools/z80/mem.asm by tools/asm2ir4.py (do not edit manually).

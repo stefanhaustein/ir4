@@ -11,14 +11,15 @@
 
 ## Modules
 
-- [file](file.md) — Portable sequential file I/O (fallback stubs + convenience wrappers)
+- [file](file.md) — Sequential file I/O (fallback stubs + convenience wrappers)
 - [graphics](graphics.md) — Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 - [heap](heap.md) — First-fit dynamic memory allocator starting at __heap_start
 - [i32](i32.md) — 32-bit signed division and modulo fallbacks (auto-required when i32/ or i32mod is used)
-- [joystick](joystick.md) — Joystick and gamepad input (optional override per platform)
+- [joystick](joystick.md) — Joystick and gamepad input
 - [math](math.md) — Floating-point math helpers
-- [memory](memory.md) — Portable byte-slice memory operations
-- [sound](sound.md) — Sound effects (optional override per platform)
-- [sprite](sprite.md) — Hardware sprites (optional override per platform)
+- [memory](memory.md) — Byte-slice memory operations
+- [sound](sound.md) — Sound effects
+- [sprite](sprite.md) — Hardware sprites
 - [stdio](stdio.md) — Console I/O, formatting, and screen control
-- [system](system.md) — Portable system, CLI arguments, environment, CWD, and clock API
+- [system](system.md) — System, CLI arguments, environment, CWD, and clock API
+- [terminal](terminal.md) — Text screen & cursor control (ANSI defaults)

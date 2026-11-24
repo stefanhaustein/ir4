@@ -1,0 +1,52 @@
+\ lib/zx81/terminal.ir4 - Sinclair ZX81 D_FILE text screen & cursor control
+
+require "stdio.ir4"
+
+extern __zx81_cls 0x0A2A ( )
+
+fn termwidth ( -> :i ) 32 end
+fn termheight ( -> :i ) 22 end
+
+fn termx ( -> :i ) 33 0x4039 i>a u8@ - end
+fn termy ( -> :i ) 24 0x403A i>a u8@ - end
+
+fn termclear ( )
+  __zx81_cls
+end
+
+\ Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
+fn termgoto ( x :i y :i )
+  x 0 < if 0 -> x then
+  x 31 > if 31 -> x then
+  y 0 < if 0 -> y then
+  y 21 > if 21 -> y then
+  0x400C i>a a@ y 33 * 1 + x + a+ 0x400E i>a a!
+  33 x - 0x4039 i>a i8!
+  24 y - 0x403A i>a i8!
+end
+
+fn __zx81_clr_span ( to_end :i )
+  0x400E i>a a@ -> var p :a
+  to_end if 22 termy - else 1 then -> var rows :i
+  begin rows 0 > while
+    begin p u8@ 0x76 <> while
+      0 p i8!
+      1 +-> p
+    repeat
+    1 +-> p
+    -1 +-> rows
+  repeat
+end
+
+fn termcleareol ( )
+  0 __zx81_clr_span
+end
+
+fn termcleareos ( )
+  1 __zx81_clr_span
+end
+
+fn termcursor ( visible :i ) visible drop end
+fn termfg ( c :i ) c drop end
+fn termbg ( c :i ) c drop end
+fn termreset ( ) end

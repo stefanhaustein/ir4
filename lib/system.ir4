@@ -1,4 +1,4 @@
-\ lib/system.ir4 - Portable system, CLI arguments, environment, CWD, and clock API
+\ lib/system.ir4 - System, CLI arguments, environment, CWD, and clock API
 
 require "i32.ir4"
 

@@ -1,7 +1,6 @@
 \ lib/zx81/stdio.ir4 - Sinclair ZX81 console I/O (ROM RST `$10` / CLS `$0A2A`)
 
 extern __zx81_rst10 0x0010 ( A :i )
-extern __zx81_cls 0x0A2A ( )
 extern __zx81_find_char 0x07BD ( BC :i -> HL :a )
 
 \ Translate ASCII character to ZX81 character set
@@ -102,28 +101,5 @@ fn key ( -> :i )
   k
 end
 
-fn cls ( )
-  __zx81_cls
-end
-
-fn termwidth ( -> :i ) 32 end
-fn termheight ( -> :i ) 22 end
-
-\ No-op on ZX81 (monochrome display).
-fn fgcolor ( c :i ) c drop end
-\ No-op on ZX81 (monochrome display).
-fn bgcolor ( c :i ) c drop end
-
 \ Always returns `charset_native` (`0`: ZX81 ROM has uppercase and block symbols only).
 fn getcharset ( -> :i ) 0 end
-
-\ Updates DF_CC (`$400E`) and S_POSN (`$4039`/`$403A`) directly in D_FILE (clamped to 32x22).
-fn gotoxy ( x :i y :i )
-  x 0 < if 0 -> x then
-  x 31 > if 31 -> x then
-  y 0 < if 0 -> y then
-  y 21 > if 21 -> y then
-  0x400C i>a a@ y 33 * 1 + x + a+ 0x400E i>a a!
-  33 x - 0x4039 i>a i8!
-  24 y - 0x403A i>a i8!
-end

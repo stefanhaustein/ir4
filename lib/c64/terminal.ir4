@@ -1,0 +1,111 @@
+\ lib/c64/terminal.ir4 - Commodore 64 KERNAL text screen & cursor control
+
+require "stdio.ir4"
+
+var __c64_txt_bg :i
+
+init
+  0xD021 i>a u8@ -> __c64_txt_bg
+end
+
+\ Query KERNAL screen size via SCREEN ($FFED: X=cols, Y=rows)
+code c64 __c64_screen ( -> :i )
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xED :i8 0xFF :i8
+  0x8A :i8 0x85 :i8 0xFB :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8
+  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
+  0x98 :i8 0x9D :i8 1 :as
+end
+
+\ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
+code c64 __c64_plot ( x :i y :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x18 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ Read KERNAL cursor via PLOT ($FFF0, C=1 -> X=row, Y=col -> (col<<8)|row).
+code c64 __c64_plot_get ( -> :i )
+  0x8A :i8 0x48 :i8
+  0x38 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x8A :i8 0x85 :i8 0xFB :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8
+  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
+  0x98 :i8 0x9D :i8 1 :as
+end
+
+fn termwidth ( -> :i ) __c64_screen 255 and end
+fn termheight ( -> :i ) __c64_screen 8 u>> 255 and end
+fn termx ( -> :i ) __c64_plot_get 8 u>> 255 and end
+fn termy ( -> :i ) __c64_plot_get 255 and end
+
+fn termgoto ( x :i y :i )
+  x 0 < if 0 -> x then
+  y 0 < if 0 -> y then
+  x y __c64_plot
+end
+
+\ Applies saved termbg color (`$D021`) and clears the text screen.
+fn termclear ( )
+  __c64_txt_bg 0xD021 i>a i8!
+  147 emit
+end
+
+fn __c64_clr_span ( x :i y :i to_end :i )
+  termwidth -> var w :i
+  termheight -> var h :i
+  y 0 < y h >= or if return then
+  x 0 < if 0 -> x then
+  to_end if h else y 1 + then -> var endy :i
+  y -> var r :i
+  begin r endy < while
+    r y = if x else 0 then -> var cx :i
+    cx r termgoto
+    w cx - -> var cnt :i
+    r h 1 - = if cnt 1 - -> cnt then
+    begin cnt 0 > while
+      32 emit
+      -1 +-> cnt
+    repeat
+    1 +-> r
+  repeat
+  x y termgoto
+end
+
+fn termcleareol ( )
+  termx termy 0 __c64_clr_span
+end
+
+fn termcleareos ( )
+  termx termy 1 __c64_clr_span
+end
+
+\ Set cursor flash flag via BLNSW ($00CC: 0 = enabled, 1 = disabled).
+fn termcursor ( visible :i )
+  visible 0 <> if 0 else 1 then 204 i>a i8!
+end
+
+data __c64_pal
+  0 :i8 2 :i8 5 :i8 7 :i8 6 :i8 4 :i8 3 :i8 1 :i8
+end
+
+fn termfg ( c :i )
+  __c64_pal c 7 and a+ u8@ 646 i>a i8!
+end
+
+\ Records background color for the next termclear (`$D021`; standard text mode has no per-character background).
+fn termbg ( c :i )
+  __c64_pal c 7 and a+ u8@ -> __c64_txt_bg
+end
+
+fn termreset ( )
+  7 termfg
+  0 termbg
+end

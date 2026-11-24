@@ -1,4 +1,4 @@
-\ memory.ir4 - Portable byte-slice memory operations
+\ memory.ir4 - Byte-slice memory operations
 
 \ Fill *len* bytes starting at *dst* with byte value *val*
 default fn memfill ( dst :a len :i val :i )

@@ -9,21 +9,9 @@ LIB_DIR = ROOT / "lib"
 DOCS_DIR = ROOT / "docs" / "lib"
 OUT_PATH = DOCS_DIR / "README.md"
 
-ORDER = [
-    "stdio.ir4",
-    "memory.ir4",
-    "heap.ir4",
-    "math.ir4",
-    "i32.ir4",
-    "graphics.ir4",
-    "sprite.ir4",
-    "sound.ir4",
-    "joystick.ir4",
-    "file.ir4",
-    "system.ir4",
-]
-
-PLATFORMS = sorted(["c64", "x16", "agon", "zx81", "cpm"])
+PLATFORMS = sorted(
+    d.name for d in LIB_DIR.iterdir() if d.is_dir() and not d.name.startswith(".")
+)
 
 FN_RE = re.compile(r"^((?:(?:default|hot)\s+)*)fn\s+(\S+)\s*\(([^)]*)\)")
 CONST_RE = re.compile(r"^(?:default\s+)?const\s+(\S+)\s+\S+\s+(:\S+)")
@@ -123,6 +111,10 @@ def main():
 
     parsed = [(p, *parse_lib(p)) for p in files]
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
+    expected_docs = {p.stem for p in files} | {"README"}
+    for stale in DOCS_DIR.glob("*.md"):
+        if stale.stem not in expected_docs:
+            stale.unlink()
 
     for p, header, entries in parsed:
         mod_stem = p.stem

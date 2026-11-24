@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/sprite.ir4](../../lib/sprite.ir4)
 
-Hardware sprites (optional override per platform)
+Hardware sprites
 
 ## Functions
 

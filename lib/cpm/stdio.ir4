@@ -17,19 +17,3 @@ end
 fn cpm_exit ( )
   0 0 bdos drop
 end
-
-fn cls ( )
-  27 emit 72 emit 27 emit 74 emit
-end
-
-fn gotoxy ( x :i y :i )
-  27 emit 89 emit y 32 + emit x 32 + emit
-end
-
-fn fgcolor ( c :i )
-  c drop
-end
-
-fn bgcolor ( c :i )
-  c drop
-end

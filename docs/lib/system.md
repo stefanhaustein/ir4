@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/system.ir4](../../lib/system.ir4)
 
-Portable system, CLI arguments, environment, CWD, and clock API
+System, CLI arguments, environment, CWD, and clock API
 
 ## Functions
 
@@ -37,6 +37,10 @@ Portable system, CLI arguments, environment, CWD, and clock API
 ### agon
 
 Agon Light MOS system, CLI args, CWD, and millisecond clock
+
+### arm64
+
+macOS ARM64 JIT system, CLI args, environment, CWD, and clock
 
 ### c64
 

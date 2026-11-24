@@ -146,31 +146,6 @@ fn typeb ( n :i )
   n w typebw
 end
 
-\ Clear screen (using active background color where supported) and home cursor (ANSI default)
-default fn cls ( )
-  27 emit 91 emit 50 emit 74 emit
-  27 emit 91 emit 72 emit
-end
-
-\ Move text cursor to 0-based column *x*, row *y* (ANSI default)
-default fn gotoxy ( x :i y :i )
-  27 emit 91 emit
-  y 1 + typeu
-  59 emit
-  x 1 + typeu
-  72 emit
-end
-
-\ Return terminal width in columns (default: 80)
-default fn termwidth ( -> :i )
-  80
-end
-
-\ Return terminal height in rows (default: 24)
-default fn termheight ( -> :i )
-  24
-end
-
 \ Non-blocking read of next buffered character; returns and consumes char code or 0 if none ready; default: 0
 default fn inkey ( -> :i )
   0
@@ -189,20 +164,6 @@ end
 \ Blocking read of next key mapped to normalized ASCII (defaults to raw key)
 default fn xkey ( -> :i )
   key
-end
-
-\ Set foreground text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
-default fn fgcolor ( c :i )
-  27 emit 91 emit
-  c 8 < if 30 c + else 82 c + then typeu
-  109 emit
-end
-
-\ Set background text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
-default fn bgcolor ( c :i )
-  27 emit 91 emit
-  c 8 < if 40 c + else 92 c + then typeu
-  109 emit
 end
 
 \ Select text character set (`charset_native` or `charset_text`; no-op where fixed)

@@ -1,7 +1,7 @@
 \ graphics.ir4 - Pixel graphics (default: ANSI 16-color VGA / 256-color UTF-8 half-block backend)
 \ Platform overrides implement the `default fn` entries below.
 
-require "stdio.ir4"
+require "terminal.ir4"
 require "memory.ir4"
 require "heap.ir4"
 
@@ -56,7 +56,7 @@ default fn gfxmode ( mode :i )
     __gfx_fb cells 0 memfill
     15 -> __gfx_col
   then
-  cls
+  termclear
 end
 
 \ Restore text mode and release graphics resources
@@ -66,7 +66,7 @@ default fn gfxdone ( )
     0 i>a -> __gfx_fb
   then
   27 emit 91 emit 48 emit 109 emit
-  0 termheight 1 - gotoxy
+  0 termheight 1 - termgoto
   cr
 end
 
@@ -143,7 +143,7 @@ fn __gfx_sgr_fg ( c :i )
   __gfx_depth 8 = if
     27 emit 91 emit 51 emit 56 emit 59 emit 53 emit 59 emit c typeu 109 emit
   else
-    c fgcolor
+    c termfg
   then
 end
 
@@ -151,12 +151,12 @@ fn __gfx_sgr_bg ( c :i )
   __gfx_depth 8 = if
     27 emit 91 emit 52 emit 56 emit 59 emit 53 emit 59 emit c typeu 109 emit
   else
-    c bgcolor
+    c termbg
   then
 end
 
 fn __gfx_emit_cell ( cx :i cy :i top :i bot :i )
-  cx cy gotoxy
+  cx cy termgoto
   top __gfx_sgr_fg
   bot __gfx_sgr_bg
   226 emit 150 emit 128 emit
@@ -285,7 +285,7 @@ default fn gfxclear ( )
     __gfx_fb cells __gfx_col 4 << __gfx_col or memfill
   then
   __gfx_col __gfx_sgr_bg
-  cls
+  termclear
 end
 
 \ Draw a circle outline of radius *r* centered at (*cx*, *cy*) using the midpoint algorithm
@@ -339,7 +339,7 @@ default fn gfxtext ( x :i y :i s :a len :i )
         bg __gfx_sgr_bg
         bg -> last_bg
       then
-      cx row gotoxy
+      cx row termgoto
       s i a+ u8@ emit
     then
     1 +-> i

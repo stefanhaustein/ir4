@@ -1,0 +1,101 @@
+\ lib/x16/terminal.ir4 - Commander X16 KERNAL text screen & cursor control
+
+require "stdio.ir4"
+
+\ Query KERNAL screen size via SCREEN ($FFED: X=cols, Y=rows)
+code x16 __x16_screen ( -> :i )
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xED :i8 0xFF :i8
+  0x8A :i8 0x85 :i8 0x02 :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8
+  0xA5 :i8 0x02 :i8 0x9D :i8 0 :as
+  0x98 :i8 0x9D :i8 1 :as
+end
+
+\ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
+code x16 __x16_plot ( x :i y :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x18 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+\ Read KERNAL cursor via PLOT ($FFF0, C=1 -> X=row, Y=col -> (col<<8)|row).
+code x16 __x16_plot_get ( -> :i )
+  0x8A :i8 0x48 :i8
+  0x38 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
+  0x8A :i8 0x85 :i8 0x02 :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8
+  0xA5 :i8 0x02 :i8 0x9D :i8 0 :as
+  0x98 :i8 0x9D :i8 1 :as
+end
+
+fn termwidth ( -> :i ) __x16_screen 255 and end
+fn termheight ( -> :i ) __x16_screen 8 u>> 255 and end
+fn termx ( -> :i ) __x16_plot_get 8 u>> 255 and end
+fn termy ( -> :i ) __x16_plot_get 255 and end
+
+fn termclear ( ) 147 emit end
+
+fn termgoto ( x :i y :i )
+  x 0 < if 0 -> x then
+  y 0 < if 0 -> y then
+  x y __x16_plot
+end
+
+fn __x16_clr_span ( x :i y :i to_end :i )
+  termwidth -> var w :i
+  termheight -> var h :i
+  y 0 < y h >= or if return then
+  x 0 < if 0 -> x then
+  to_end if h else y 1 + then -> var endy :i
+  y -> var r :i
+  begin r endy < while
+    r y = if x else 0 then -> var cx :i
+    cx r termgoto
+    w cx - -> var cnt :i
+    r h 1 - = if cnt 1 - -> cnt then
+    begin cnt 0 > while
+      32 emit
+      -1 +-> cnt
+    repeat
+    1 +-> r
+  repeat
+  x y termgoto
+end
+
+fn termcleareol ( )
+  termx termy 0 __x16_clr_span
+end
+
+fn termcleareos ( )
+  termx termy 1 __x16_clr_span
+end
+
+\ No-op on X16 (no single KERNAL cursor visibility toggle)
+fn termcursor ( visible :i ) visible drop end
+
+\ ANSI 0..7 -> PETSCII color control bytes (black, red, green, yellow, blue, purple, cyan, white)
+data __x16_fg_codes
+  144 :i8 28 :i8 30 :i8 158 :i8 31 :i8 156 :i8 159 :i8 5 :i8
+end
+
+fn termfg ( c :i )
+  __x16_fg_codes c 7 and a+ u8@ emit
+end
+
+fn termbg ( c :i )
+  1 emit
+  c termfg
+  1 emit
+end
+
+fn termreset ( )
+  7 termfg
+  0 termbg
+end

@@ -1,0 +1,73 @@
+\ lib/terminal.ir4 - Text screen & cursor control (ANSI defaults)
+
+require "stdio.ir4"
+
+\ Return terminal width in columns (default: 80)
+default fn termwidth ( -> :i )
+  80
+end
+
+\ Return terminal height in rows (default: 24)
+default fn termheight ( -> :i )
+  24
+end
+
+\ Return current 0-based cursor column, or < 0 if cursor readback is unsupported
+default fn termx ( -> :i )
+  -1
+end
+
+\ Return current 0-based cursor row, or < 0 if cursor readback is unsupported
+default fn termy ( -> :i )
+  -1
+end
+
+\ Clear screen (applying active background color where supported) and home cursor (ANSI default)
+default fn termclear ( )
+  27 emit 91 emit 50 emit 74 emit
+  27 emit 91 emit 72 emit
+end
+
+\ Clear from cursor to end of current line (ANSI default)
+default fn termcleareol ( )
+  27 emit 91 emit 75 emit
+end
+
+\ Clear from cursor to end of screen (ANSI default)
+default fn termcleareos ( )
+  27 emit 91 emit 74 emit
+end
+
+\ Move text cursor to 0-based column *x*, row *y* (ANSI default)
+default fn termgoto ( x :i y :i )
+  27 emit 91 emit
+  y 1 + typeu
+  59 emit
+  x 1 + typeu
+  72 emit
+end
+
+\ Show (*visible* <> 0) or hide (*visible* = 0) the text cursor (ANSI default)
+default fn termcursor ( visible :i )
+  27 emit 91 emit 63 emit 50 emit 53 emit
+  visible 0 <> if 104 else 108 then emit
+end
+
+\ Set foreground text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
+default fn termfg ( c :i )
+  27 emit 91 emit
+  c 8 < if 30 c + else 82 c + then typeu
+  109 emit
+end
+
+\ Set background text color *c* using ANSI color index (0..7, 8..15 bright; ANSI default)
+default fn termbg ( c :i )
+  27 emit 91 emit
+  c 8 < if 40 c + else 92 c + then typeu
+  109 emit
+end
+
+\ Reset text attributes and colors to terminal defaults (ANSI default)
+default fn termreset ( )
+  27 emit 91 emit 48 emit 109 emit
+end

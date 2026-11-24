@@ -1,6 +1,6 @@
 \ cpm/graphics.ir4 - CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
 
-require "stdio.ir4"
+require "terminal.ir4"
 
 data __cpm_ramp
   " .:+*%#@"
@@ -28,11 +28,11 @@ fn gfxmode ( mode :i )
   termwidth -> __cpm_w
   termheight -> __cpm_h
   7 -> __cpm_col
-  cls
+  termclear
 end
 
 fn gfxdone ( )
-  0 __cpm_h 1 - gotoxy
+  0 __cpm_h 1 - termgoto
   cr
 end
 
@@ -48,7 +48,7 @@ end
 
 fn gfxpx ( x :i y :i )
   x 0 < x __cpm_w >= or y 0 < y __cpm_h >= or or if return then
-  x y gotoxy
+  x y termgoto
   __cpm_ramp __cpm_col a+ u8@ emit
 end
 
@@ -58,7 +58,7 @@ fn gfxhline ( x :i y :i w :i )
   x w + __cpm_w > if __cpm_w x - -> w then
   w 0 <= if return then
   __cpm_ramp __cpm_col a+ u8@ -> var ch :i
-  x y gotoxy
+  x y termgoto
   begin w 0 > while
     ch emit
     -1 +-> w
@@ -66,7 +66,7 @@ fn gfxhline ( x :i y :i w :i )
 end
 
 fn gfxclear ( )
-  cls
+  termclear
 end
 
 fn gfxcharw ( -> :i ) 1 end
@@ -74,6 +74,6 @@ fn gfxcharh ( -> :i ) 1 end
 
 \ Snaps (*x*, *y*) to VT52 character cell (`x, y`) via `type`.
 fn gfxtext ( x :i y :i s :a len :i )
-  x y gotoxy
+  x y termgoto
   s len type
 end

@@ -2,7 +2,7 @@
 
 [← Library Index](README.md) · Source: [lib/joystick.ir4](../../lib/joystick.ir4)
 
-Joystick and gamepad input (optional override per platform)
+Joystick and gamepad input
 Bitmask returned by joystate:
 1 = Up, 2 = Down, 4 = Left, 8 = Right, 16 = Fire/Btn1, 32 = Btn2, 64 = Select, 128 = Start
 

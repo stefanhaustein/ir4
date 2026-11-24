@@ -1,0 +1,27 @@
+\ lib/cpm/terminal.ir4 - CP/M VT52 terminal screen & cursor control
+
+require "stdio.ir4"
+
+fn termclear ( )
+  27 emit 72 emit 27 emit 74 emit
+end
+
+fn termcleareol ( )
+  27 emit 75 emit
+end
+
+fn termcleareos ( )
+  27 emit 74 emit
+end
+
+fn termgoto ( x :i y :i )
+  27 emit 89 emit y 32 + emit x 32 + emit
+end
+
+fn termcursor ( visible :i )
+  27 emit visible 0 <> if 101 else 102 then emit
+end
+
+fn termfg ( c :i ) c drop end
+fn termbg ( c :i ) c drop end
+fn termreset ( ) end
