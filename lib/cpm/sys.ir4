@@ -1,0 +1,67 @@
+\ lib/cpm/sys.ir4 - CP/M BDOS CLI arguments and current drive letter
+
+require "i32.ir4"
+
+extern __cpm_sys_bdos 0x0005 ( C :i DE :i -> A :i )
+
+fn __cpm_scan_args ( want :i buf :a max :i -> :i )
+  want 0 = if
+    max 0 < if -1 return then
+    max 0 > if 0 buf i8! then
+    0 return
+  then
+  0x0080 i>a u8@ -> var tlen :i
+  tlen 127 > if 127 -> tlen then
+  0x0081 i>a -> var p :a
+  1 -> var cnt :i
+  0 -> var i :i
+  begin
+    begin i tlen < p i a+ u8@ 32 <= and while 1 +-> i repeat
+    i tlen < if
+      want cnt = if
+        max 0 < if -1 return then
+        0 -> var n :i
+        begin
+          i tlen < if
+            p i a+ u8@ -> var ch :i
+            ch 32 > if
+              n max < if ch buf n a+ i8! 1 +-> n then
+              1 +-> i
+              1
+            else
+              0
+            then
+          else
+            0
+          then
+        while repeat
+        n max < if 0 buf n a+ i8! then
+        n return
+      then
+      1 +-> cnt
+      begin i tlen < p i a+ u8@ 32 > and while 1 +-> i repeat
+      1
+    else
+      0
+    then
+  while repeat
+  want 0 < if cnt else -1 then
+end
+
+fn sysargc ( -> :i )
+  -1 0 i>a 0 __cpm_scan_args
+end
+
+fn sysargv ( idx :i buf :a max :i -> :i )
+  idx 0 < if -1 return then
+  idx buf max __cpm_scan_args
+end
+
+fn syscwd ( buf :a max :i -> :i )
+  max 0 < if -1 return then
+  25 0 __cpm_sys_bdos -> var drv :i
+  max 0 > if drv 65 + buf i8! then
+  max 1 > if 58 buf 1 a+ i8! then
+  max 2 > if 0 buf 2 a+ i8! then
+  max 2 < if max else 2 then
+end

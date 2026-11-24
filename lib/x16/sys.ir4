@@ -1,0 +1,168 @@
+\ lib/x16/sys.ir4 - Commander X16 KERNAL system clock, sleep, and CMDR-DOS CWD
+
+require "i32.ir4"
+require "mem.ir4"
+
+\ __x16sys_rdtim32 ( -> :i32 )  RDTIM $FFDE: A=LSB, X=mid, Y=MSB -> 4-byte :i32
+code x16 __x16sys_rdtim32 ( -> :i32 )
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xDE :i8 0xFF :i8
+  0x85 :i8 0x02 :i8
+  0x86 :i8 0x03 :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8 0xCA :i8 0xCA :i8
+  0xA5 :i8 0x02 :i8 0x9D :i8 0 :as
+  0xA5 :i8 0x03 :i8 0x9D :i8 1 :as
+  0x98 :i8 0x9D :i8 2 :as
+  0xA9 :i8 0x00 :i8 0x9D :i8 3 :as
+end
+
+extern __x16sys_readst 0xFFB7 ( -> A :i )
+extern __x16sys_close  0xFFC3 ( A :i )
+extern __x16sys_clrchn 0xFFCC ( )
+extern __x16sys_chrin  0xFFCF ( -> A :i )
+
+code x16 __x16sys_setlfs ( lfn :i dev :i sa :i )
+  0xBD :i8 0 :as 0xA8 :i8
+  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
+  0xBD :i8 4 :as 0x85 :i8 0x02 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x03 :i8
+  0xA5 :i8 0x02 :i8
+  0x20 :i8 0xBA :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+code x16 __x16sys_setnam ( addr :a len :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
+  0xBD :i8 3 :as 0xA8 :i8
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x03 :i8
+  0xA5 :i8 0x02 :i8
+  0x20 :i8 0xBD :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+end
+
+code x16 __x16sys_open ( -> :i )
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xC0 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8
+  0xA9 :i8 0x00 :i8
+  0x90 :i8 0x02 :i8
+  0xA9 :i8 0xFF :i8
+  0x9D :i8 0 :as
+  0x9D :i8 1 :as
+end
+
+code x16 __x16sys_chkin ( lfn :i -> :i )
+  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
+  0x8A :i8 0x48 :i8
+  0xA6 :i8 0x02 :i8
+  0x20 :i8 0xC6 :i8 0xFF :i8
+  0x68 :i8 0xAA :i8
+  0xB0 :i8 0x09 :i8
+  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
+  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
+end
+
+var __x16sys_tok :bytes 64
+var __x16sys_cwd :bytes 128
+
+fn syscwd ( buf :a max :i -> :i )
+  max 0 < if -1 return then
+  128 -> var p :i
+  36 __x16sys_tok i8!
+  61 __x16sys_tok 1 a+ i8!
+  67 __x16sys_tok 2 a+ i8!
+  14 8 0 __x16sys_setlfs
+  __x16sys_tok 3 __x16sys_setnam
+  __x16sys_open 0 <> if -1 return then
+  14 __x16sys_chkin 0 <> if
+    __x16sys_clrchn
+    14 __x16sys_close
+    -1 return
+  then
+  __x16sys_chrin drop
+  __x16sys_chrin drop
+  0 -> var line :i
+  begin
+    __x16sys_chrin -> var lo :i
+    __x16sys_readst 131 and 0 <> if
+      0
+    else
+      __x16sys_chrin -> var hi :i
+      lo 0 = hi 0 = and if
+        0
+      else
+        __x16sys_chrin drop
+        __x16sys_chrin drop
+        0 -> var n :i
+        0 -> var st :i
+        0 -> var is_hdr :i
+        begin
+          __x16sys_chrin -> var c :i
+          __x16sys_readst 195 and 0 <> c 0 = or -> var eol :i
+          c 0 <> if
+            st 0 = if
+              c 18 = if 1 -> is_hdr then
+              c 34 = if 1 -> st then
+            else st 1 = if
+              c 34 = if
+                2 -> st
+              else
+                n 60 < if c __x16sys_tok n a+ i8! 1 +-> n then
+              then
+            then then
+          then
+          eol 0 =
+        while repeat
+        is_hdr 0 = line 0 > and n 0 > and if
+          n 1 = __x16sys_tok u8@ 47 = and if
+            0
+          else
+            p n 1 + - -> var np :i
+            np 0 >= if
+              np -> p
+              47 __x16sys_cwd p a+ i8!
+              __x16sys_cwd p 1 + a+ __x16sys_tok n memcpy
+            then
+            1
+          then
+        else
+          1 +-> line
+          1
+        then
+      then
+    then
+  while repeat
+  __x16sys_clrchn
+  14 __x16sys_close
+  p 128 = if
+    127 -> p
+    47 __x16sys_cwd p a+ i8!
+  then
+  128 p - -> var clen :i
+  clen max > if max -> clen then
+  buf __x16sys_cwd p a+ clen memcpy
+  clen max < if 0 buf clen a+ i8! then
+  clen
+end
+
+fn sysmillis ( -> :i32 )
+  __x16sys_rdtim32 50 i>i32 i32* 3 i>i32 i32/
+end
+
+fn syssleep ( ms :i )
+  ms 0 <= if return then
+  sysmillis -> var t0 :i32
+  ms i>i32 -> var dur :i32
+  begin
+    sysmillis t0 i32- -> var dt :i32
+    dt 0 i>i32 i32< if dt 86400000 i>i32 i32+ -> dt then
+    dt dur i32<
+  while repeat
+end

@@ -1,0 +1,96 @@
+\ lib/agon/sys.ir4 - Agon Light MOS system, CLI args, CWD, and millisecond clock
+
+require "i32.ir4"
+
+\ __agon_sysvars ( -> :a )  MOS $08: returns IX -> HLU
+code agon __agon_sysvars ( -> :a )
+  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
+  0xDD :i8 0xE5 :i8 0xE1 :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ __agon_ffs_getcwd ( buf :a max :i -> :i )  MOS $9E: HL=buf, BC=max -> A=FRESULT
+code agon __agon_ffs_getcwd ( buf :a max :i -> :i )
+  0xFD :i8 0xE1 :i8
+  0xC1 :i8
+  0xE1 :i8
+  0xFD :i8 0xE5 :i8
+  0x3E :i8 0x9E :i8 0x5B :i8 0xCF :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+var __agon_cwdbuf :bytes 256
+
+fn __agon_scan_args ( want :i buf :a max :i -> :i )
+  want 0 = if
+    max 0 < if -1 return then
+    max 0 > if 0 buf i8! then
+    0 return
+  then
+  0x040037 i>a a@ -> var p :a
+  p 0 i>a a= if
+    want 0 < if 1 else -1 then return
+  then
+  1 -> var cnt :i
+  0 -> var i :i
+  begin
+    begin p i a+ u8@ -> var c :i c 0 <> c 32 <= and while 1 +-> i repeat
+    p i a+ u8@ 0 <> if
+      want cnt = if
+        max 0 < if -1 return then
+        0 -> var n :i
+        begin
+          p i a+ u8@ -> var ch :i
+          ch 32 > if
+            n max < if ch buf n a+ i8! 1 +-> n then
+            1 +-> i
+            1
+          else
+            0
+          then
+        while repeat
+        n max < if 0 buf n a+ i8! then
+        n return
+      then
+      1 +-> cnt
+      begin p i a+ u8@ 32 > while 1 +-> i repeat
+      1
+    else
+      0
+    then
+  while repeat
+  want 0 < if cnt else -1 then
+end
+
+fn sysargc ( -> :i )
+  -1 0 i>a 0 __agon_scan_args
+end
+
+fn sysargv ( idx :i buf :a max :i -> :i )
+  idx 0 < if -1 return then
+  idx buf max __agon_scan_args
+end
+
+fn syscwd ( buf :a max :i -> :i )
+  max 0 < if -1 return then
+  __agon_cwdbuf 256 __agon_ffs_getcwd 0 <> if -1 return then
+  0 -> var n :i
+  begin n max < __agon_cwdbuf n a+ u8@ 0 <> and while
+    __agon_cwdbuf n a+ u8@ buf n a+ i8!
+    1 +-> n
+  repeat
+  n max < if 0 buf n a+ i8! then
+  n
+end
+
+fn sysmillis ( -> :i32 )
+  __agon_sysvars i32@ 10 i>i32 i32*
+end
+
+fn syssleep ( ms :i )
+  ms 0 <= if return then
+  sysmillis -> var t0 :i32
+  ms i>i32 -> var dur :i32
+  begin sysmillis t0 i32- dur i32< while repeat
+end

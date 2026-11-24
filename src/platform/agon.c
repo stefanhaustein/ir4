@@ -6,9 +6,11 @@
 size_t be_ez80_rsp_off(void);
 size_t be_ez80_rstack_top_off(void);
 
+static size_t agon_base = 0x040000UL;
+
 static void agon_begin(size_t base) {
     size_t i;
-    (void)base;
+    agon_base = base;
     /* Reserve JP start (4 bytes) + pad to 0x40 + "MOS" header (5 bytes) */
     cb_emit8(EZ80_JP);
     cb_emit24(0);
@@ -33,6 +35,16 @@ static void agon_end(int main_idx) {
     }
 
     cb_patch24(1, entry);
+
+    /* Preserve MOS entry HL (cmd tail ptr), IX (argv), BC (C = argc) in header pad 0x37..0x3F */
+    cb_emit8(EZ80_LD_NN_HL);
+    cb_emit24((u32)(agon_base + 0x37));
+    cb_emit8(0xDD);
+    cb_emit8(0x22);
+    cb_emit24((u32)(agon_base + 0x3A));
+    cb_emit8(0xED);
+    cb_emit8(0x43);
+    cb_emit24((u32)(agon_base + 0x3D));
 
     /* Initialize BSS return stack pointer */
     cb_emit8(EZ80_LD_HL_N24);

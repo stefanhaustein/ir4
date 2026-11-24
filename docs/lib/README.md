@@ -21,3 +21,4 @@
 - [sfx](sfx.md) — Sound effects (optional override per platform)
 - [sprite](sprite.md) — Hardware sprites (optional override per platform)
 - [stdio](stdio.md) — Console I/O, formatting, and screen control
+- [sys](sys.md) — Portable system, CLI arguments, environment, CWD, and clock API

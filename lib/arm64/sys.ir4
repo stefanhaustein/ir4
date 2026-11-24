@@ -1,0 +1,61 @@
+\ lib/arm64/sys.ir4 - macOS ARM64 JIT system, CLI args, environment, CWD, and clock
+
+require "i32.ir4"
+
+extern __ir4_jit_argc ( -> :i )
+extern __ir4_jit_argv ( idx :i -> :a )
+extern getenv ( name0 :a -> :a )
+extern getcwd ( buf :a size :i -> :a )
+extern clock_gettime ( clk_id :i tp :a -> :i )
+extern usleep ( usec :i -> :i )
+
+var __arm64_tp :bytes 16
+var __arm64_sysbuf :bytes 4096
+
+fn __arm64_copy_z ( cstr :a buf :a max :i -> :i )
+  cstr 0 i>a a= max 0 < or if -1 return then
+  0 -> var n :i
+  begin n max < cstr n a+ u8@ 0 <> and while
+    cstr n a+ u8@ buf n a+ i8!
+    1 +-> n
+  repeat
+  n max < if 0 buf n a+ i8! then
+  n
+end
+
+fn sysargc ( -> :i )
+  __ir4_jit_argc
+end
+
+fn sysargv ( idx :i buf :a max :i -> :i )
+  idx __ir4_jit_argv buf max __arm64_copy_z
+end
+
+fn sysenv ( name :a nlen :i buf :a max :i -> :i )
+  nlen 0 < nlen 4095 > or if -1 return then
+  0 -> var i :i
+  begin i nlen < while
+    name i a+ u8@ __arm64_sysbuf i a+ i8!
+    1 +-> i
+  repeat
+  0 __arm64_sysbuf nlen a+ i8!
+  __arm64_sysbuf getenv buf max __arm64_copy_z
+end
+
+fn syscwd ( buf :a max :i -> :i )
+  max 0 < if -1 return then
+  __arm64_sysbuf 4096 getcwd -> var res :a
+  res 0 i>a a= if -1 return then
+  __arm64_sysbuf buf max __arm64_copy_z
+end
+
+fn sysmillis ( -> :i32 )
+  6 __arm64_tp clock_gettime drop
+  __arm64_tp @ 1000 * __arm64_tp 8 a+ @ 1000000 / + i>i32
+end
+
+fn syssleep ( ms :i )
+  ms 0 > if
+    ms 1000 * usleep drop
+  then
+end

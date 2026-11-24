@@ -2,11 +2,31 @@
 #include "codebuf.h"
 #include "frontend.h"
 
+static const char *jit_prog_name = NULL;
+static int jit_user_argc = 0;
+static char **jit_user_argv = NULL;
+
+void ir4_jit_set_args(const char *prog, int argc, char **argv) {
+    jit_prog_name = prog;
+    jit_user_argc = (argc > 0 && argv) ? argc : 0;
+    jit_user_argv = jit_user_argc ? argv : NULL;
+}
+
 #if defined(__APPLE__) && defined(__aarch64__)
 #include <dlfcn.h>
 #include <libkern/OSCacheControl.h>
 #include <pthread.h>
 #include <sys/mman.h>
+
+static long jit_get_argc(void) { return jit_prog_name ? (long)(1 + jit_user_argc) : 0; }
+
+static const char *jit_get_argv(long idx) {
+    if (idx == 0)
+        return jit_prog_name;
+    if (idx > 0 && idx <= (long)jit_user_argc)
+        return jit_user_argv[idx - 1];
+    return NULL;
+}
 
 /* Tiny ARM64 C-to-IR4th wrapper emitted at the end of code_buf:
  *   STP X29, X30, [SP, #-16]!
@@ -101,8 +121,15 @@ static void arm64_run_jit(size_t main_idx) {
             for (i = 0; i < cb_extern_reloc_count(); i++) {
                 size_t off;
                 const char *name = cb_extern_reloc_name(i, &off);
-                void *sym = dlsym(RTLD_DEFAULT, name);
+                void *sym;
                 unsigned long addr;
+                if (strcmp(name, "__ir4_jit_argc") == 0) {
+                    sym = (void *)jit_get_argc;
+                } else if (strcmp(name, "__ir4_jit_argv") == 0) {
+                    sym = (void *)jit_get_argv;
+                } else {
+                    sym = dlsym(RTLD_DEFAULT, name);
+                }
                 if (!sym) {
                     fprintf(stderr, "JIT: unresolved extern '%s'\n", name);
                     exit(1);

@@ -87,6 +87,10 @@ test: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -O0 -t arm64 -o $(BUILD)/peephole_o0_arm64.bin --run tests/test_peephole.ir4
 	./$(TARGET) -t cpm   -o $(BUILD)/file_cpm.com     tests/test_file.ir4
 	cd $(BUILD) && ../$(TARGET) -t arm64 -o file_arm64.bin --run ../tests/test_file.ir4 && rm -f IR4TEST.TMP
+	./$(TARGET) -t c64   -o $(BUILD)/sys_c64.prg        tests/test_sys.ir4
+	./$(TARGET) -t x16   -o $(BUILD)/sys_x16.prg        tests/test_sys.ir4
+	./$(TARGET) -t cpm   -o $(BUILD)/sys_cpm.com        tests/test_sys.ir4
+	./$(TARGET) -t arm64 -o $(BUILD)/sys_arm64.bin      --run tests/test_sys.ir4 -- ALPHA BETA
 	./$(TARGET) -t c64   -o $(BUILD)/rtl_c64.prg        tests/test_rtl.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/rtl_x16.prg        tests/test_rtl.ir4
 	./$(TARGET) -t arm64 -o $(BUILD)/rtl_arm64.bin      --run tests/test_rtl.ir4 >/dev/null
@@ -139,6 +143,7 @@ test-z80: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t cpm -o build/fnptr.com    tests/test_fnptr.ir4
 	./$(TARGET) -t cpm -o build/peephole.com tests/test_peephole.ir4
 	./$(TARGET) -t cpm -o build/file.com     tests/test_file.ir4
+	./$(TARGET) -t cpm -o build/sys.com      tests/test_sys.ir4
 	./$(TARGET) -t cpm -o build/rtl.com      tests/test_rtl.ir4
 	./$(TARGET) -t cpm -o build/stdio.com    tests/test_stdio.ir4
 	./$(TARGET) -t cpm -o build/gfx.com      tests/test_gfx.ir4
@@ -146,17 +151,20 @@ test-z80: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t cpm -o build/sfx.com      tests/test_sfx.ir4
 	./$(TARGET) -t cpm -o build/sprite.com   tests/test_sprite.ir4
 	@if command -v tnylpo >/dev/null 2>&1; then \
-		for pair in "fib.com:0" "core.com:0" "muldiv.com:0" "mem.com:0" "float.com:0" "req.com:0" "data.com:0" "ext.com:OK0" "i32.com:0" "fnptr.com:0" "peephole.com:0" "file.com:0" "joy.com:0" "sfx.com:0"; do \
+		for pair in "fib.com:0" "core.com:0" "muldiv.com:0" "mem.com:0" "float.com:0" "req.com:0" "data.com:0" "ext.com:OK0" "i32.com:0" "fnptr.com:0" "peephole.com:0" "file.com:0" "sys.com:0" "joy.com:0" "sfx.com:0"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(cd $(BUILD) && tnylpo $$f | tr -d '\r\n'); \
 			echo "tnylpo $$f -> $$out"; \
-			test "$$out" = "$$exp"; \
+			test "$$out" = "$$exp" || exit 1; \
 		done; \
+		out=$$(cd $(BUILD) && tnylpo sys.com ALPHA BETA | tr -d '\r\n'); \
+		echo "tnylpo sys.com ALPHA BETA -> $$out"; \
+		test "$$out" = "0" || exit 1; \
 		rm -f $(BUILD)/IR4TEST.TMP; \
 		for f in rtl.com stdio.com gfx.com sprite.com; do \
 			out=$$(cd $(BUILD) && tnylpo $$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "tnylpo $$f -> $$out"; \
-			test "$$out" = "0"; \
+			test "$$out" = "0" || exit 1; \
 		done; \
 	else \
 		echo "tnylpo not found; skipping Z80 execution"; \
@@ -176,6 +184,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t agon -o $(BUILD)/i32_agon.bin      tests/test_i32.ir4
 	./$(TARGET) -t agon -o $(BUILD)/peephole_agon.bin tests/test_peephole.ir4
 	./$(TARGET) -t agon -o $(BUILD)/file_agon.bin     tests/test_file.ir4
+	./$(TARGET) -t agon -o $(BUILD)/sys_agon.bin      tests/test_sys.ir4
 	./$(TARGET) -t agon -o $(BUILD)/rtl_agon.bin      tests/test_rtl.ir4
 	./$(TARGET) -t agon -o $(BUILD)/stdio_agon.bin    tests/test_stdio.ir4
 	./$(TARGET) -t agon -o $(BUILD)/gfx_agon.bin      tests/test_gfx.ir4
@@ -186,7 +195,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 	if [ -n "$$emu" ] && [ -x "$$emu" ]; then \
 		sd="$$(pwd)/$(BUILD)/agon-sd"; \
 		mkdir -p "$$sd"; \
-		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000" "peephole_agon.bin:000000" "file_agon.bin:000000" "rtl_agon.bin:000000" "stdio_agon.bin:000000" "gfx_agon.bin:000000" "joy_agon.bin:000000" "sfx_agon.bin:000000" "sprite_agon.bin:000000"; do \
+		for pair in "fib_agon.bin:000000" "core_agon.bin:000000" "muldiv_agon.bin:000000" "mem_agon.bin:000000" "float_agon.bin:000000" "req_agon.bin:000000" "data_agon.bin:000000" "ext_agon.bin:000000" "math_agon.bin:000000" "fnptr_agon.bin:000000" "i32_agon.bin:000000" "peephole_agon.bin:000000" "file_agon.bin:000000" "sys_agon.bin:000000" "rtl_agon.bin:000000" "stdio_agon.bin:000000" "gfx_agon.bin:000000" "joy_agon.bin:000000" "sfx_agon.bin:000000" "sprite_agon.bin:000000"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			cp $(BUILD)/$$f "$$sd/test.bin"; \
 			printf "load test.bin\nrun\n" > "$$sd/autoexec.txt"; \
@@ -212,6 +221,7 @@ test-6502: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/fnptr_sim65.bin    tests/test_fnptr.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/peephole_sim65.bin tests/test_peephole.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/file_sim65.bin     tests/test_file.ir4
+	./$(TARGET) -t sim65 -o $(BUILD)/sys_sim65.bin      tests/test_sys.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/rtl_sim65.bin      tests/test_rtl.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/stdio_sim65.bin    tests/test_stdio.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/gfx_sim65.bin      tests/test_gfx.ir4
@@ -219,7 +229,7 @@ test-6502: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/sfx_sim65.bin      tests/test_sfx.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/sprite_sim65.bin   tests/test_sprite.ir4
 	@if command -v sim65 >/dev/null 2>&1; then \
-		for pair in "fib_sim65.bin:0" "core_sim65.bin:0" "muldiv_sim65.bin:0" "mem_sim65.bin:0" "float_sim65.bin:0" "req_sim65.bin:0" "data_sim65.bin:0" "ext_sim65.bin:OK0" "math_sim65.bin:0" "i32_sim65.bin:0" "fnptr_sim65.bin:0" "peephole_sim65.bin:0" "file_sim65.bin:0" "joy_sim65.bin:0" "sfx_sim65.bin:0"; do \
+		for pair in "fib_sim65.bin:0" "core_sim65.bin:0" "muldiv_sim65.bin:0" "mem_sim65.bin:0" "float_sim65.bin:0" "req_sim65.bin:0" "data_sim65.bin:0" "ext_sim65.bin:OK0" "math_sim65.bin:0" "i32_sim65.bin:0" "fnptr_sim65.bin:0" "peephole_sim65.bin:0" "file_sim65.bin:0" "sys_sim65.bin:0" "joy_sim65.bin:0" "sfx_sim65.bin:0"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(sim65 $(BUILD)/$$f | tr -d '\r\n'); \
 			echo "sim65 $$f -> $$out"; \
@@ -248,6 +258,7 @@ test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/fnptr_rv32.elf    tests/test_fnptr.ir4
 	./$(TARGET) -t virt -o $(BUILD)/peephole_rv32.elf tests/test_peephole.ir4
 	./$(TARGET) -t virt -o $(BUILD)/file_rv32.elf     tests/test_file.ir4
+	./$(TARGET) -t virt -o $(BUILD)/sys_rv32.elf      tests/test_sys.ir4
 	./$(TARGET) -t virt -o $(BUILD)/rtl_rv32.elf      tests/test_rtl.ir4
 	./$(TARGET) -t virt -o $(BUILD)/stdio_rv32.elf    tests/test_stdio.ir4
 	./$(TARGET) -t virt -o $(BUILD)/gfx_rv32.elf      tests/test_gfx.ir4
@@ -255,7 +266,7 @@ test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/sfx_rv32.elf      tests/test_sfx.ir4
 	./$(TARGET) -t virt -o $(BUILD)/sprite_rv32.elf   tests/test_sprite.ir4
 	@if command -v qemu-system-riscv32 >/dev/null 2>&1; then \
-		for pair in "fib_rv32.elf:0" "core_rv32.elf:0" "muldiv_rv32.elf:0" "mem_rv32.elf:0" "float_rv32.elf:0" "req_rv32.elf:0" "data_rv32.elf:0" "ext_rv32.elf:OK0" "math_rv32.elf:0" "i32_rv32.elf:0" "fnptr_rv32.elf:0" "peephole_rv32.elf:0" "file_rv32.elf:0" "joy_rv32.elf:0" "sfx_rv32.elf:0"; do \
+		for pair in "fib_rv32.elf:0" "core_rv32.elf:0" "muldiv_rv32.elf:0" "mem_rv32.elf:0" "float_rv32.elf:0" "req_rv32.elf:0" "data_rv32.elf:0" "ext_rv32.elf:OK0" "math_rv32.elf:0" "i32_rv32.elf:0" "fnptr_rv32.elf:0" "peephole_rv32.elf:0" "file_rv32.elf:0" "sys_rv32.elf:0" "joy_rv32.elf:0" "sfx_rv32.elf:0"; do \
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(qemu-system-riscv32 -machine virt -cpu rv32 -bios none -nographic -kernel $(BUILD)/$$f | tr -d '\r\n'); \
 			echo "qemu-system-riscv32 $$f -> $$out"; \

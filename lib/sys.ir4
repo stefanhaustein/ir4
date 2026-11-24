@@ -1,0 +1,45 @@
+\ lib/sys.ir4 - Portable system, CLI arguments, environment, CWD, and clock API
+
+require "i32.ir4"
+
+\ Return number of command-line arguments (including index 0); 0 if unavailable
+default fn sysargc ( -> :i )
+  0
+end
+
+\ Copy argument idx (0 .. sysargc-1) into buf (at most max bytes); return length or < 0 if unavailable
+default fn sysargv ( idx :i buf :a max :i -> :i )
+  idx drop buf drop max drop
+  -1
+end
+
+\ Look up environment variable name (nlen bytes); copy up to max bytes into buf; return length or < 0
+default fn sysenv ( name :a nlen :i buf :a max :i -> :i )
+  name drop nlen drop buf drop max drop
+  -1
+end
+
+\ Copy current working directory path into buf (at most max bytes); return length or < 0
+default fn syscwd ( buf :a max :i -> :i )
+  buf drop max drop
+  -1
+end
+
+\ Return monotonic millisecond counter as 32-bit signed integer (:i32)
+default fn sysmillis ( -> :i32 )
+  0 i>i32
+end
+
+\ Sleep for approximately ms milliseconds
+default fn syssleep ( ms :i )
+  ms drop
+end
+
+\ Look up NUL-terminated environment variable name0; copy up to max bytes into buf; return length or < 0
+fn sysenv0 ( name0 :a buf :a max :i -> :i )
+  0 -> var nlen :i
+  begin name0 nlen a+ u8@ 0 <> while
+    1 +-> nlen
+  repeat
+  name0 nlen buf max sysenv
+end

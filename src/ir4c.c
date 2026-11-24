@@ -36,7 +36,7 @@ static const Platform *const platforms[] = {
 static void print_usage(void) {
     fprintf(stderr, "Usage: ir4c [-t z80|ez80|6502|arm64|rv32|bc|cpm|zx81|agon|sim65|c64|x16|x16-cart|virt|obj] "
                     "[-b hex_addr] [-o out.bin] [-I dir] [-O0|-O1] [--platform name] "
-                    "[--zp hex_addr] [--stack-zp hex_addr] [--no-stack-zp] [--run] <input.ir4>\n");
+                    "[--zp hex_addr] [--stack-zp hex_addr] [--no-stack-zp] [--run] <input.ir4> [-- <args...>]\n");
 }
 
 int main(int argc, char **argv) {
@@ -67,6 +67,8 @@ int main(int argc, char **argv) {
     const char *platform = NULL;
     int target_set = 0;
     int base_set = 0;
+    int run_argc = 0;
+    char **run_argv = NULL;
     int i;
     int j;
     FILE *in_fp;
@@ -203,6 +205,10 @@ int main(int argc, char **argv) {
             if (!platform && plat->req_platform) {
                 platform = plat->req_platform;
             }
+        } else if (strcmp(argv[i], "--") == 0) {
+            run_argc = argc - (i + 1);
+            run_argv = argv + (i + 1);
+            break;
         } else if (argv[i][0] == '-') {
             print_usage();
             return 1;
@@ -215,6 +221,13 @@ int main(int argc, char **argv) {
         print_usage();
         return 1;
     }
+
+#if IR4_ENABLE_JIT
+    ir4_jit_set_args(in_path, run_argc, run_argv);
+#else
+    (void)run_argc;
+    (void)run_argv;
+#endif
 
     in_fp = fopen(in_path, "r");
     if (!in_fp) {

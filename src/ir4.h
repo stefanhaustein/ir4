@@ -321,5 +321,6 @@ void be_6502_peep_fence(void);
 void be_6502_set_trampoline(u16 bank_call_addr, u16 kernal_call_addr);
 void be_6502_ensure_helpers(int need_mul, int need_div, int need_icall, int need_fp);
 void be_rv32_set_obj(int obj);
+void ir4_jit_set_args(const char *prog, int argc, char **argv);
 
 #endif /* IR4_H */

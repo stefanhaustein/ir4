@@ -1,0 +1,32 @@
+\ lib/c64/sys.ir4 - Commodore 64 KERNAL system clock and sleep
+
+require "i32.ir4"
+
+\ __c64_rdtim32 ( -> :i32 )  RDTIM $FFDE: A=LSB, X=mid, Y=MSB -> 4-byte :i32
+code c64 __c64_rdtim32 ( -> :i32 )
+  0x8A :i8 0x48 :i8
+  0x20 :i8 0xDE :i8 0xFF :i8
+  0x85 :i8 0xFB :i8
+  0x86 :i8 0xFC :i8
+  0x68 :i8 0xAA :i8
+  0xCA :i8 0xCA :i8 0xCA :i8 0xCA :i8
+  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
+  0xA5 :i8 0xFC :i8 0x9D :i8 1 :as
+  0x98 :i8 0x9D :i8 2 :as
+  0xA9 :i8 0x00 :i8 0x9D :i8 3 :as
+end
+
+fn sysmillis ( -> :i32 )
+  __c64_rdtim32 50 i>i32 i32* 3 i>i32 i32/
+end
+
+fn syssleep ( ms :i )
+  ms 0 <= if return then
+  sysmillis -> var t0 :i32
+  ms i>i32 -> var dur :i32
+  begin
+    sysmillis t0 i32- -> var dt :i32
+    dt 0 i>i32 i32< if dt 86400000 i>i32 i32+ -> dt then
+    dt dur i32<
+  while repeat
+end
