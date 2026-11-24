@@ -16,6 +16,10 @@ end
 
 var __x16_charset :i
 
+init
+  0 -> __x16_charset
+end
+
 \ Maps key input to normalized ASCII (direct pass-through in ISO `charset_text`; PETSCII case swap in `charset_native`).
 fn xinkey ( -> :i )
   inkey -> var c :i

@@ -268,8 +268,10 @@ void cb_patch_data_init_relocs_base(u32 code_base, u32 data_base) {
 
 void cb_patch_data_relocs(size_t data_base) {
     size_t i;
+    size_t heap_off = cb_data_size();
     for (i = 0; i < relocs.len; i++) {
-        size_t addr = data_base + relocs.data[i].data_offset;
+        size_t off = relocs.data[i].data_offset;
+        size_t addr = data_base + (off == CB_HEAP_START_OFF ? heap_off : off);
         if (relocs.data[i].split) {
             code_buf.data[relocs.data[i].off1] = (u8)(addr & 0xFF);
             code_buf.data[relocs.data[i].off2] = (u8)((addr >> 8) & 0xFF);

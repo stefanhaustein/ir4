@@ -39,6 +39,11 @@ code x16 __x16_keyhdl ( )
 end
 
 init
+  0 -> var i :i
+  begin i 16 < while
+    0 __x16_keys i a+ i8!
+    1 +-> i
+  repeat
   & __x16_keyhdl 0x032E i>a a!
 end
 

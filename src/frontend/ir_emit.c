@@ -314,9 +314,17 @@ static void emit_word(size_t fidx) {
                 }
                 be->push_data(ins->u.offset);
                 break;
-            case IR_PUSH_HEAP_START:
-                be->push_data(heap_start_off);
+            case IR_PUSH_HEAP_START: {
+                size_t off = CB_HEAP_START_OFF;
+#if IR4_ENABLE_ARM64
+                if (be == &be_arm64) off = heap_start_off;
+#endif
+#if IR4_ENABLE_RV32
+                if (be == &be_rv32) off = heap_start_off;
+#endif
+                be->push_data(off);
                 break;
+            }
             case IR_LOCAL_OP:
                 if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
                     if (ir_can_fuse(w, i, 3) &&

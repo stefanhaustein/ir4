@@ -12,6 +12,14 @@ var __gfx_col :i
 var __gfx_depth :i
 var __gfx_fb :a
 
+init
+  0 -> __gfx_w
+  0 -> __gfx_h
+  15 -> __gfx_col
+  4 -> __gfx_depth
+  0 i>a -> __gfx_fb
+end
+
 \ Returns (addr, count) of :i16 4-tuples: (mode, width, height, depth_bpp)
 default fn gfxmodes ( -> :a :i )
   0 __gfx_def_modes i16!
@@ -182,6 +190,20 @@ default fn gfxpx ( x :i y :i )
   then
   val cell i8!
   x row val 4 u>> val 15 and __gfx_emit_cell
+end
+
+\ Read pixel color index at (*x*, *y*), or < 0 if out of bounds or unsupported
+default fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x __gfx_w >= or y 0 < y __gfx_h >= or or if -1 return then
+  __gfx_fb 0 i>a a= if -1 return then
+  y 1 u>> -> var row :i
+  __gfx_depth 8 = if
+    __gfx_fb row __gfx_w * x + 1 << a+ -> var cell :a
+    y 1 and 0 = if cell u8@ else cell 1 a+ u8@ then
+    return
+  then
+  __gfx_fb row __gfx_w * x + a+ u8@ -> var val :i
+  y 1 and 0 = if val 4 u>> else val 15 and then
 end
 
 \ Draw a horizontal line of width *w* starting at (*x*, *y*) (default: gfxpx loop)

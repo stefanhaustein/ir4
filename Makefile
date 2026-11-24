@@ -206,7 +206,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 			printf "load test.bin\nrun\n" > "$$sd/autoexec.txt"; \
 			bc=$$(cd "$$(dirname "$$emu")" && printf "state\nexit\n" | SDL_AUDIODRIVER=dummy SDL_VIDEO_DRIVER=dummy "./$$(basename "$$emu")" -u --sdcard "$$sd" --debugger -b 0x000d5f | sed -n 's/.*\* 000d5f:.* BC:\([0-9a-fA-F]*\).*/\1/p' | head -n1); \
 			echo "fab-agon-emulator $$f -> BC=$$bc"; \
-			test "$$bc" = "$$exp"; \
+			test "$$bc" = "$$exp" || exit 1; \
 		done; \
 	else \
 		echo "fab-agon-emulator not found; skipping eZ80 execution"; \
@@ -239,12 +239,12 @@ test-6502: $(TARGET) tests/test_*.ir4
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(sim65 $(BUILD)/$$f | tr -d '\r\n'); \
 			echo "sim65 $$f -> $$out"; \
-			test "$$out" = "$$exp"; \
+			test "$$out" = "$$exp" || exit 1; \
 		done; \
 		for f in rtl_sim65.bin stdio_sim65.bin terminal_sim65.bin graphics_sim65.bin sprite_sim65.bin; do \
 			out=$$(sim65 $(BUILD)/$$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "sim65 $$f -> $$out"; \
-			test "$$out" = "0"; \
+			test "$$out" = "0" || exit 1; \
 		done; \
 	else \
 		echo "sim65 not found; skipping 6502 execution"; \
@@ -277,12 +277,12 @@ test-rv32: $(TARGET) tests/test_*.ir4
 			f=$${pair%%:*}; exp=$${pair#*:}; \
 			out=$$(qemu-system-riscv32 -machine virt -cpu rv32 -bios none -nographic -kernel $(BUILD)/$$f | tr -d '\r\n'); \
 			echo "qemu-system-riscv32 $$f -> $$out"; \
-			test "$$out" = "$$exp"; \
+			test "$$out" = "$$exp" || exit 1; \
 		done; \
 		for f in rtl_rv32.elf stdio_rv32.elf terminal_rv32.elf graphics_rv32.elf sprite_rv32.elf; do \
 			out=$$(qemu-system-riscv32 -machine virt -cpu rv32 -bios none -nographic -kernel $(BUILD)/$$f | tr -d '\r' | grep . | tail -n 1); \
 			echo "qemu-system-riscv32 $$f -> $$out"; \
-			test "$$out" = "0"; \
+			test "$$out" = "0" || exit 1; \
 		done; \
 	else \
 		echo "qemu-system-riscv32 not found; skipping RV32 execution"; \

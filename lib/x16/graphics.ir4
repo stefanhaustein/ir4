@@ -11,6 +11,12 @@ var __x16_col :i
 var __x16_w :i
 var __x16_h :i
 
+init
+  15 -> __x16_col
+  0 -> __x16_w
+  0 -> __x16_h
+end
+
 code x16 __x16_mode_gfx ( )
   0xA9 :i8 0x80 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
 end
@@ -120,6 +126,12 @@ hot fn gfxpx ( x :i y :i )
   x 0 < x __x16_w >= or y 0 < y __x16_h >= or or if return then
   x y 0 __x16_set_addr
   __x16_col 0x9F23 i>a i8!
+end
+
+hot fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x __x16_w >= or y 0 < y __x16_h >= or or if -1 return then
+  x y 0 __x16_set_addr
+  0x9F23 i>a u8@
 end
 
 hot fn gfxhline ( x :i y :i w :i )

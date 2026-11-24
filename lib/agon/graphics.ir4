@@ -20,6 +20,13 @@ var __gh :i
 var __gd :i
 var __agon_spr_active :i
 
+init
+  0 -> __gw
+  0 -> __gh
+  0 -> __gd
+  0 -> __agon_spr_active
+end
+
 fn __vdu16 ( v :i )
   v 255 and emit
   v 8 >> 255 and emit
@@ -111,6 +118,30 @@ end
 
 fn gfxpx ( x :i y :i )
   69 x y __vdu_plot
+end
+
+\ __agon_gfx_sysvars ( -> :a )  MOS $08: returns IX -> HLU
+code agon __agon_gfx_sysvars ( -> :a )
+  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
+  0xDD :i8 0xE5 :i8 0xE1 :i8
+  0xD1 :i8 0xE5 :i8 0xD5 :i8
+end
+
+\ Read pixel color index at (*x*, *y*) via VDP `VDU 23, 0, $84`; returns -1 if out of bounds or unsupported.
+fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x __gw >= or y 0 < y __gh >= or or if -1 return then
+  __agon_gfx_sysvars -> var sv :a
+  sv 4 a+ -> var pf :a
+  pf u8@ 251 and pf i8!
+  23 emit 0 emit 0x84 emit
+  x __vdu16
+  y __vdu16
+  20000 -> var spin :i
+  begin spin 0 > pf u8@ 4 and 0 = and while
+    -1 +-> spin
+  repeat
+  pf u8@ 4 and 0 = if -1 return then
+  sv 0x16 a+ u8@
 end
 
 fn gfxhline ( x :i y :i w :i )

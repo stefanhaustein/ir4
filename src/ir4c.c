@@ -281,8 +281,10 @@ int main(int argc, char **argv) {
 #if IR4_ENABLE_RV32
     if (be != &be_rv32)
 #endif
-    if (cb_data_size() > 0) {
-        size_t data_addr = cb_is_banked() ? (cb_get_bank(0).base + cb_get_bank(0).len) : cb_cur_addr();
+    {
+        size_t data_addr;
+        (void)cb_alloc_data(0, be->word_bytes);
+        data_addr = cb_is_banked() ? (cb_get_bank(0).base + cb_get_bank(0).len) : cb_cur_addr();
         cb_patch_data_relocs(data_addr);
     }
 

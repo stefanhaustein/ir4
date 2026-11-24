@@ -4,6 +4,10 @@ require "terminal.ir4"
 
 var __zx81_col :i
 
+init
+  1 -> __zx81_col
+end
+
 data __zx81_modes
   0 :i16 64 :i16 48 :i16 1 :i16
 end
@@ -48,10 +52,8 @@ fn gfxclear ( )
   repeat
 end
 
-fn gfxpx ( x :i y :i )
-  x 0 < x 64 >= or y 0 < y 48 >= or or if return then
-  0x400C i>a a@ -> var df :a
-  df 1 y 1 u>> 33 * + x 1 u>> + a+ -> var p :a
+fn __zx81_cell_info ( x :i y :i -> :a :i :i )
+  0x400C i>a a@ 1 y 1 u>> 33 * + x 1 u>> + a+ -> var p :a
   p u8@ -> var ch :i
   0 -> var bits :i
   ch 8 < if
@@ -62,6 +64,12 @@ fn gfxpx ( x :i y :i )
     then
   then
   1 x 1 and + y 1 and 0 <> if 2 << then -> var mask :i
+  p bits mask
+end
+
+fn gfxpx ( x :i y :i )
+  x 0 < x 64 >= or y 0 < y 48 >= or or if return then
+  __zx81_cell_info -> var mask :i -> var bits :i -> var p :a
   __zx81_col 0 <> if
     bits mask or -> bits
   else
@@ -72,6 +80,12 @@ fn gfxpx ( x :i y :i )
   else
     0x8F bits - p i8!
   then
+end
+
+fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x 64 >= or y 0 < y 48 >= or or if -1 return then
+  __zx81_cell_info -> var mask :i -> var bits :i drop
+  bits mask and 0 <> if 1 else 0 then
 end
 
 fn gfxcharw ( -> :i ) 2 end

@@ -31,6 +31,11 @@ var __arm64_statbuf :bytes 144
 var __arm64_path :bytes 256
 var __arm64_path2 :bytes 256
 
+init
+  __arm64_fps 128 0 memfill
+  __arm64_dirs 64 0 memfill
+end
+
 fn __arm64_fp_addr ( fd :i -> :a )
   __arm64_fps fd 3 << a+
 end

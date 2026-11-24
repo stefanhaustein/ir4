@@ -6,6 +6,10 @@ var __c64_spr_vis :i
 var __c64_img_mc  :bytes 48
 var __c64_img_col :bytes 48
 
+init
+  0 -> __c64_spr_vis
+end
+
 data __c64_spr_bit_tbl
   1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8
 end

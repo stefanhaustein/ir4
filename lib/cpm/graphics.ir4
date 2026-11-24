@@ -1,5 +1,6 @@
 \ cpm/graphics.ir4 - CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
 
+require "memory.ir4"
 require "terminal.ir4"
 
 data __cpm_ramp
@@ -7,9 +8,17 @@ data __cpm_ramp
 end
 
 var __cpm_modes :bytes 8
+var __cpm_fb :bytes 2048
 var __cpm_w :i
 var __cpm_h :i
 var __cpm_col :i
+
+init
+  __cpm_fb 2048 0 memfill
+  0 -> __cpm_w
+  0 -> __cpm_h
+  7 -> __cpm_col
+end
 
 fn gfxmodes ( -> :a :i )
   0 __cpm_modes i16!
@@ -27,6 +36,7 @@ fn gfxmode ( mode :i )
   mode drop
   termwidth -> __cpm_w
   termheight -> __cpm_h
+  __cpm_fb 2048 0 memfill
   7 -> __cpm_col
   termclear
 end
@@ -48,8 +58,17 @@ end
 
 fn gfxpx ( x :i y :i )
   x 0 < x __cpm_w >= or y 0 < y __cpm_h >= or or if return then
+  y __cpm_w * x + -> var idx :i
+  idx 2048 < if __cpm_col __cpm_fb idx a+ i8! then
   x y termgoto
   __cpm_ramp __cpm_col a+ u8@ emit
+end
+
+fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x __cpm_w >= or y 0 < y __cpm_h >= or or if -1 return then
+  y __cpm_w * x + -> var idx :i
+  idx 2048 >= if -1 return then
+  __cpm_fb idx a+ u8@
 end
 
 fn gfxhline ( x :i y :i w :i )
@@ -57,6 +76,8 @@ fn gfxhline ( x :i y :i w :i )
   x 0 < if x +-> w 0 -> x then
   x w + __cpm_w > if __cpm_w x - -> w then
   w 0 <= if return then
+  y __cpm_w * x + -> var idx :i
+  idx w + 2048 <= if __cpm_fb idx a+ w __cpm_col memfill then
   __cpm_ramp __cpm_col a+ u8@ -> var ch :i
   x y termgoto
   begin w 0 > while
@@ -66,6 +87,7 @@ fn gfxhline ( x :i y :i w :i )
 end
 
 fn gfxclear ( )
+  __cpm_fb 2048 0 memfill
   termclear
 end
 

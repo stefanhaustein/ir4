@@ -34,6 +34,12 @@ Platform overrides implement the `default fn` entries below.
 
   Draw a filled rectangle at (*x*, *y*) with size *w* x *h* (default: gfxhline loop)
 
+- **gfxgetpx** ( x :i y :i -> :i )
+
+  Read pixel color index at (*x*, *y*), or < 0 if out of bounds or unsupported
+  - *agon:* Read pixel color index at (*x*, *y*) via VDP `VDU 23, 0, $84`; returns -1 if out of bounds or unsupported.
+  - *c64:* Read color index at (*x*, *y*): foreground nibble when bitmap bit is set, cell background nibble when clear; -1 if out of bounds.
+
 - **gfxheight** ( -> :i ) — Current graphics screen height in pixels
 - **gfxhline** ( x :i y :i w :i )
 

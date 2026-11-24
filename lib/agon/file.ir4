@@ -232,6 +232,12 @@ var __agon_dirs    :bytes 256
 var __agon_diropen :bytes 4
 var __agon_filinfo :bytes 280
 
+init
+  __agon_handles 8 0 memfill
+  __agon_modes 8 0 memfill
+  __agon_diropen 4 0 memfill
+end
+
 fn __agon_strlen0 ( s :a -> :i )
   s -> var p :a
   begin p u8@ 0 <> while p 1 a+ -> p repeat

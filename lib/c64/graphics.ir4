@@ -29,6 +29,11 @@ end
 var __c64_col :i
 var __c64_bg :i
 
+init
+  1 -> __c64_col
+  0 -> __c64_bg
+end
+
 \ Map RAM underneath KERNAL ROM ($E000-$FFFF) with IRQs disabled
 hot code c64 __c64_ram_on ( )
   0x78 :i8 0xA9 :i8 0x35 :i8 0x85 :i8 0x01 :i8
@@ -211,6 +216,20 @@ hot fn gfxpx ( x :i y :i )
     cell u8@ 15 and __c64_col 4 << or cell i8!
   then
   __c64_ram_off
+end
+
+\ Read color index at (*x*, *y*): foreground nibble when bitmap bit is set, cell background nibble when clear; -1 if out of bounds.
+hot fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x 320 >= or y 0 < y 200 >= or or if -1 return then
+  y 3 u>> -> var row :i
+  x 3 u>> -> var col :i
+  0xE000 i>a row 8 << row 6 << + col 3 << + y 7 and + a+ -> var p :a
+  128 x 7 and u>> -> var mask :i
+  __c64_ram_on
+  p u8@ mask and -> var on :i
+  0xCC00 i>a row 5 << row 3 << + col + a+ u8@ -> var attr :i
+  __c64_ram_off
+  on 0 <> if attr 4 u>> else attr 15 and then
 end
 
 \ Clear h vertical pixels starting at p with inverted bitmask nmask.

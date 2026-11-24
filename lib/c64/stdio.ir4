@@ -36,6 +36,10 @@ end
 
 var __c64_charset :i
 
+init
+  0 -> __c64_charset
+end
+
 \ Switch between `charset_native` (`0`, `142 emit`) and `charset_text` (`1`, `14 emit`).
 fn setcharset ( mode :i )
   mode 1 = if

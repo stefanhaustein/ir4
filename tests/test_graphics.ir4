@@ -18,17 +18,37 @@ fn main ( -> :i )
   gfxcharw 0 <= if 8 return then
   gfxcharh 0 <= if 9 return then
 
-  0 0 0 gfxrgb gfxcolor
+  0 0 0 gfxrgb -> var c_bg :i
+  c_bg gfxcolor
   gfxclear
   1 gfxborder
 
   255 255 255 gfxrgb -> var c_white :i
   0 255 0 gfxrgb -> var c_green :i
-  c_white gfxcolor
 
-  \ Clipping / out-of-bounds guards + primitives
+  \ Clipping / out-of-bounds guards + pixel readback symmetry
+  -5 -5 gfxgetpx 0 >= if 10 return then
+  9999 9999 gfxgetpx 0 >= if 11 return then
+  3 5 gfxgetpx -> var px0 :i
+  px0 0 >= px0 c_bg <> and if 12 return then
+
+  c_white gfxcolor
   -5 -5 gfxpx
   9999 9999 gfxpx
+  3 5 gfxpx
+  3 5 gfxgetpx -> var px1 :i
+  px1 0 >= px1 c_white <> and if 13 return then
+
+  1 1 gfxpx
+  2 1 gfxpx
+  c_bg gfxcolor
+  1 1 gfxpx
+  1 1 gfxgetpx -> var px2 :i
+  px2 0 >= px2 c_bg <> and if 14 return then
+  2 1 gfxgetpx -> var px3 :i
+  px3 0 >= px3 c_white <> and if 15 return then
+
+  c_white gfxcolor
   0 0 gfxpx
   0 1 20 gfxhline
   2 0 15 gfxvline

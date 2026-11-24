@@ -39,6 +39,8 @@ void cb_emit_data_word(i32 val, u8 word_bytes);
 const u8 *cb_init_data(void);
 size_t cb_init_data_size(void);
 
+#define CB_HEAP_START_OFF ((size_t)-1)
+
 void cb_add_data_reloc(size_t patch_offset, size_t data_offset);
 void cb_add_data_reloc24(size_t patch_offset, size_t data_offset);
 void cb_add_data_reloc_split(size_t lo_offset, size_t hi_offset, size_t data_offset);
