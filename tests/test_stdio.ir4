@@ -12,7 +12,7 @@ fn main ( -> :i )
 
   \ Charset selection & query
   charset_native setcharset
-  target_c64 target_x16 or target_zx81 or if
+  target_c64 target_x16 or target_x16gs or target_zx81 or if
     getcharset charset_native <> if 10 return then
   else
     getcharset charset_text <> if 10 return then

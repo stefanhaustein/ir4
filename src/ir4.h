@@ -76,6 +76,9 @@ typedef signed long i32;
 #ifndef IR4_ENABLE_SIM65816
 #define IR4_ENABLE_SIM65816 IR4_ENABLE_65816
 #endif
+#ifndef IR4_ENABLE_X16GS
+#define IR4_ENABLE_X16GS IR4_ENABLE_65816
+#endif
 #ifndef IR4_ENABLE_C64
 #define IR4_ENABLE_C64 IR4_ENABLE_6502
 #endif
@@ -310,6 +313,7 @@ extern const Platform plat_z80_zx81;
 extern const Platform plat_ez80_agon;
 extern const Platform plat_6502_sim;
 extern const Platform plat_65816_sim;
+extern const Platform plat_65816_x16gs;
 extern const Platform plat_6502_c64;
 extern const Platform plat_6502_x16;
 extern const Platform plat_6502_x16_cart;

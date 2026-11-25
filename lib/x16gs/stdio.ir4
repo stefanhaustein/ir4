@@ -1,0 +1,140 @@
+\ lib/x16gs/stdio.ir4 - Commander X16GS KERNAL console I/O ($FFD2 / $FFE4)
+
+\ Write 10-byte Bank-0 KERNAL trampoline in Golden RAM at $00:0450..$00:0459
+\ (entered via JSL in E=0 so SEC;XCE / CLC;XCE execute with PB = $00;
+\  D = $0400 uses $0400..$043F; $0440..$0441 holds entry S; DBR = $07):
+\   SEC; XCE; CLI; JSR <addr>; SEI; CLC; XCE; RTL
+\ Call with ( a_in :i addr :i -> a_out :i ).
+code x16gs __x16gs_kernal ( a_in :i addr :i -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8      \ LDA $0200,X (addr)
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8 \ STA $000454
+  0xE8 :i8 0xE8 :i8               \ INX; INX
+  0xBD :i8 0x00 :i8 0x02 :i8      \ LDA $0200,X (a_in)
+  0xA8 :i8                        \ TAY (hold a_in in Y across trampoline setup)
+  0x86 :i8 0x1E :i8               \ STX $1E (save data stack X at $041E)
+  0x3B :i8                        \ TSC
+  0x85 :i8 0x1C :i8               \ STA $1C (save native S at $041C)
+  0xE2 :i8 0x20 :i8               \ SEP #$20
+  0xA9 :i8 0x38 :i8               \ LDA #$38 (SEC)
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ STA $000450
+  0xA9 :i8 0xFB :i8               \ LDA #$FB (XCE)
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8 \ STA $000451
+  0xA9 :i8 0x58 :i8               \ LDA #$58 (CLI)
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8 \ STA $000452
+  0xA9 :i8 0x20 :i8               \ LDA #$20 (JSR)
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8 \ STA $000453
+  0xA9 :i8 0x78 :i8               \ LDA #$78 (SEI)
+  0x8F :i8 0x56 :i8 0x04 :i8 0x00 :i8 \ STA $000456
+  0xA9 :i8 0x18 :i8               \ LDA #$18 (CLC)
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8 \ STA $000457
+  0xA9 :i8 0xFB :i8               \ LDA #$FB (XCE)
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8 \ STA $000458
+  0xA9 :i8 0x6B :i8               \ LDA #$6B (RTL)
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8 \ STA $000459
+  0xC2 :i8 0x20 :i8               \ REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8      \ LDA #$0000
+  0x5B :i8                        \ TCD (D = $0000)
+  0xE2 :i8 0x20 :i8               \ SEP #$20
+  0xA9 :i8 0x00 :i8               \ LDA #$00
+  0x48 :i8 0xAB :i8               \ PHA; PLB (DBR = $00)
+  0xC2 :i8 0x20 :i8               \ REP #$20
+  0xA2 :i8 0xDF :i8 0x01 :i8      \ LDX #$01DF
+  0x9A :i8                        \ TXS
+  0x98 :i8                        \ TYA (a_in -> A)
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ JSL $000450 (switches E=1 & back in Bank $00)
+  0xC2 :i8 0x30 :i8               \ REP #$30
+  0xA8 :i8                        \ TAY (save 8-bit A result)
+  0xE2 :i8 0x20 :i8               \ SEP #$20
+  0xA9 :i8 0x07 :i8               \ LDA #$07
+  0x48 :i8 0xAB :i8               \ PHA; PLB (DBR = $07)
+  0xC2 :i8 0x20 :i8               \ REP #$20
+  0xA9 :i8 0x00 :i8 0x04 :i8      \ LDA #$0400
+  0x5B :i8                        \ TCD (D = $0400)
+  0xA6 :i8 0x1E :i8               \ LDX $1E (restore data stack X)
+  0xA5 :i8 0x1C :i8               \ LDA $1C (restore native S)
+  0x1B :i8                        \ TCS
+  0x98 :i8                        \ TYA
+  0x29 :i8 0xFF :i8 0x00 :i8      \ AND #$00FF
+  0x9D :i8 0x00 :i8 0x02 :i8      \ STA $0200,X (overwrite a_in slot with result)
+end
+
+fn emit ( c :i )
+  c 0xFFD2 __x16gs_kernal drop
+end
+
+fn inkey ( -> :i )
+  0 0xFFE4 __x16gs_kernal
+end
+
+fn key ( -> :i )
+  0 -> var c :i
+  begin
+    inkey -> c
+    c 0 =
+  while repeat
+  c
+end
+
+var __x16_charset :i
+
+\ Maps key input to normalized ASCII (direct pass-through in ISO `charset_text`; PETSCII case swap in `charset_native`).
+fn xinkey ( -> :i )
+  inkey -> var c :i
+  c 0 = if 0 return then
+  c 20 = if 8 return then
+  __x16_charset 1 = if c return then
+  c 65 >= c 90 <= and if c 32 + return then
+  c 193 >= c 218 <= and if c 128 - return then
+  c
+end
+
+\ Blocking read using xinkey.
+fn xkey ( -> :i )
+  0 -> var c :i
+  begin
+    xinkey -> c
+    c 0 =
+  while repeat
+  c
+end
+
+\ Switch between `charset_native` (`0`, `143 emit 142 emit`) and `charset_text` (`1`, `15 emit` ISO-8859-15).
+fn setcharset ( mode :i )
+  mode 1 = if
+    1 -> __x16_charset
+    15 emit
+  else
+    0 -> __x16_charset
+    143 emit 142 emit
+  then
+end
+
+fn getcharset ( -> :i )
+  __x16_charset
+end
+
+\ Map normalized ASCII to PETSCII (Lowercase/Uppercase mode: A-Z, a-z, _, |).
+fn __x16_xlat ( c :i -> :i )
+  c 65 >= c 90 <= and if c 128 + return then
+  c 97 >= c 122 <= and if c 32 - return then
+  c 0x5F = if 0xA4 return then
+  c 0x7C = if 0xDD return then
+  c
+end
+
+\ Maps ASCII to ISO (`charset_text`) or uppercase PETSCII (`charset_native`); uses `$80` verbatim mode for `"` so quote mode never triggers.
+fn xemit ( c :i )
+  c 10 = c 13 = or if 13 emit return then
+  c 8 = if 20 emit return then
+  c 34 = if 128 emit 34 emit return then
+  c 32 < c 126 > or if return then
+  __x16_charset 1 = if
+    c emit
+    return
+  then
+  c 65 >= c 90 <= and if
+    c emit
+  else
+    c __x16_xlat emit
+  then
+end

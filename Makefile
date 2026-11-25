@@ -5,7 +5,7 @@ BUILD   = build
 TARGET  = $(BUILD)/ir4c
 SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
           src/backend/z80.c src/backend/ez80.c src/backend/6502.c src/backend/65816.c src/backend/arm64.c src/backend/rv32.c src/backend/bc.c \
-          src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/sim65816.c src/platform/c64.c src/platform/x16.c \
+          src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/sim65816.c src/platform/x16gs.c src/platform/c64.c src/platform/x16.c \
           src/platform/jit.c src/platform/elf.c src/platform/bc.c
 OBJS    = $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 
@@ -261,6 +261,10 @@ test-65816: $(TARGET) tests/test_*.ir4
 		echo "sim65816 test_$${name}.ir4 -> $$out"; \
 		test "$$out" = "0" || exit 1; \
 	done
+	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg  examples/hello.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/stdio_x16gs.prg  tests/test_stdio.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/rtl_x16gs.prg    tests/test_rtl.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/system_x16gs.prg tests/test_system.ir4
 
 test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/fib_rv32.elf      tests/test_fib.ir4

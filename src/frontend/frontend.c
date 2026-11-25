@@ -50,7 +50,7 @@ static BlockVec blocks;
 
 static const char *const known_targets[] = {
     "z80", "ez80", "6502", "65816", "arm64", "rv32", "bc",
-    "cpm", "zx81", "agon", "sim65", "sim65816", "c64", "x16", "virt", "obj", "jit"};
+    "cpm", "zx81", "agon", "sim65", "sim65816", "x16gs", "c64", "x16", "virt", "obj", "jit"};
 
 static int is_known_raw_target(const char *tok) {
     size_t i;

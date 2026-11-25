@@ -22,6 +22,9 @@ static const Platform *const platforms[] = {
 #if IR4_ENABLE_SIM65816
     &plat_65816_sim,
 #endif
+#if IR4_ENABLE_X16GS
+    &plat_65816_x16gs,
+#endif
 #if IR4_ENABLE_C64
     &plat_6502_c64,
 #endif
