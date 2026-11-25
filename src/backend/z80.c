@@ -123,14 +123,20 @@ static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
 
     if (!is_recursive) {
         u16 static_bytes = 0;
-        for (i = param_cnt; i < total_locals; i++) {
-            u16 sz = (locals[i].size > 0) ? (u16)((locals[i].size + 1) & ~1)
-                                          : (u16)z80_type_bytes(locals[i].type);
-            z80_local_off.data[i] = static_bytes;
-            z80_is_static_slot.data[i] = 1;
-            static_bytes += sz;
-        }
         z80_local_bytes = 0;
+        for (i = param_cnt; i < total_locals; i++) {
+            if (locals[i].size > 0) {
+                u16 sz = (u16)((locals[i].size + 1) & ~1);
+                z80_local_off.data[i] = z80_local_bytes;
+                z80_is_static_slot.data[i] = 0;
+                z80_local_bytes += sz;
+            } else {
+                u16 sz = (u16)z80_type_bytes(locals[i].type);
+                z80_local_off.data[i] = static_bytes;
+                z80_is_static_slot.data[i] = 1;
+                static_bytes += sz;
+            }
+        }
         if (static_bytes > 0) {
             z80_static_base = cb_alloc_data(static_bytes, 1);
             for (i = param_cnt; i < total_locals; i++) {
@@ -174,7 +180,7 @@ static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
         off += sz;
     }
 
-    /* Allocate & zero-initialize non-parameter locals on SP */
+    /* Allocate & zero-initialize non-parameter SP locals */
     if (z80_local_bytes > 0) {
         u16 words = (u16)(z80_local_bytes / 2);
         if (words <= 8) {
@@ -186,9 +192,9 @@ static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
             cb_emit8_16(Z80_LD_HL_NN, (u16)(0 - z80_local_bytes));
             cb_emit8(Z80_ADD_HL_SP);
             cb_emit8(Z80_LD_SP_HL);
-            /* Zero scalar locals only */
+            /* Zero scalar SP locals only */
             for (i = param_cnt; i < total_locals; i++) {
-                if (locals[i].size == 0) {
+                if (locals[i].size == 0 && !z80_is_static_slot.data[i]) {
                     u8 k;
                     u8 sz = z80_type_bytes(locals[i].type);
                     cb_emit8_16(Z80_LD_HL_NN, z80_local_off.data[i]);

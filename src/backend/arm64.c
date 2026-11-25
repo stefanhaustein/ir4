@@ -232,7 +232,10 @@ static void a64_local_op(LocalOp op, size_t slot, StackType type, size_t stack_b
             cb_emit32(0x8B000020UL);                                   /* ADD X0, X1, X0 */
             cb_emit32(0xF80003A0UL | (((0UL - off) & 0x1FFUL) << 12)); /* STUR X0, [X29, #-off] */
         } else {
-            mov_x0_u32(off, 1);
+            cb_emit32(0xD2800001UL | ((off & 0xFFFFUL) << 5));
+            if ((off >> 16) != 0) {
+                cb_emit32(0xF2A00001UL | (((off >> 16) & 0xFFFFUL) << 5));
+            }
             cb_emit32(0xCB0103A1UL); /* SUB X1, X29, X1 */
             cb_emit32(0xF9400022UL); /* LDR X2, [X1] */
             cb_emit32(0x8B000040UL); /* ADD X0, X2, X0 */
@@ -736,7 +739,7 @@ static void a64_op(IrOp op) {
 }
 
 static size_t a64_emit_br_fwd(BranchCond cond) {
-    u16 pos;
+    size_t pos;
     if (cond == BR_JZ) {
         pop_x0();
         pos = cb_pc();

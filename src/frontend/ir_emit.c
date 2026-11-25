@@ -36,7 +36,7 @@ void ir_emit_reset(void) {
     heap_start_off = 0;
 }
 
-static Bool can_reach_func(size_t cur, size_t target, Bool *visited) {
+static Bool can_reach_func(size_t cur, size_t target, Bool *visited, const Bool *addr_taken) {
     WordIR *w = words.data[cur];
     size_t i;
     if (funcs.data[cur]->is_extern || w->is_code)
@@ -49,8 +49,21 @@ static Bool can_reach_func(size_t cur, size_t target, Bool *visited) {
                 return true;
             if (!visited[callee]) {
                 visited[callee] = true;
-                if (can_reach_func(callee, target, visited))
+                if (can_reach_func(callee, target, visited, addr_taken))
                     return true;
+            }
+        } else if (ins->kind == IR_ICALL) {
+            size_t k;
+            for (k = 0; k < funcs.len; k++) {
+                if (!addr_taken[k])
+                    continue;
+                if (k == target)
+                    return true;
+                if (!visited[k]) {
+                    visited[k] = true;
+                    if (can_reach_func(k, target, visited, addr_taken))
+                        return true;
+                }
             }
         }
     }
@@ -536,14 +549,38 @@ void run_reachability_dce(void) {
         }
     }
 
-    visited = (Bool *)vec_calloc(funcs.len ? funcs.len : 1, sizeof(Bool));
-    for (f = 0; f < funcs.len; f++) {
-        if (words.data[f]->reachable) {
-            memset(visited, 0, funcs.len * sizeof(Bool));
-            funcs.data[f]->is_recursive = can_reach_func(f, f, visited);
+    {
+        Bool *addr_taken = (Bool *)vec_calloc(funcs.len ? funcs.len : 1, sizeof(Bool));
+        size_t di;
+        for (di = 0; di < cb_data_init_reloc_count(); di++) {
+            size_t po, tv;
+            u8 ab;
+            Bool is_c;
+            cb_get_data_init_reloc(di, &po, &tv, &ab, &is_c);
+            if (is_c && tv < funcs.len)
+                addr_taken[tv] = true;
         }
+        for (f = 0; f < funcs.len; f++) {
+            WordIR *w = words.data[f];
+            size_t i;
+            if (!w->reachable || funcs.data[f]->is_extern || w->is_code)
+                continue;
+            for (i = 0; i < w->ir_len; i++) {
+                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+                if (ins->kind == IR_PUSH_FN && ins->u.func_idx < funcs.len)
+                    addr_taken[ins->u.func_idx] = true;
+            }
+        }
+        visited = (Bool *)vec_calloc(funcs.len ? funcs.len : 1, sizeof(Bool));
+        for (f = 0; f < funcs.len; f++) {
+            if (words.data[f]->reachable) {
+                memset(visited, 0, funcs.len * sizeof(Bool));
+                funcs.data[f]->is_recursive = can_reach_func(f, f, visited, addr_taken);
+            }
+        }
+        free(visited);
+        free(addr_taken);
     }
-    free(visited);
 }
 
 static u16 assign_code_banks(void) {

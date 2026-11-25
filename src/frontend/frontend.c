@@ -98,19 +98,21 @@ static const char *type_name(StackType t) {
     return "?";
 }
 
+static size_t tstack_type_bytes(StackType t) {
+    if (t == TY_F)
+        return (be->word_bytes == 3) ? 6 : be->float_bytes;
+    if (t == TY_A)
+        return be->addr_bytes;
+    if (t == TY_I32)
+        return (be->word_bytes == 3) ? 6 : 4;
+    return be->word_bytes;
+}
+
 static size_t tstack_bytes(void) {
     size_t bytes = 0;
     size_t i;
     for (i = 0; i < tstack.len; i++) {
-        StackType t = tstack.data[i];
-        if (t == TY_F)
-            bytes += be->float_bytes;
-        else if (t == TY_A)
-            bytes += be->addr_bytes;
-        else if (t == TY_I32)
-            bytes += 4;
-        else
-            bytes += be->word_bytes;
+        bytes += tstack_type_bytes(tstack.data[i]);
     }
     return bytes;
 }
@@ -1543,7 +1545,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
                 ins->u.loc.op = LOCAL_GET;
                 ins->u.loc.slot = lv->slot;
                 ins->u.loc.type = lv->type;
-                ins->u.loc.stack_bytes = tstack_bytes() + 4;
+                ins->u.loc.stack_bytes = tstack_bytes() + tstack_type_bytes(lv->type);
                 ins = emit_ir(IR_ALU_OP, w);
                 ins->u.op = (lv->type == TY_F) ? OP_FADD : OP_ADD32;
                 ins = emit_ir(IR_LOCAL_OP, w);
