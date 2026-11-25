@@ -1,8 +1,15 @@
 # A typed Forth Dialect as an Intermediate Representation
 
-**IR4(th)** is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as Z80 and 6502) and constrained embedded systems.
+**IR4(th)** is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs and constrained embedded systems.
 
-IR4(th) programs are compiled via a 2-pass direct machine-code compiler (with reachability dead-code elimination) using ir4c (written in strict C89).
+The architecture is structured around two tiers of retro targets:
+
+- **8-bit execution targets (Z80, 6502):** Compact 16-bit code generation for classic 64 KB machines (CP/M, ZX81, Commodore 64, Commander X16).
+- **24-bit retro host & toolchain targets (eZ80, W65C816):** Flat 24-bit addressing for expanded retro systems (Agon Light / Console8, Commander X16GS) capable of hosting full toolchains, compilers, and IDEs directly on retro hardware.
+
+Furthermore, IR4(th) includes native ARM64 JIT (`--run`), RISC-V (`rv32`), and a built-in bytecode VM (`bc`) for fast host-side development and verification.
+
+IR4(th) programs are compiled via a 2-pass direct machine-code compiler (`ir4c`, written in strict C89) with reachability dead-code elimination.
 
 IR4(th) is aimed at language builders as a compiler backend target rather than a language for writing applications directly. While it is expressive enough for hand-written tests and demos, high-level features such as structs, arrays, or records are intentionally out of scope and left to frontend languages.
 
