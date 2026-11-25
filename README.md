@@ -130,20 +130,25 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 - [tools/](tools/) — Relocatable runtime generators and developer tools
 - [docs/](docs/) — Platform documentation and screenshots
 
-## Demo Videos
 
-YT Playlist: https://www.youtube.com/watch?v=m7Sv4vFC7ec&list=PLQKhMXcXxjVY
+## Screenshots & Videos 
 
-## Screenshots
+[YT Playlist](https://www.youtube.com/watch?v=m7Sv4vFC7ec&list=PLQKhMXcXxjVY) (The [spheres.ir4](examples/spheres.ir4) demo works similarily on Agon and X16 and with a reduced number of spheres on C64.)
 
-| Target | Julia Set ([julia.ir4](examples/julia.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
+| Sysinfo ([sysinfo.ir4](examples/sysinfo.ir4)) | Julia Set ([julia.ir4](examples/julia.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
 |---|---|---|
-| **Agon** | <img src="docs/img/julia_agon.png" alt="Agon Julia" width="320"> | <img src="docs/img/testcard_agon.png" alt="Agon testcard" width="320"> |
-| **Commander X16** | <img src="docs/img/julia_x16.png" alt="Commander X16 Julia" width="320"> | <img src="docs/img/testcard_x16.png" alt="Commander X16 testcard" width="320"> |
-| **Commodore 64** | <img src="docs/img/julia_c64.png" alt="C64 Julia" width="320"> | <img src="docs/img/testcard_c64.png" alt="C64 testcard" width="320"> |
-| **CP/M** | <img src="docs/img/julia_cpm.png" alt="CP/M Julia" width="320"> | — |
-| **Sinclair ZX81** | <img src="docs/img/julia_zx81.png" alt="ZX81 Julia" width="320"> | — |
-| **Terminal (ANSI half-blocks)** | <img src="docs/img/julia_arm64.png" alt="ARM64 ANSI Julia" width="320"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="320"> |
+| **Agon** | | |
+| <img src="docs/img/sysinfo_agon.png" alt="Agon sysinfo" width="260"> | <img src="docs/img/julia_agon.png" alt="Agon Julia" width="260"> | <img src="docs/img/testcard_agon.png" alt="Agon testcard" width="260"> |
+| **Commander X16** | | |
+| <img src="docs/img/sysinfo_x16.png" alt="Commander X16 sysinfo" width="260"> | <img src="docs/img/julia_x16.png" alt="Commander X16 Julia" width="260"> | <img src="docs/img/testcard_x16.png" alt="Commander X16 testcard" width="260"> |
+| **Commodore 64** | | |
+| <img src="docs/img/sysinfo_c64.png" alt="C64 sysinfo" width="260"> | <img src="docs/img/julia_c64.png" alt="C64 Julia" width="260"> | <img src="docs/img/testcard_c64.png" alt="C64 testcard" width="260"> |
+| **CP/M** | | |
+| <img src="docs/img/sysinfo_cpm.png" alt="CP/M sysinfo" width="260"> | <img src="docs/img/julia_cpm.png" alt="CP/M Julia" width="260"> | — |
+| **Sinclair ZX81** | | |
+| <img src="docs/img/sysinfo_zx81.png" alt="ZX81 sysinfo" width="260"> | <img src="docs/img/julia_zx81.png" alt="ZX81 Julia" width="260"> | — |
+| **Terminal (ANSI half-blocks)** | | |
+| <img src="docs/img/sysinfo_arm64.png" alt="ARM64 ANSI sysinfo" width="260"> | <img src="docs/img/julia_arm64.png" alt="ARM64 ANSI Julia" width="260"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="260"> |
 
 
 ## License
