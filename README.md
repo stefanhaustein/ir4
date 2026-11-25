@@ -132,18 +132,18 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 
 ## Demo Videos
 
-YT Playlist: https://www.youtube.com/watch?v=l4LC_M3oXqM&list=PLQKhMXcXxjVY
+YT Playlist: https://www.youtube.com/watch?v=m7Sv4vFC7ec&list=PLQKhMXcXxjVY
 
 ## Screenshots
 
-| Target | Mandelbrot ([mandel.ir4](examples/mandel.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
+| Target | Julia Set ([julia.ir4](examples/julia.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
 |---|---|---|
-| **Commander X16** | <img src="docs/img/mandel_x16.png" alt="Commander X16 Mandelbrot" width="320"> | <img src="docs/img/testcard_x16.png" alt="Commander X16 testcard" width="320"> |
-| **Commodore 64** | <img src="docs/img/mandel_c64.png" alt="C64 Mandelbrot" width="320"> | <img src="docs/img/testcard_c64.png" alt="C64 testcard" width="320"> |
-| **Agon** | <img src="docs/img/mandel_agon.png" alt="Agon Mandelbrot" width="320"> | <img src="docs/img/testcard_agon.png" alt="Agon testcard" width="320"> |
-| **CP/M** | <img src="docs/img/mandel_cpm.png" alt="CP/M Mandelbrot" width="320"> | — |
-| **Sinclair ZX81** | <img src="docs/img/mandel_zx81.png" alt="ZX81 Mandelbrot" width="320"> | — |
-| **Terminal (ANSI half-blocks)** | <img src="docs/img/mandel_arm64.png" alt="ARM64 ANSI Mandelbrot" width="320"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="320"> |
+| **Agon** | <img src="docs/img/julia_agon.png" alt="Agon Julia" width="320"> | <img src="docs/img/testcard_agon.png" alt="Agon testcard" width="320"> |
+| **Commander X16** | <img src="docs/img/julia_x16.png" alt="Commander X16 Julia" width="320"> | <img src="docs/img/testcard_x16.png" alt="Commander X16 testcard" width="320"> |
+| **Commodore 64** | <img src="docs/img/julia_c64.png" alt="C64 Julia" width="320"> | <img src="docs/img/testcard_c64.png" alt="C64 testcard" width="320"> |
+| **CP/M** | <img src="docs/img/julia_cpm.png" alt="CP/M Julia" width="320"> | — |
+| **Sinclair ZX81** | <img src="docs/img/julia_zx81.png" alt="ZX81 Julia" width="320"> | — |
+| **Terminal (ANSI half-blocks)** | <img src="docs/img/julia_arm64.png" alt="ARM64 ANSI Julia" width="320"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="320"> |
 
 
 ## License

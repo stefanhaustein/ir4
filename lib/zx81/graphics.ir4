@@ -69,7 +69,7 @@ end
 
 fn gfxpx ( x :i y :i )
   x 0 < x 64 >= or y 0 < y 48 >= or or if return then
-  __zx81_cell_info -> var mask :i -> var bits :i -> var p :a
+  x y __zx81_cell_info -> var mask :i -> var bits :i -> var p :a
   __zx81_col 0 <> if
     bits mask or -> bits
   else
@@ -84,7 +84,7 @@ end
 
 fn gfxgetpx ( x :i y :i -> :i )
   x 0 < x 64 >= or y 0 < y 48 >= or or if -1 return then
-  __zx81_cell_info -> var mask :i -> var bits :i drop
+  x y __zx81_cell_info -> var mask :i -> var bits :i drop
   bits mask and 0 <> if 1 else 0 then
 end
 

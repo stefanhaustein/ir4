@@ -1,0 +1,127 @@
+\ Cross-platform 6-bit fixed-point Julia set with smooth shading
+\ 1.0 = 64 (overflow-guarded for signed 16-bit :i on 6502/Z80)
+
+require "stdio.ir4"
+require "graphics.ir4"
+
+\ c = 0.375 + 0.421875i (open Fatou-dust spirals, minimal interior)
+const JULIA_CR  24 :i
+const JULIA_CI  27 :i
+
+var pal :bytes 256
+
+fn __lerp ( a :i b :i u :i -> :i )
+  a b a - u * 8 >> +
+end
+
+fn __ramp_rgb ( t :i -> :i )
+  t 255 > if 255 -> t then
+  t 63 and 2 << -> var u :i
+  t 64 < if
+    20 40 u __lerp  0 20 u __lerp  80 220 u __lerp  gfxrgb return
+  then
+  t 128 < if
+    40 190 u __lerp  20  220 140 u __lerp  gfxrgb return
+  then
+  t 192 < if
+    190 255 u __lerp  20 130 u __lerp  140 0 u __lerp  gfxrgb return
+  then
+  255  130 255 u __lerp  0 210 u __lerp  gfxrgb
+end
+
+fn init_pal ( )
+  gfxdepth -> var d :i
+  0 pal i8!
+  1 -> var i :i
+  begin i 256 < while
+    d 1 = if
+      i 2 >> 1 and
+    else
+      i 80 < if
+        i 1 <<
+      else
+        160 i 80 - 6 * 11 / +
+      then
+      __ramp_rgb
+    then
+    pal i a+ i8!
+    1 +-> i
+  repeat
+end
+
+hot fn julia_px ( zr :i zi :i -> :i )
+  0 -> var it :i
+  0 -> var idx :i
+  begin it 60 < while
+    zr 180 > zr -180 < or zi 180 > zi -180 < or or if
+      it 3 << 12 + -> idx
+      idx 255 > if 255 -> idx then
+      idx return
+    then
+    zr zr * 6 >> -> var zr2 :i
+    zi zi * 6 >> -> var zi2 :i
+    zr2 zi2 + -> var r2 :i
+    r2 256 > if
+      1024 r2 - 7 >> -> var frac :i
+      frac 0 < if 0 -> frac then
+      frac 3 > if 3 -> frac then
+      it 3 << frac 1 << + 12 + -> idx
+      idx 255 > if 255 -> idx then
+      idx return
+    then
+    zr zi * 5 >> JULIA_CI + -> zi
+    zr2 zi2 - JULIA_CR + -> zr
+    1 +-> it
+  repeat
+  255
+end
+
+fn render_julia ( )
+  gfxwidth -> var w :i
+  gfxheight -> var h :i
+  h 1 + 1 u>> -> var half_h :i
+  141 7 << w / -> var step_x :i
+  106 7 << h / -> var step_y :i
+  0 gfxcolor
+  gfxclear
+  0 -> var sw :i
+  0 -> var py :i
+  begin py half_h < while
+    py step_y * 7 >> 53 - -> var zi0 :i
+    h 1 - py - -> var my :i
+    0 -> var px :i
+    0 -> var x0 :i
+    -1 -> var c :i
+    begin px w < while
+      px step_x * 7 >> 70 - -> var zr0 :i
+      pal zr0 zi0 julia_px a+ u8@ -> var nc :i
+      nc c <> if
+        c 0 > if
+          px x0 - -> sw
+          c gfxcolor
+          x0 py sw gfxhline
+          my py <> if w px - my sw gfxhline then
+        then
+        px -> x0
+        nc -> c
+      then
+      1 +-> px
+    repeat
+    c 0 > if
+      w x0 - -> sw
+      c gfxcolor
+      x0 py sw gfxhline
+      my py <> if 0 my sw gfxhline then
+    then
+    1 +-> py
+  repeat
+end
+
+fn main ( -> :i )
+  160 120 8 gfxinit
+  init_pal
+  render_julia
+  key drop
+  gfxdone
+  0
+end
