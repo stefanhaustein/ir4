@@ -1,0 +1,208 @@
+\ x16gs/graphics.ir4 - Commander X16GS VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
+
+require "stdio.ir4"
+
+const __VERA_ADDR_L 0x9F20 :a
+const __VERA_ADDR_M 0x9F21 :a
+const __VERA_ADDR_H 0x9F22 :a
+const __VERA_DATA0  0x9F23 :a
+const __VERA_CTRL   0x9F25 :a
+const __VERA_VIDEO  0x9F29 :a
+const __VERA_HSCALE 0x9F2A :a
+const __VERA_VSCALE 0x9F2B :a
+const __VERA_BORDER 0x9F2C :a
+
+data __x16gs_modes
+  128 :i16 320 :i16 240 :i16 8 :i16
+  1   :i16 160 :i16 120 :i16 8 :i16
+end
+
+var __x16gs_col :i
+var __x16gs_w :i
+var __x16gs_h :i
+
+init
+  15 -> __x16gs_col
+end
+
+fn gfxmodes ( -> :a :i )
+  __x16gs_modes 2
+end
+
+fn gfxwidth ( -> :i ) __x16gs_w end
+fn gfxheight ( -> :i ) __x16gs_h end
+fn gfxdepth ( -> :i ) 8 end
+
+fn __x16gs_init_pal ( )
+  \ VERA palette indices 16..231 at VRAM $1FA20 (auto-inc +1 => ADDR_H = $11)
+  0 __VERA_CTRL i8!
+  0x20 __VERA_ADDR_L i8!
+  0xFA __VERA_ADDR_M i8!
+  0x11 __VERA_ADDR_H i8!
+  0 -> var r :i
+  begin r 6 < while
+    0 -> var g :i
+    begin g 6 < while
+      0 -> var b :i
+      begin b 6 < while
+        g 3 * 4 << b 3 * or __VERA_DATA0 i8!
+        r 3 * __VERA_DATA0 i8!
+        1 +-> b
+      repeat
+      1 +-> g
+    repeat
+    1 +-> r
+  repeat
+end
+
+fn gfxmode ( mode :i )
+  15 -> __x16gs_col
+  0x80 0xFF5F __x16gs_kernal drop
+  1 0xFF62 __x16gs_kernal drop
+  __x16gs_init_pal
+  mode 1 = if
+    160 -> __x16gs_w
+    120 -> __x16gs_h
+    0 __VERA_CTRL i8!
+    32 __VERA_HSCALE i8!
+    32 __VERA_VSCALE i8!
+  else
+    320 -> __x16gs_w
+    240 -> __x16gs_h
+  then
+end
+
+fn gfxdone ( )
+  0 __VERA_CTRL i8!
+  __VERA_VIDEO u8@ 0xBF and __VERA_VIDEO i8!
+  0x00 0xFF5F __x16gs_kernal drop
+  getcharset charset_text = if 1 else 2 then 0xFF62 __x16gs_kernal drop
+end
+
+fn gfxvsync ( )
+  0 0xFFDE __x16gs_kernal -> var t :i
+  begin 0 0xFFDE __x16gs_kernal t = while repeat
+end
+
+fn gfxticks ( -> :i )
+  0 0xFFDE __x16gs_kernal
+end
+
+\ Map 8-bit RGB to X16 default 6x6x6 palette cube (indices 16..231)
+fn gfxrgb ( r :i g :i b :i -> :i )
+  r 6 * 8 u>> 36 *
+  g 6 * 8 u>> 6 * +
+  b 6 * 8 u>> +
+  16 +
+end
+
+fn gfxborder ( c :i )
+  0 __VERA_CTRL i8!
+  c __VERA_BORDER i8!
+end
+
+hot fn gfxcolor ( c :i )
+  c 255 and -> __x16gs_col
+end
+
+hot fn __x16gs_set_addr ( x :i y :i inc :i )
+  0 __VERA_CTRL i8!
+  x 255 and y 3 and 6 << + -> var lo :i
+  x 8 u>> y + y 2 u>> + -> var mid :i
+  lo 255 > if
+    lo 255 and -> lo
+    1 +-> mid
+  then
+  lo __VERA_ADDR_L i8!
+  mid 255 and __VERA_ADDR_M i8!
+  mid 8 u>> inc or __VERA_ADDR_H i8!
+end
+
+hot fn gfxpx ( x :i y :i )
+  x 0 < x __x16gs_w >= or y 0 < y __x16gs_h >= or or if return then
+  x y 0 __x16gs_set_addr
+  __x16gs_col __VERA_DATA0 i8!
+end
+
+hot fn gfxgetpx ( x :i y :i -> :i )
+  x 0 < x __x16gs_w >= or y 0 < y __x16gs_h >= or or if -1 return then
+  x y 0 __x16gs_set_addr
+  __VERA_DATA0 u8@
+end
+
+hot fn gfxhline ( x :i y :i w :i )
+  y 0 < y __x16gs_h >= or if return then
+  x 0 < if x +-> w 0 -> x then
+  x w + __x16gs_w > if __x16gs_w x - -> w then
+  w 0 <= if return then
+  x y 0x10 __x16gs_set_addr
+  begin w 0 > while
+    __x16gs_col __VERA_DATA0 i8!
+    -1 +-> w
+  repeat
+end
+
+hot fn gfxvline ( x :i y :i h :i )
+  x 0 < x __x16gs_w >= or if return then
+  y 0 < if y +-> h 0 -> y then
+  y h + __x16gs_h > if __x16gs_h y - -> h then
+  h 0 <= if return then
+  x y 0xE0 __x16gs_set_addr
+  begin h 0 > while
+    __x16gs_col __VERA_DATA0 i8!
+    -1 +-> h
+  repeat
+end
+
+hot fn gfxclear ( )
+  0 0 0x10 __x16gs_set_addr
+  __VERA_DATA0 -> var d0 :a
+  __x16gs_col -> var c :i
+  __x16gs_h -> var row :i
+  begin row 0 > while
+    40 -> var blk :i
+    begin blk 0 > while
+      c d0 i8! c d0 i8! c d0 i8! c d0 i8!
+      c d0 i8! c d0 i8! c d0 i8! c d0 i8!
+      -1 +-> blk
+    repeat
+    -1 +-> row
+  repeat
+end
+
+fn gfxcharw ( -> :i ) 8 end
+fn gfxcharh ( -> :i ) 8 end
+
+\ Pixel-positioned 8x8 text from VERA VRAM ($1F000) using ISO ASCII font loaded by `gfxmode`.
+fn gfxtext ( x :i y :i s :a len :i )
+  var buf :bytes 8
+  begin
+    len 0 >
+  while
+    s u8@ -> var sc :i
+    0 __VERA_CTRL i8!
+    sc 3 << 255 and __VERA_ADDR_L i8!
+    0xF0 sc 5 u>> + __VERA_ADDR_M i8!
+    0x11 __VERA_ADDR_H i8!
+    0 -> var r :i
+    begin r 8 < while
+      __VERA_DATA0 u8@ buf r a+ i8!
+      1 +-> r
+    repeat
+    0 -> r
+    begin r 8 < while
+      buf r a+ u8@ -> var bits :i
+      bits 0 <> if
+        0 -> var c :i
+        begin c 8 < while
+          bits 128 c u>> and if x c + y r + gfxpx then
+          1 +-> c
+        repeat
+      then
+      1 +-> r
+    repeat
+    8 +-> x
+    1 +-> s
+    -1 +-> len
+  repeat
+end
