@@ -4,7 +4,7 @@
 
 The architecture is structured around two tiers of retro targets:
 
-- **8-bit execution targets (Z80, 6502):** Compact 16-bit code generation for classic 64 KB machines (CP/M, ZX81, Commodore 64, Commander X16).
+- **8-bit execution targets (Z80, 6502):** Code generation for classic 64 KB machines (CP/M, ZX81, Commodore 64, Commander X16).
 - **24-bit retro host & toolchain targets (eZ80, W65C816):** Flat 24-bit addressing for expanded retro systems (Agon Light / Console8, Commander X16GS) capable of hosting full toolchains, compilers, and IDEs directly on retro hardware.
 
 Furthermore, IR4(th) includes native ARM64 JIT (`--run`), RISC-V (`rv32`), and a built-in bytecode VM (`bc`) for fast host-side development and verification.
