@@ -7,7 +7,8 @@ require "sprite.ir4"
 require "sound.ir4"
 require "joystick.ir4"
 
-data s_title  "IR4th Diagnostics (" 0 :i8 end
+data s_title  "IR4th SysInfo " 0 :i8 end
+data s_qopen  " (" 0 :i8 end
 data s_quit   ":quit)" 0 :i8 end
 data s_sfx    "Sfx:  " 0 :i8 end
 data s_joy    "  Joy: " 0 :i8 end
@@ -32,8 +33,8 @@ data s_jcol   " : " 0 :i8 end
 data s_jhdr   "         4321RLDU" 0 :i8 end
 data s_chdr   "   0123456789ABCDEF 0123456789ABCDEF" 0 :i8 end
 data s_chdr_n "0123456789ABCDEF0123456789ABCDEF" 0 :i8 end
-data s_raw    ":raw  " 0 :i8 end
-data s_xplat  ":xplat" 0 :i8 end
+data s_raw    ":raw" 0 :i8 end
+data s_xplat  ":xpl" 0 :i8 end
 data s_nat    ":nat" 0 :i8 end
 data s_txt    ":txt" 0 :i8 end
 data s_colk   ":" 0 :i8 end
@@ -46,7 +47,6 @@ fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
   termwidth 36 < -> var narrow :i
   7 termfg sb termbg
   0 2 termgoto
-  termwidth typei 120 xemit termheight typei 32 emit
   70 print_key s_colk type0 6 termfg fg 2 typehw 7 termfg 32 emit
   66 print_key s_colk type0 6 termfg cb 2 typehw 7 termfg 32 emit
   83 print_key s_colk type0 6 termfg sb 2 typehw 7 termfg 32 emit
@@ -89,7 +89,7 @@ fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
   7 termfg sb termbg
   termclear
   0 0 termgoto
-  s_title type0 81 print_key s_quit type0
+  s_title type0 termwidth typei 120 xemit termheight typei s_qopen type0 81 print_key s_quit type0
 
   4 use_x fg cb sb bd draw_charset
 
