@@ -47,16 +47,6 @@ end
 See [examples/](examples/) for more code examples and [tests/](tests/) for the full test suite.
 
 
-## Compiler Optimizations
-
-- **Dead-code elimination:** Only functions reachable from `main` and `init` blocks are emitted.
-- **Constant folding & casts:** Compile-time folding for integer arithmetic/comparisons and literal casts (`:a`, `:i32`, `:u32`).
-- **Strength reduction:** Power-of-2 `*`, `u/`, and `umod` by constants lower to shifts (`<<`, `u>>`) and masks (`and`); multiply/unsigned-divide by `1` is elided.
-- **Immediate lowering:** Constant-operand `+`/`-`, comparisons, shifts, and base+offset memory accesses emit immediate instructions where supported by the target.
-- **Static locals (Z80 / eZ80 / 6502):** Non-recursive functions place locals in static RAM rather than frame-pointer stacks.
-- **On-demand runtimes:** Math, `:i32`, and floating-point helpers are embedded only when referenced.
-
-
 ## Building & Testing
 
 ```sh
@@ -66,16 +56,6 @@ make test-rv32    # Build QEMU virt ELF32 binaries and run them via qemu-system-
 make test-6502    # Build sim65 binaries and run them via sim65 (if installed)
 make test-z80     # Build CP/M .com binaries and run them via tnylpo (if installed)
 make test-ez80    # Build Agon MOS binaries and run them via fab-agon-emulator (if installed)
-```
-
-## Reference Implementation
-
-Because `ir4c` includes multiple backends, peephole passes, banking, and compact modes, [ref/ir4p.pas](ref/ir4p.pas) provides an unoptimized, single-pass reference compiler for QEMU `virt` (RV32IMF) in ~2,660 lines of standalone classic Pascal (`fpc -Mtp`). It implements the full language specification and serves as both a readable spec walkthrough and an independent test oracle:
-
-```sh
-fpc -Mtp -O2 -FEbuild ref/ir4p.pas
-./build/ir4p tests/test_core.ir4 -o build/core_p.elf
-qemu-system-riscv32 -machine virt -bios none -nographic -kernel build/core_p.elf
 ```
 
 ## Usage
@@ -91,20 +71,27 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 
 ## Architectures & Platforms
 
-- **6502** (-t 6502, configurable `--zp`, `--stack-zp`, `--no-stack-zp`)
-  - [c64](docs/target/c64.md) (-t c64) — Commodore 64 PRG
+- **[6502](docs/target/6502/README.md)** (-t 6502, configurable `--zp`, `--stack-zp`, `--no-stack-zp`)
+  - [c64](docs/target/c64/README.md) (-t c64) — Commodore 64 PRG
   - sim65 (-t sim65) — cc65 simulator
-  - [x16](docs/target/x16.md) (-t x16, -t x16-cart) — Commander X16 PRG and banked CRT cartridges
+  - [x16](docs/target/x16/README.md) (-t x16, -t x16-cart) — Commander X16 PRG and banked CRT cartridges
 - **ARM64** (-t arm64) — AArch64 machine code, with `--run` JIT on macOS Apple Silicon
 - **Bytecode VM** (-t bc) — IR4(th) bytecode, with `--run` in the built-in stack VM
-- **eZ80** (-t ez80)
-  - [agon](docs/target/agon.md) (-t agon) — Agon Light / Console8 24-bit ADL MOS executables
+- **[eZ80](docs/target/ez80/README.md)** (-t ez80)
+  - [agon](docs/target/agon/README.md) (-t agon) — Agon Light / Console8 24-bit ADL MOS executables
 - **RISC-V RV32IM** (-t rv32)
   - obj (-t obj) — relocatable ELF32 object files (linking extern symbols and libgcc soft-float)
   - virt (-t virt) — standalone QEMU virt ELF32
-- **Z80** (-t z80)
-  - [cpm](docs/target/cpm.md) (-t cpm) — CP/M COM executables
-  - [zx81](docs/target/zx81.md) (-t zx81) — Sinclair ZX81 `.p` snapshots
+- **[Z80](docs/target/z80/README.md)** (-t z80)
+  - [cpm](docs/target/cpm/README.md) (-t cpm) — CP/M COM executables
+  - [zx81](docs/target/zx81/README.md) (-t zx81) — Sinclair ZX81 `.p` snapshots
+
+`ir4c` enables `-O1` optimizations by default (toggleable with `-O0`), including reachability dead-code elimination, constant folding, power-of-2 strength reduction, immediate/compare-branch lowering, and on-demand runtime embedding. These reflect the current 2-pass stack-oriented compiler rather than a limit of IR4(th) itself — the typed, monomorphic IR leaves plenty of headroom for future backends (such as register-allocating emitters).
+
+
+## Frontends
+
+- **[PASTA/84 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
 
 
 ## Companion Library
