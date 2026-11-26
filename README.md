@@ -17,6 +17,15 @@ See [docs/spec.md](docs/spec.md) for the full language specification and the [Lo
 
 This project is based on [hi5](https://github.com/stefanhaustein/hi5), an earlier IR stack language prototype implemented in KMP with Z80 support motivated by [Pasta80](https://github.com/pleumann/pasta80).
 
+## Relation to WebAssembly
+
+IR4(th) fills a niche similar to WebAssembly (Wasm) — a statically typed, monomorphic stack-based intermediate representation — simplified to fit 8-bit and constrained retro targets:
+
+- **Target-native widths:** Rather than mandating 32/64-bit integers, 64 KB linear-memory pages, and IEEE 754 floats, IR4(th) scales its default word (`:i`), address (`:a`), and float (`:f`) types to the target CPU (such as 16-bit or 24-bit addresses and `math48`/`wozfp` floats), with explicit `:i32` available where needed.
+
+- **Bare-metal access vs. sandbox:** Wasm runs in a sandboxed VM with imported host APIs; IR4(th) targets bare metal with direct flat-memory loads/stores and `extern` bindings.
+
+- **Minimal text format and direct emission:** Instead of Wasm's binary module sections, validation rules, and strictly structured control flow, IR4(th) is a simple Forth-like text IR supporting both structured blocks (`if`, `begin`/`while`/`repeat`) and unstructured jumps (`jmp`, `jz`, `jtab`). For simple projects targeting WebAssembly, it is generally recommended to emit C and compile it to Wasm rather than generating Wasm directly; IR4(th)'s simplicity makes workarounds where it is simpler to generate intermediate C unnecessary here, enabling frontends to target it directly.
 
 ## Examples
 
