@@ -56,6 +56,10 @@ For graphics or larger programs (such as `pasta84/examples/mandelbrot.pas` or `p
 x64sc -autostartprgmode 1 pasta84/examples/mandelbrot.prg
 ```
 
+Running `pasta84/examples/fibo.pas` on C64 (`./pasta84/pasta84.sh -t c64 pasta84/examples/fibo.pas`):
+
+<img src="../../img/pasta_fibo_c64.png" alt="PASTA/84 fibo.pas on Commodore 64" width="320">
+
 ### Commander X16 (`x16`)
 
 Compile to `hello.prg` (BASIC stub at `$0801`):
