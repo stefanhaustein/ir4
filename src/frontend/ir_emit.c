@@ -646,8 +646,18 @@ static Bool *select_compact_funcs(void) {
     u32 *est = (u32 *)vec_calloc(funcs.len, sizeof(u32));
     u32 *heat = (u32 *)vec_calloc(funcs.len, sizeof(u32));
     u32 total_est = 0;
+    u32 compact_thresh = 10240;
+    u32 native_budget = 6144;
     size_t max_ir = 1;
     size_t f;
+
+#if IR4_ENABLE_EZ80
+    if (be == &be_ez80 && (cb_cur_addr() - cb_pc()) < 0x0B0000UL) {
+        free(est);
+        free(heat);
+        return NULL;
+    }
+#endif
 
     for (f = 0; f < funcs.len; f++) {
         if (!funcs.data[f]->is_extern && words.data[f]->reachable && !words.data[f]->is_code) {
@@ -657,9 +667,8 @@ static Bool *select_compact_funcs(void) {
                 max_ir = words.data[f]->ir_len;
         }
     }
-    if (total_est > 10240) {
+    if (total_est > compact_thresh) {
         u8 *depth = (u8 *)vec_calloc(max_ir, sizeof(u8));
-        u32 native_budget = 6144;
         int pass;
         fn_compact = (Bool *)vec_calloc(funcs.len, sizeof(Bool));
         for (f = 0; f < funcs.len; f++) {

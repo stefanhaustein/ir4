@@ -98,8 +98,12 @@ end
 
 var __agon_handles :bytes 8
 var __agon_modes   :bytes 8
+var __agon_bkind   :bytes 8
 var __agon_pos     :bytes 24
 var __agon_size    :bytes 24
+var __agon_bpos    :bytes 24
+var __agon_blen    :bytes 24
+var __agon_buf     :bytes 2048
 var __agon_path    :bytes 256
 var __agon_path2   :bytes 256
 
@@ -107,9 +111,33 @@ fn __agon_cell ( base :a fd :i -> :a )
   base fd 3 * a+
 end
 
+fn __agon_fbuf ( fd :i -> :a )
+  __agon_buf fd 8 << a+
+end
+
 fn __agon_valid_fd ( fd :i -> :i )
   fd 0 < fd 7 > or if 0 return then
   __agon_handles fd a+ u8@ 0 <>
+end
+
+fn __agon_flush_buf ( fd :i -> :i )
+  __agon_bkind fd a+ u8@ -> var k :i
+  k 0 = if 0 return then
+  0 __agon_bkind fd a+ i8!
+  __agon_bpos fd __agon_cell @ -> var bp :i
+  __agon_blen fd __agon_cell @ -> var bl :i
+  0 __agon_bpos fd __agon_cell !
+  0 __agon_blen fd __agon_cell !
+  k 2 = if
+    bl 0 > if
+      __agon_handles fd a+ u8@ fd __agon_fbuf bl __mos_fwrite bl <> if -1 return then
+    then
+    0 return
+  then
+  bp bl < if
+    __agon_handles fd a+ u8@ __agon_pos fd __agon_cell @ __mos_flseek 0 <> if -1 return then
+  then
+  0
 end
 
 fn __agon_copy_path ( dst :a src :a len :i -> :i )
@@ -156,6 +184,9 @@ fn fsopen ( path :a len :i mode :i -> :i )
   then
   h __agon_handles fd a+ i8!
   smode __agon_modes fd a+ i8!
+  0 __agon_bkind fd a+ i8!
+  0 __agon_bpos fd __agon_cell !
+  0 __agon_blen fd __agon_cell !
   pos __agon_pos fd __agon_cell !
   sz __agon_size fd __agon_cell !
   fd
@@ -163,36 +194,162 @@ end
 
 fn fsclose ( fd :i -> :i )
   fd __agon_valid_fd 0 = if -1 return then
+  fd __agon_flush_buf -> var ferr :i
   __agon_handles fd a+ u8@ __mos_fclose drop
   0 __agon_handles fd a+ i8!
   0 __agon_modes fd a+ i8!
-  0
+  0 __agon_bkind fd a+ i8!
+  ferr
 end
 
 fn fsread ( fd :i buf :a len :i -> :i )
   len 0 < fd __agon_valid_fd 0 = or if -1 return then
   __agon_modes fd a+ u8@ 2 = if -1 return then
   len 0 = if 0 return then
-  __agon_handles fd a+ u8@ buf len __mos_fread -> var got :i
-  __agon_pos fd __agon_cell @ got + __agon_pos fd __agon_cell !
-  got
+  __agon_bkind fd a+ u8@ 2 = if
+    fd __agon_flush_buf 0 <> if -1 return then
+  then
+  0 -> var total :i
+  __agon_bkind fd a+ u8@ 1 = if
+    __agon_bpos fd __agon_cell @ -> var bp :i
+    __agon_blen fd __agon_cell @ bp - -> var avail :i
+    avail 0 > if
+      len avail < if len else avail then -> var take :i
+      buf fd __agon_fbuf bp a+ take memcpy
+      bp take + -> bp
+      bp __agon_bpos fd __agon_cell !
+      bp __agon_blen fd __agon_cell @ >= if 0 __agon_bkind fd a+ i8! then
+      __agon_pos fd __agon_cell @ take + __agon_pos fd __agon_cell !
+      buf take a+ -> buf
+      len take - -> len
+      take -> total
+      len 0 = if total return then
+    else
+      0 __agon_bkind fd a+ i8!
+    then
+  then
+  len 256 >= if
+    __agon_handles fd a+ u8@ buf len __mos_fread -> var got :i
+    __agon_pos fd __agon_cell @ got + __agon_pos fd __agon_cell !
+    total got + return
+  then
+  __agon_handles fd a+ u8@ fd __agon_fbuf 256 __mos_fread -> var rgot :i
+  rgot 0 <= if total return then
+  len rgot < if len else rgot then -> var rtake :i
+  buf fd __agon_fbuf rtake memcpy
+  rgot rtake > if
+    1 __agon_bkind fd a+ i8!
+    rtake __agon_bpos fd __agon_cell !
+    rgot __agon_blen fd __agon_cell !
+  else
+    0 __agon_bkind fd a+ i8!
+  then
+  __agon_pos fd __agon_cell @ rtake + __agon_pos fd __agon_cell !
+  total rtake +
 end
 
 fn fswrite ( fd :i buf :a len :i -> :i )
   len 0 < fd __agon_valid_fd 0 = or if -1 return then
   __agon_modes fd a+ u8@ 1 = if -1 return then
   len 0 = if 0 return then
-  __agon_handles fd a+ u8@ buf len __mos_fwrite -> var put :i
-  __agon_pos fd __agon_cell @ put + -> var npos :i
+  __agon_bkind fd a+ u8@ 1 = if
+    fd __agon_flush_buf 0 <> if -1 return then
+  then
+  __agon_blen fd __agon_cell @ -> var bl :i
+  __agon_bkind fd a+ u8@ 2 <> if 0 -> bl then
+  bl len + 256 <= if
+    fd __agon_fbuf bl a+ buf len memcpy
+    bl len + -> bl
+    2 __agon_bkind fd a+ i8!
+    bl __agon_blen fd __agon_cell !
+    __agon_pos fd __agon_cell @ len + -> var npos :i
+    npos __agon_pos fd __agon_cell !
+    npos __agon_size fd __agon_cell @ > if
+      npos __agon_size fd __agon_cell !
+    then
+    bl 256 >= if
+      fd __agon_flush_buf 0 <> if -1 return then
+    then
+    len return
+  then
+  fd __agon_flush_buf 0 <> if -1 return then
+  len 256 >= if
+    __agon_handles fd a+ u8@ buf len __mos_fwrite -> var put :i
+    __agon_pos fd __agon_cell @ put + -> var npos2 :i
+    npos2 __agon_pos fd __agon_cell !
+    npos2 __agon_size fd __agon_cell @ > if
+      npos2 __agon_size fd __agon_cell !
+    then
+    put return
+  then
+  fd __agon_fbuf buf len memcpy
+  2 __agon_bkind fd a+ i8!
+  len __agon_blen fd __agon_cell !
+  __agon_pos fd __agon_cell @ len + -> var npos3 :i
+  npos3 __agon_pos fd __agon_cell !
+  npos3 __agon_size fd __agon_cell @ > if
+    npos3 __agon_size fd __agon_cell !
+  then
+  len
+end
+
+fn fsgetc ( fd :i -> :i )
+  fd 0 >= fd 7 <= and if
+    __agon_bkind fd a+ u8@ 1 = if
+      __agon_bpos fd __agon_cell @ -> var bp :i
+      bp __agon_blen fd __agon_cell @ < if
+        fd __agon_fbuf bp a+ u8@ -> var ch :i
+        bp 1 + __agon_bpos fd __agon_cell !
+        __agon_pos fd __agon_cell @ 1 + __agon_pos fd __agon_cell !
+        ch return
+      then
+    then
+  then
+  fd __agon_valid_fd 0 = if -1 return then
+  __agon_modes fd a+ u8@ 2 = if -1 return then
+  __agon_bkind fd a+ u8@ 2 = if
+    fd __agon_flush_buf 0 <> if -1 return then
+  then
+  0 __agon_bkind fd a+ i8!
+  __agon_handles fd a+ u8@ fd __agon_fbuf 256 __mos_fread -> var got :i
+  got 0 <= if -1 return then
+  1 __agon_bkind fd a+ i8!
+  1 __agon_bpos fd __agon_cell !
+  got __agon_blen fd __agon_cell !
+  __agon_pos fd __agon_cell @ 1 + __agon_pos fd __agon_cell !
+  fd __agon_fbuf u8@
+end
+
+fn fsputc ( fd :i c :i -> :i )
+  fd __agon_valid_fd 0 = if -1 return then
+  __agon_modes fd a+ u8@ 1 = if -1 return then
+  __agon_bkind fd a+ u8@ 1 = if
+    fd __agon_flush_buf 0 <> if -1 return then
+  then
+  __agon_blen fd __agon_cell @ -> var bl :i
+  c fd __agon_fbuf bl a+ i8!
+  bl 1 + -> bl
+  2 __agon_bkind fd a+ i8!
+  bl __agon_blen fd __agon_cell !
+  __agon_pos fd __agon_cell @ 1 + -> var npos :i
   npos __agon_pos fd __agon_cell !
   npos __agon_size fd __agon_cell @ > if
     npos __agon_size fd __agon_cell !
   then
-  put
+  bl 256 >= if
+    fd __agon_flush_buf return
+  then
+  0
 end
 
 fn fsseek ( fd :i pos :i -> :i )
   pos 0 < fd __agon_valid_fd 0 = or if -1 return then
+  __agon_bkind fd a+ u8@ 2 = if
+    fd __agon_flush_buf 0 <> if -1 return then
+  then
+  0 __agon_bkind fd a+ i8!
+  0 __agon_bpos fd __agon_cell !
+  0 __agon_blen fd __agon_cell !
   __agon_handles fd a+ u8@ pos __mos_flseek 0 <> if -1 return then
   pos __agon_pos fd __agon_cell !
   0
@@ -210,7 +367,7 @@ end
 
 fn fsflush ( fd :i -> :i )
   fd __agon_valid_fd 0 = if -1 return then
-  0
+  fd __agon_flush_buf
 end
 
 fn fsdelete ( path :a len :i -> :i )

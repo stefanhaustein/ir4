@@ -5,6 +5,11 @@ code agon emit ( c :i )
   0xD1 :i8 0xE1 :i8 0xD5 :i8 0x7D :i8 0x5B :i8 0xD7 :i8
 end
 
+fn xemit ( c :i )
+  c 10 = if 13 emit then
+  c emit
+end
+
 \ Non-blocking read of next key event; returns (vkeycode << 8) | keyascii, or 0 if none.
 \ Clears sysvar_vkeydown so each keypress is consumed once.
 code agon inkey ( -> :i )

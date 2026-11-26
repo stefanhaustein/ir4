@@ -46,16 +46,23 @@ static void agon_end(int main_idx) {
     cb_emit8(0x43);
     cb_emit24((u32)(agon_base + 0x3D));
 
-    /* Switch SP out of MOS's ~6 KB 0x0BE250 stack (right above sysvars/FatFS at 0x0BCxxx)
-     * to top of 448 KB user SRAM (0x0B0000) when running in user space (< 0x0B0000). */
-    if (agon_base < 0x0B0000UL) {
+    /* Preserve MOS IX (sysvars) and IY across program execution */
+    cb_emit8(0xDD);
+    cb_emit8(0xE5);
+    cb_emit8(0xFD);
+    cb_emit8(0xE5);
+
+    /* Switch SP out of MOS's ~6 KB 0x0BE250 stack (right above sysvars/FatFS at 0x0BCxxx):
+     * to 0x0B0000 for user-space binaries (< 0x0B0000), or 0x0BB000 for 0x0B0000 MOSlets. */
+    {
+        u32 top_sp = (agon_base < 0x0B0000UL) ? 0x0B0000UL : 0x0BB000UL;
         cb_emit8(EZ80_LD_HL_N24);
         cb_emit24(0);
         cb_emit8(EZ80_ADD_HL_SP);
         cb_emit8(EZ80_LD_NN_HL);
         cb_emit24((u32)(agon_base + 0x34));
         cb_emit8(EZ80_LD_HL_N24);
-        cb_emit24(0x0B0000UL);
+        cb_emit24(top_sp);
         cb_emit8(EZ80_LD_SP_HL);
     }
 
@@ -97,11 +104,13 @@ static void agon_end(int main_idx) {
     if (sig->out_types.len == 1) {
         cb_emit8(EZ80_POP_BC); /* preserve main() return value in BC for test harness */
     }
-    if (agon_base < 0x0B0000UL) {
-        cb_emit8(EZ80_LD_HL_NN);
-        cb_emit24((u32)(agon_base + 0x34));
-        cb_emit8(EZ80_LD_SP_HL);
-    }
+    cb_emit8(EZ80_LD_HL_NN);
+    cb_emit24((u32)(agon_base + 0x34));
+    cb_emit8(EZ80_LD_SP_HL);
+    cb_emit8(0xFD);
+    cb_emit8(0xE1);
+    cb_emit8(0xDD);
+    cb_emit8(0xE1);
     cb_emit8(EZ80_LD_HL_N24);
     cb_emit24(0); /* MOS exit code */
     cb_emit8(EZ80_RET);
