@@ -328,6 +328,8 @@ u8 be_6502_stack_zp_base(void);
 size_t be_6502_stack_data_off(void);
 void be_6502_set_compact(int compact);
 int be_6502_get_compact(void);
+void be_ez80_set_compact(int compact);
+int be_ez80_get_compact(void);
 void be_6502_set_call_bank(u16 bank);
 void be_6502_peep_fence(void);
 void be_6502_set_trampoline(u16 bank_call_addr, u16 kernal_call_addr);

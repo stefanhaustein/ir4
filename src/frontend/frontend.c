@@ -129,7 +129,7 @@ static void tpop_expect(StackType expected) {
     StackType got = tpop();
     if (got != expected) {
         const SrcFile *cur = lex_cur();
-        fprintf(stderr, "ir4c error (%s:%lu): expected %s, got %s\n", cur->path,
+        fprintf(stderr, "%s:%lu: error: ir4c: expected %s, got %s\n", cur->path,
                 (unsigned long)cur->line_num, type_name(expected), type_name(got));
         exit(1);
     }
@@ -2042,7 +2042,7 @@ static void compile_body(WordIR *w) {
 
         {
             const SrcFile *cur = lex_cur();
-            fprintf(stderr, "ir4c error (%s:%lu): unknown word '%s'\n", cur->path,
+            fprintf(stderr, "%s:%lu: error: ir4c: unknown word '%s'\n", cur->path,
                     (unsigned long)cur->line_num, tok);
         }
         exit(1);

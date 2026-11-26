@@ -28,7 +28,7 @@ fn __agon_scan_args ( want :i buf :a max :i -> :i )
     max 0 > if 0 buf i8! then
     0 return
   then
-  0x040037 i>a a@ -> var p :a
+  & __agon_scan_args a>i 0x0B0000 >= if 0x0B0037 else 0x040037 then i>a a@ -> var p :a
   p 0 i>a a= if
     want 0 < if 1 else -1 then return
   then

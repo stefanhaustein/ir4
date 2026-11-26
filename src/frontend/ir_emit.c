@@ -617,7 +617,30 @@ static u16 assign_code_banks(void) {
     return max_bank;
 }
 
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
+static int get_be_compact(void) {
 #if IR4_ENABLE_6502
+    if (be == &be_6502)
+        return be_6502_get_compact();
+#endif
+#if IR4_ENABLE_EZ80
+    if (be == &be_ez80)
+        return be_ez80_get_compact();
+#endif
+    return 0;
+}
+
+static void set_be_compact(int c) {
+#if IR4_ENABLE_6502
+    if (be == &be_6502)
+        be_6502_set_compact(c);
+#endif
+#if IR4_ENABLE_EZ80
+    if (be == &be_ez80)
+        be_ez80_set_compact(c);
+#endif
+}
+
 static Bool *select_compact_funcs(void) {
     Bool *fn_compact = NULL;
     u32 *est = (u32 *)vec_calloc(funcs.len, sizeof(u32));
@@ -712,8 +735,8 @@ static Bool *select_compact_funcs(void) {
 #endif
 
 void emit_program(void) {
-#if IR4_ENABLE_6502
-    int saved_compact = (be == &be_6502) ? be_6502_get_compact() : 0;
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
+    int saved_compact = get_be_compact();
 #endif
     Bool *fn_compact = NULL;
     u16 max_bank = 0;
@@ -729,17 +752,16 @@ void emit_program(void) {
     if (cb_is_banked() && funcs.len > 0) {
         max_bank = assign_code_banks();
     }
-#if IR4_ENABLE_6502
-    else if (be == &be_6502 && saved_compact == 2 && funcs.len > 0) {
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
+    else if (saved_compact == 2 && funcs.len > 0) {
         fn_compact = select_compact_funcs();
     }
 #endif
 
     if (cb_is_banked()) {
         u16 b;
-#if IR4_ENABLE_6502
-        if (be == &be_6502)
-            be_6502_set_compact(0);
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
+        set_be_compact(0);
 #endif
         for (b = 0; b <= max_bank; b++) {
             if (b > 0)
@@ -783,21 +805,20 @@ void emit_program(void) {
     } else {
         for (f = 0; f < funcs.len; f++) {
             if (!funcs.data[f]->is_extern && words.data[f]->reachable) {
-#if IR4_ENABLE_6502
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
                 if (funcs.data[f]->is_hot)
-                    be_6502_set_compact(0);
+                    set_be_compact(0);
                 else if (fn_compact)
-                    be_6502_set_compact(fn_compact[f] ? 1 : 0);
-                else if (be == &be_6502 && saved_compact == 2)
-                    be_6502_set_compact(0);
+                    set_be_compact(fn_compact[f] ? 1 : 0);
+                else if (saved_compact == 2)
+                    set_be_compact(0);
 #endif
                 emit_word(f);
             }
         }
     }
-#if IR4_ENABLE_6502
-    if (be == &be_6502)
-        be_6502_set_compact(saved_compact);
+#if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
+    set_be_compact(saved_compact);
 #endif
     free(fn_compact);
 

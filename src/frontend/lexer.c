@@ -20,9 +20,9 @@ void ir4_add_lib_root(const char *path) {
 void ir4_die(const char *msg) {
     if (src_stack.len > 0) {
         const SrcFile *cur = &src_stack.data[src_stack.len - 1];
-        fprintf(stderr, "ir4c error (%s:%lu): %s\n", cur->path, (unsigned long)cur->line_num, msg);
+        fprintf(stderr, "%s:%lu: error: ir4c: %s\n", cur->path, (unsigned long)cur->line_num, msg);
     } else {
-        fprintf(stderr, "ir4c error: %s\n", msg);
+        fprintf(stderr, "error: ir4c: %s\n", msg);
     }
     exit(1);
 }
@@ -315,7 +315,7 @@ void push_require_ex(const char *name, int lib_only) {
 
     {
         const SrcFile *cur = &src_stack.data[src_stack.len - 1];
-        fprintf(stderr, "ir4c error (%s:%u): cannot open required file '%s'\n", cur->path,
+        fprintf(stderr, "%s:%u: error: ir4c: cannot open required file '%s'\n", cur->path,
                 cur->line_num, name);
         exit(1);
     }
