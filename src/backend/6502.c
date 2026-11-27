@@ -556,7 +556,7 @@ static void m6502_push_i32(i32 val) {
 static void m6502_push_data(size_t offset) {
     u16 lo_pos, hi_pos;
     if (m6502_compact) {
-        cb_emit8(BC_PUSH_I16);
+        cb_emit8(BC_PUSH_W);
         bc_emit_data_reloc(offset, 2);
         return;
     }
@@ -2273,7 +2273,7 @@ static void m6502_patch_call(size_t call_pc, size_t call_addr, size_t target_add
 static size_t m6502_push_fn(size_t target_addr) {
     size_t pc;
     if (m6502_compact) {
-        cb_emit8(BC_PUSH_I16);
+        cb_emit8(BC_PUSH_W);
         pc = cb_pc();
         cb_emit16((u16)target_addr);
         return pc;
@@ -2354,11 +2354,11 @@ static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type) {
     if (m6502_static_frame) {
         u16 data_off = (u16)(m6502_static_base + off);
         if (op == LOCAL_ADDR)
-            cb_emit8(BC_PUSH_I16);
+            cb_emit8(BC_PUSH_W);
         else if (op == LOCAL_GET)
-            cb_emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
+            cb_emit8(sz == 4 ? BC_STATIC_GET32 : BC_STATIC_GET);
         else
-            cb_emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
+            cb_emit8(sz == 4 ? BC_STATIC_SET32 : BC_STATIC_SET);
         cb_add_data_reloc(cb_pc(), data_off);
         cb_emit16(0x0000);
     } else if (m6502_local_is_big.data[slot]) {
@@ -2367,9 +2367,9 @@ static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type) {
         if (op == LOCAL_ADDR)
             cb_emit8_8(BC_LOCAL_ADDR, (u8)off);
         else if (op == LOCAL_GET)
-            cb_emit8_8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2, (u8)off);
+            cb_emit8_8(sz == 4 ? BC_LOCAL_GET32 : BC_LOCAL_GET, (u8)off);
         else
-            cb_emit8_8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2, (u8)off);
+            cb_emit8_8(sz == 4 ? BC_LOCAL_SET32 : BC_LOCAL_SET, (u8)off);
     }
 }
 
@@ -2603,8 +2603,8 @@ static void ensure_6502_vm(void) {
     m6502_sta_stk(1);
     cb_emit8_16(M6502_JMP, vm_next_addr);
 
-    /* BC_PUSH_I16 */
-    handlers[BC_PUSH_I16] = cb_cur_addr();
+    /* BC_PUSH_W */
+    handlers[BC_PUSH_W] = cb_cur_addr();
     emit_vm_read_ip_a(ip_lo, ip_hi);
     cb_emit8(M6502_DEX);
     cb_emit8(M6502_DEX);
@@ -2658,13 +2658,13 @@ static void ensure_6502_vm(void) {
     m6502_sta_stk(1);
     cb_emit8_16(M6502_JMP, vm_next_addr);
 
-    /* BC_STATIC_GET2 / GET4 / SET2 / SET4 */
+    /* BC_STATIC_GET / GET32 / SET / SET32 */
     {
         int is_set, sz4;
         for (is_set = 0; is_set < 2; is_set++) {
             for (sz4 = 0; sz4 < 2; sz4++) {
-                BcOp bc = is_set ? (sz4 ? BC_STATIC_SET4 : BC_STATIC_SET2)
-                                 : (sz4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
+                BcOp bc = is_set ? (sz4 ? BC_STATIC_SET32 : BC_STATIC_SET)
+                                 : (sz4 ? BC_STATIC_GET32 : BC_STATIC_GET);
                 u8 n = sz4 ? 4 : 2;
                 u8 b;
                 handlers[bc] = cb_cur_addr();
@@ -2694,13 +2694,13 @@ static void ensure_6502_vm(void) {
         }
     }
 
-    /* BC_LOCAL_GET2 / GET4 / SET2 / SET4 */
+    /* BC_LOCAL_GET / GET32 / SET / SET32 */
     {
         int is_set, sz4;
         for (is_set = 0; is_set < 2; is_set++) {
             for (sz4 = 0; sz4 < 2; sz4++) {
-                BcOp bc = is_set ? (sz4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2)
-                                 : (sz4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2);
+                BcOp bc = is_set ? (sz4 ? BC_LOCAL_SET32 : BC_LOCAL_SET)
+                                 : (sz4 ? BC_LOCAL_GET32 : BC_LOCAL_GET);
                 u8 n = sz4 ? 4 : 2;
                 u8 b;
                 handlers[bc] = cb_cur_addr();
@@ -2843,14 +2843,14 @@ static void ensure_6502_vm(void) {
         cb_emit8_16(M6502_JMP, (save) ? vm_restore_ip_addr : vm_next_addr);                           \
     } while (0)
 
-    VM_STK(BC_DUP2, OP_DUP, TY_W, TY_NONE, 0);
-    VM_STK(BC_DUP4, OP_DUP, TY_I32, TY_NONE, 0);
-    VM_STK(BC_DROP2, OP_DROP, TY_W, TY_NONE, 0);
-    VM_STK(BC_DROP4, OP_DROP, TY_I32, TY_NONE, 0);
-    VM_STK(BC_SWAP22, OP_SWAP, TY_W, TY_W, 0);
-    VM_STK(BC_SWAP24, OP_SWAP, TY_I32, TY_W, 1);
-    VM_STK(BC_SWAP42, OP_SWAP, TY_W, TY_I32, 1);
-    VM_STK(BC_SWAP44, OP_SWAP, TY_I32, TY_I32, 0);
+    VM_STK(BC_DUP, OP_DUP, TY_W, TY_NONE, 0);
+    VM_STK(BC_DUP32, OP_DUP, TY_I32, TY_NONE, 0);
+    VM_STK(BC_DROP, OP_DROP, TY_W, TY_NONE, 0);
+    VM_STK(BC_DROP32, OP_DROP, TY_I32, TY_NONE, 0);
+    VM_STK(BC_SWAP, OP_SWAP, TY_W, TY_W, 0);
+    VM_STK(BC_SWAP_W32, OP_SWAP, TY_I32, TY_W, 1);
+    VM_STK(BC_SWAP_32W, OP_SWAP, TY_W, TY_I32, 1);
+    VM_STK(BC_SWAP32, OP_SWAP, TY_I32, TY_I32, 0);
 #undef VM_STK
 
     /* ALU / cmp / mem / conv ops */
@@ -2921,8 +2921,8 @@ static void ensure_6502_vm(void) {
     VM_OP(BC_I8FETCH, OP_I8FETCH, 1);
     VM_OP(BC_U8FETCH, OP_U8FETCH, 1);
     VM_OP(BC_I8STORE, OP_I8STORE, 1);
-    VM_OP(BC_FETCH16, OP_FETCH, 1);
-    VM_OP(BC_STORE16, OP_STORE, 1);
+    VM_OP(BC_FETCH, OP_FETCH, 1);
+    VM_OP(BC_STORE, OP_STORE, 1);
     VM_OP(BC_FETCH32, OP_I32FETCH, 1);
     VM_OP(BC_STORE32, OP_I32STORE, 1);
     VM_OP(BC_BCOPY, OP_BCOPY, 1);

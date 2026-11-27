@@ -123,7 +123,7 @@ static void bc_run_vm(size_t main_idx) {
             wr16(mem, sp, (u16)v);
             break;
         }
-        case BC_PUSH_I16:
+        case BC_PUSH_W:
         case BC_PUSH_DATA:
         case BC_PUSH_FN: {
             u16 v = rd16(mem, pc);
@@ -153,56 +153,56 @@ static void bc_run_vm(size_t main_idx) {
             break;
         }
 
-        case BC_STATIC_GET2: {
+        case BC_STATIC_GET: {
             u16 addr = rd16(mem, pc);
             pc += 2;
             sp -= 2;
             wr16(mem, sp, rd16(mem, addr));
             break;
         }
-        case BC_STATIC_GET4: {
+        case BC_STATIC_GET32: {
             u16 addr = rd16(mem, pc);
             pc += 2;
             sp -= 4;
             wr32(mem, sp, rd32(mem, addr));
             break;
         }
-        case BC_STATIC_SET2: {
+        case BC_STATIC_SET: {
             u16 addr = rd16(mem, pc);
             pc += 2;
             wr16(mem, addr, rd16(mem, sp));
             sp += 2;
             break;
         }
-        case BC_STATIC_SET4: {
+        case BC_STATIC_SET32: {
             u16 addr = rd16(mem, pc);
             pc += 2;
             wr32(mem, addr, rd32(mem, sp));
             sp += 4;
             break;
         }
-        case BC_LOCAL_GET2: {
+        case BC_LOCAL_GET: {
             u16 off = rd16(mem, pc);
             pc += 2;
             sp -= 2;
             wr16(mem, sp, rd16(mem, (u16)(fp + off)));
             break;
         }
-        case BC_LOCAL_GET4: {
+        case BC_LOCAL_GET32: {
             u16 off = rd16(mem, pc);
             pc += 2;
             sp -= 4;
             wr32(mem, sp, rd32(mem, (u16)(fp + off)));
             break;
         }
-        case BC_LOCAL_SET2: {
+        case BC_LOCAL_SET: {
             u16 off = rd16(mem, pc);
             pc += 2;
             wr16(mem, (u16)(fp + off), rd16(mem, sp));
             sp += 2;
             break;
         }
-        case BC_LOCAL_SET4: {
+        case BC_LOCAL_SET32: {
             u16 off = rd16(mem, pc);
             pc += 2;
             wr32(mem, (u16)(fp + off), rd32(mem, sp));
@@ -217,46 +217,46 @@ static void bc_run_vm(size_t main_idx) {
             break;
         }
 
-        case BC_DUP2: {
+        case BC_DUP: {
             u16 v = rd16(mem, sp);
             sp -= 2;
             wr16(mem, sp, v);
             break;
         }
-        case BC_DUP4: {
+        case BC_DUP32: {
             u32 v = rd32(mem, sp);
             sp -= 4;
             wr32(mem, sp, v);
             break;
         }
-        case BC_DROP2:
+        case BC_DROP:
             sp += 2;
             break;
-        case BC_DROP4:
+        case BC_DROP32:
             sp += 4;
             break;
-        case BC_SWAP22: {
+        case BC_SWAP: {
             u16 a = rd16(mem, sp);
             u16 b = rd16(mem, (u16)(sp + 2));
             wr16(mem, sp, b);
             wr16(mem, (u16)(sp + 2), a);
             break;
         }
-        case BC_SWAP24: {
+        case BC_SWAP_W32: {
             u32 t = rd32(mem, sp);
             u16 n = rd16(mem, (u16)(sp + 4));
             wr16(mem, sp, n);
             wr32(mem, (u16)(sp + 2), t);
             break;
         }
-        case BC_SWAP42: {
+        case BC_SWAP_32W: {
             u16 t = rd16(mem, sp);
             u32 n = rd32(mem, (u16)(sp + 2));
             wr32(mem, sp, n);
             wr16(mem, (u16)(sp + 4), t);
             break;
         }
-        case BC_SWAP44: {
+        case BC_SWAP32: {
             u32 a = rd32(mem, sp);
             u32 b = rd32(mem, (u16)(sp + 4));
             wr32(mem, sp, b);
@@ -708,11 +708,14 @@ static void bc_run_vm(size_t main_idx) {
             sp += 4;
             break;
         }
-        case BC_FETCH16: {
+        case BC_FETCH:
+        case BC_U16FETCH:
+        case BC_I16FETCH: {
             u16 addr = rd16(mem, sp);
             wr16(mem, sp, rd16(mem, addr));
             break;
         }
+        case BC_STORE:
         case BC_STORE16: {
             u16 addr = rd16(mem, sp);
             u16 val = rd16(mem, (u16)(sp + 2));
@@ -776,12 +779,6 @@ static void bc_run_vm(size_t main_idx) {
             wr16(mem, sp, v);
             break;
         }
-        case BC_I16FETCH:
-        case BC_FETCH24:
-        case BC_STORE24:
-            fprintf(stderr, "24-bit opcode 0x%02X in 16-bit bc VM\n", op);
-            free(mem);
-            exit(1);
         }
     }
 }

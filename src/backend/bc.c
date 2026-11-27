@@ -38,11 +38,11 @@ static void bc_local_op(LocalOp op, size_t slot, StackType type, size_t stack_by
             cb_add_data_reloc(cb_pc(), off);
             cb_emit16(0);
         } else if (op == LOCAL_GET) {
-            cb_emit8(sz == 4 ? BC_STATIC_GET4 : BC_STATIC_GET2);
+            cb_emit8(sz == 4 ? BC_STATIC_GET32 : BC_STATIC_GET);
             cb_add_data_reloc(cb_pc(), off);
             cb_emit16(0);
         } else {
-            cb_emit8(sz == 4 ? BC_STATIC_SET4 : BC_STATIC_SET2);
+            cb_emit8(sz == 4 ? BC_STATIC_SET32 : BC_STATIC_SET);
             cb_add_data_reloc(cb_pc(), off);
             cb_emit16(0);
         }
@@ -51,10 +51,10 @@ static void bc_local_op(LocalOp op, size_t slot, StackType type, size_t stack_by
             cb_emit8(BC_LOCAL_ADDR);
             cb_emit16(off);
         } else if (op == LOCAL_GET) {
-            cb_emit8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2);
+            cb_emit8(sz == 4 ? BC_LOCAL_GET32 : BC_LOCAL_GET);
             cb_emit16(off);
         } else {
-            cb_emit8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2);
+            cb_emit8(sz == 4 ? BC_LOCAL_SET32 : BC_LOCAL_SET);
             cb_emit16(off);
         }
     }
@@ -157,7 +157,7 @@ void bc_emit_push_w(i32 val, u8 word_bytes) {
         } else if (sv >= -128 && sv < 0) {
             cb_emit8_8(BC_PUSH_I8, (u8)(sv & 0xFF));
         } else if (sv >= -32768 && sv <= 32767) {
-            cb_emit8_16(BC_PUSH_I16, (u16)(sv & 0xFFFF));
+            cb_emit8_16(BC_PUSH_W, (u16)(sv & 0xFFFF));
         } else {
             cb_emit8(BC_PUSH_DATA);
             cb_emit24(u);
@@ -169,7 +169,7 @@ void bc_emit_push_w(i32 val, u8 word_bytes) {
         } else if (v >= -128 && v < 0) {
             cb_emit8_8(BC_PUSH_I8, (u8)(v & 0xFF));
         } else {
-            cb_emit8_16(BC_PUSH_I16, (u16)v);
+            cb_emit8_16(BC_PUSH_W, (u16)v);
         }
     }
 }
@@ -178,7 +178,7 @@ void bc_emit_push_a(u32 val, u8 addr_bytes) {
     if (addr_bytes == 3) {
         bc_emit_push_w((i32)val, 3);
     } else {
-        cb_emit8_16(BC_PUSH_I16, (u16)val);
+        cb_emit8_16(BC_PUSH_W, (u16)val);
     }
 }
 
@@ -213,20 +213,20 @@ void bc_emit_stack_op(StackOp op, StackType t1, StackType t2) {
     u8 s2 = type_size(t2);
     switch (op) {
     case OP_DUP:
-        cb_emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
+        cb_emit8(s1 == 4 ? BC_DUP32 : BC_DUP);
         break;
     case OP_DROP:
-        cb_emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
+        cb_emit8(s1 == 4 ? BC_DROP32 : BC_DROP);
         break;
     case OP_SWAP:
         if (s1 == 2 && s2 == 2)
-            cb_emit8(BC_SWAP22);
+            cb_emit8(BC_SWAP);
         else if (s1 == 4 && s2 == 2)
-            cb_emit8(BC_SWAP24);
+            cb_emit8(BC_SWAP_W32);
         else if (s1 == 2 && s2 == 4)
-            cb_emit8(BC_SWAP42);
+            cb_emit8(BC_SWAP_32W);
         else
-            cb_emit8(BC_SWAP44);
+            cb_emit8(BC_SWAP32);
         break;
     }
 }
@@ -434,34 +434,34 @@ void bc_emit_op(IrOp op, u8 word_bytes) {
         cb_emit8(BC_I8STORE);
         break;
     case OP_SI8STORE:
-        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_SWAP);
         cb_emit8(BC_I8STORE);
         break;
     case OP_I16FETCH:
-        cb_emit8(word_bytes == 3 ? BC_I16FETCH : BC_FETCH16);
+        cb_emit8(word_bytes == 2 ? BC_FETCH : BC_I16FETCH);
         break;
     case OP_U16FETCH:
-        cb_emit8(BC_FETCH16);
+        cb_emit8(word_bytes == 2 ? BC_FETCH : BC_U16FETCH);
         break;
     case OP_FETCH:
     case OP_AFETCH:
-        cb_emit8(word_bytes == 3 ? BC_FETCH24 : BC_FETCH16);
+        cb_emit8(BC_FETCH);
         break;
     case OP_I16STORE:
-        cb_emit8(BC_STORE16);
+        cb_emit8(word_bytes == 2 ? BC_STORE : BC_STORE16);
         break;
     case OP_STORE:
     case OP_ASTORE:
-        cb_emit8(word_bytes == 3 ? BC_STORE24 : BC_STORE16);
+        cb_emit8(BC_STORE);
         break;
     case OP_SI16STORE:
-        cb_emit8(BC_SWAP22);
-        cb_emit8(BC_STORE16);
+        cb_emit8(BC_SWAP);
+        cb_emit8(word_bytes == 2 ? BC_STORE : BC_STORE16);
         break;
     case OP_SSTORE:
     case OP_SASTORE:
-        cb_emit8(BC_SWAP22);
-        cb_emit8(word_bytes == 3 ? BC_STORE24 : BC_STORE16);
+        cb_emit8(BC_SWAP);
+        cb_emit8(BC_STORE);
         break;
     case OP_FFETCH:
     case OP_I32FETCH:
@@ -472,7 +472,7 @@ void bc_emit_op(IrOp op, u8 word_bytes) {
         cb_emit8(BC_STORE32);
         break;
     case OP_SFSTORE:
-        cb_emit8(BC_SWAP24);
+        cb_emit8(BC_SWAP_W32);
         cb_emit8(BC_STORE32);
         break;
     case OP_BCOPY:

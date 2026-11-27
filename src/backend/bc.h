@@ -16,34 +16,34 @@ typedef enum {
 
     BC_PUSH_0_32,
     BC_PUSH_I8,     /* i8 */
-    BC_PUSH_I16,    /* u16 */
+    BC_PUSH_W,      /* word_bytes */
     BC_PUSH_I32,    /* i32 */
     BC_PUSH_F,      /* f32 (4 bytes) */
-    BC_PUSH_DATA,   /* u16 addr */
-    BC_PUSH_FN,     /* u16 addr */
+    BC_PUSH_DATA,   /* addr_bytes */
+    BC_PUSH_FN,     /* addr_bytes */
 
     BC_INC,
     BC_DEC,
     BC_ADD_IMM8,    /* i8 */
 
-    BC_STATIC_GET2, /* u16 addr */
-    BC_STATIC_GET4, /* u16 addr */
-    BC_STATIC_SET2, /* u16 addr */
-    BC_STATIC_SET4, /* u16 addr */
-    BC_LOCAL_GET2,  /* u16 off */
-    BC_LOCAL_GET4,  /* u16 off */
-    BC_LOCAL_SET2,  /* u16 off */
-    BC_LOCAL_SET4,  /* u16 off */
-    BC_LOCAL_ADDR,  /* u16 off */
+    BC_STATIC_GET,  /* addr_bytes */
+    BC_STATIC_GET32,/* addr_bytes */
+    BC_STATIC_SET,  /* addr_bytes */
+    BC_STATIC_SET32,/* addr_bytes */
+    BC_LOCAL_GET,   /* addr_bytes */
+    BC_LOCAL_GET32, /* addr_bytes */
+    BC_LOCAL_SET,   /* addr_bytes */
+    BC_LOCAL_SET32, /* addr_bytes */
+    BC_LOCAL_ADDR,  /* addr_bytes */
 
-    BC_DUP2,
-    BC_DUP4,
-    BC_DROP2,
-    BC_DROP4,
-    BC_SWAP22,
-    BC_SWAP24,
-    BC_SWAP42,
-    BC_SWAP44,
+    BC_DUP,
+    BC_DUP32,
+    BC_DROP,
+    BC_DROP32,
+    BC_SWAP,
+    BC_SWAP_W32,
+    BC_SWAP_32W,
+    BC_SWAP32,
 
     BC_JMP,         /* u16 target_addr */
     BC_JZ,          /* u16 target_addr */
@@ -118,8 +118,8 @@ typedef enum {
     BC_I8FETCH,
     BC_U8FETCH,
     BC_I8STORE,
-    BC_FETCH16,
-    BC_STORE16,
+    BC_FETCH,
+    BC_STORE,
     BC_FETCH32,
     BC_STORE32,
     BC_BCOPY,
@@ -131,10 +131,10 @@ typedef enum {
     BC_U2I32,
     BC_I322W,
 
-    /* 24-bit word/address extensions (used by eZ80 compact mode) */
+    /* Explicit 16-bit sub-word memory ops (used when word_bytes > 2) */
+    BC_U16FETCH,
     BC_I16FETCH,
-    BC_FETCH24,
-    BC_STORE24
+    BC_STORE16
 } BcOp;
 
 const char *bc_extern_name(u16 id);
