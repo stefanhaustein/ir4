@@ -193,13 +193,20 @@ hot fn step_balls ( floor8 :i )
   repeat
 end
 
+fn drop_ball ( )
+  active 4 <= if return then
+  -1 +-> active
+  active 1 << -> var sid :i
+  sid 0 sprshow
+  sid 1 + 0 sprshow
+end
+
 hot fn run_loop ( floor8 :i )
   0 -> var elapsed :i
   gfxticks -> var prev_t :i
   0 -> var sum_dt :i
   0 -> var fcnt :i
   0 -> var base_dt :i
-  -1 -> var budget_ok :i
 
   begin inkey 0 = while
     floor8 step_balls
@@ -211,16 +218,20 @@ hot fn run_loop ( floor8 :i )
     dt +-> elapsed
     dt +-> sum_dt
     1 +-> fcnt
-    fcnt 16 >= if
+    fcnt 4 >= if
       base_dt 0 = if
         sum_dt -> base_dt
       else
-        sum_dt base_dt 4 + <= -> budget_ok
+        sum_dt base_dt < if sum_dt -> base_dt then
+        sum_dt base_dt 1 + > if
+          drop_ball
+          0 -> elapsed
+        then
       then
       0 -> sum_dt
       0 -> fcnt
     then
-    budget_ok 0 <> elapsed 240 >= and if
+    elapsed 240 >= if
       add_ball
       0 -> elapsed
       0 -> sum_dt

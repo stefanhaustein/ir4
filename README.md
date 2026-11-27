@@ -100,7 +100,7 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 
 ## Frontends
 
-- **[PASTA/84 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
+- **[PASTA/80 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
 
 
 ## Companion Library
@@ -126,7 +126,7 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 
 ## Screenshots & Videos 
 
-[YT Playlist](https://www.youtube.com/watch?v=m7Sv4vFC7ec&list=PLQKhMXcXxjVY) (The [spheres.ir4](examples/spheres.ir4) demo works similarily on Agon and X16 and with a reduced number of spheres on C64.)
+[YT Playlist](https://www.youtube.com/watch?v=o5TX4K9Wk3c&list=PLQKhMXcXxjVY) (The [spheres.ir4](examples/spheres.ir4) demo works similarily on Agon and X16 and with a reduced number of spheres on C64.)
 
 | Sysinfo ([sysinfo.ir4](examples/sysinfo.ir4)) | Julia Set ([julia.ir4](examples/julia.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
 |---|---|---|
