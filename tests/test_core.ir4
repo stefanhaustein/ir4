@@ -294,7 +294,7 @@ fn main ( -> :i )
   dup 0 <> if return then drop
   size_f 4 >= true 60 assert_eq
   dup 0 <> if return then drop
-  target_z80 target_6502 or target_65816 or target_arm64 or target_rv32 or target_ez80 or target_bc or
+  target_z80 target_6502 or target_65816 or target_arm64 or target_rv32 or target_ez80 or target_bc or target_bc32 or
   true 61 assert_eq
   dup 0 <> if return then drop
   0b101010 42 62 assert_eq

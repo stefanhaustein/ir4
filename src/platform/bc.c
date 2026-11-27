@@ -2,6 +2,10 @@
 #include "backend/bc.h"
 #include "codebuf.h"
 #include "frontend.h"
+#include "plat_web_vm.h"
+#include "vec.h"
+
+VEC_OF(U8Vec, u8);
 
 #define VM_MEM_SIZE 65536
 #define VM_STACK_TOP 0xFF00
@@ -783,4 +787,106 @@ static void bc_run_vm(size_t main_idx) {
     }
 }
 
-const Platform plat_bc_run = {"--run", &be_bc, 0x0100, NULL, true, NULL, NULL, NULL, bc_run_vm};
+static void wr32_mem(U8Vec *v, u32 val) {
+    u8 b[4];
+    cb_put_le32(b, val);
+    {
+        size_t i;
+        for (i = 0; i < 4; i++)
+            VEC_PUSH(*v, b[i]);
+    }
+}
+
+static Bool bc32_build(U8Vec *out, size_t base) {
+    int main_idx = ir4_find_func("main");
+    u32 entry = (main_idx >= 0) ? (u32)ir4_func_addr((size_t)main_idx) : (u32)base;
+    u32 code_sz = (u32)cb_pc();
+    u32 init_sz = (u32)cb_init_data_size();
+    u32 total_data = (u32)cb_data_size();
+    u32 bss_sz = (total_data > init_sz) ? (total_data - init_sz) : 0;
+    u16 ext_cnt = bc_extern_count();
+    u16 i;
+    const u8 *code = cb_data();
+    const u8 *init_d = cb_init_data();
+
+    VEC_PUSH(*out, 'I'); VEC_PUSH(*out, 'R'); VEC_PUSH(*out, '4'); VEC_PUSH(*out, 'B');
+    wr32_mem(out, (u32)base);
+    wr32_mem(out, entry);
+    wr32_mem(out, code_sz);
+    wr32_mem(out, init_sz);
+    wr32_mem(out, bss_sz);
+    wr32_mem(out, (u32)ext_cnt);
+    for (i = 0; i < ext_cnt; i++) {
+        const char *name = bc_extern_name(i);
+        size_t j, len = strlen(name) + 1;
+        for (j = 0; j < len; j++)
+            VEC_PUSH(*out, (u8)name[j]);
+    }
+    for (i = 0; (u32)i < code_sz; i++)
+        VEC_PUSH(*out, code[i]);
+    {
+        u32 k;
+        for (k = 0; k < init_sz; k++)
+            VEC_PUSH(*out, init_d[k]);
+    }
+    return true;
+}
+
+static Bool bc32_write(FILE *fp, size_t base) {
+    U8Vec bin = {NULL, 0, 0};
+    Bool ok;
+    bc32_build(&bin, base);
+    ok = (bin.len == 0 || fwrite(bin.data, 1, bin.len, fp) == bin.len) && ferror(fp) == 0;
+    free(bin.data);
+    return ok;
+}
+
+static void write_base64(FILE *fp, const u8 *d, size_t len) {
+    static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    size_t i;
+    for (i = 0; i < len; i += 3) {
+        u32 v = ((u32)d[i] << 16) |
+                ((i + 1 < len ? (u32)d[i + 1] : 0) << 8) |
+                (i + 2 < len ? (u32)d[i + 2] : 0);
+        fputc(b64[(v >> 18) & 63], fp);
+        fputc(b64[(v >> 12) & 63], fp);
+        fputc((i + 1 < len) ? b64[(v >> 6) & 63] : '=', fp);
+        fputc((i + 2 < len) ? b64[v & 63] : '=', fp);
+    }
+}
+
+static Bool web_write(FILE *fp, size_t base) {
+    U8Vec bin = {NULL, 0, 0};
+    bc32_build(&bin, base);
+    fprintf(fp,
+            "<!DOCTYPE html>\n<html><head><meta charset=\"utf-8\"><title>IR4th</title>\n"
+            "<style>body{margin:0;background:#111;display:flex;justify-content:center;"
+            "align-items:center;min-height:100vh}</style>\n</head><body>\n"
+            "<ir4-screen width=\"320\" height=\"240\" scale=\"2\" data-bin=\"");
+    write_base64(fp, bin.data, bin.len);
+    fprintf(fp, "\"></ir4-screen>\n<script>\n");
+    fwrite(plat_web_vm_js, 1, sizeof(plat_web_vm_js), fp);
+    fprintf(fp, "\n</script>\n</body></html>\n");
+    free(bin.data);
+    return ferror(fp) == 0;
+}
+
+static Bool web_js_write(FILE *fp, size_t base) {
+    U8Vec bin = {NULL, 0, 0};
+    bc32_build(&bin, base);
+    fprintf(fp,
+            "(function () {\n"
+            "  var s = document.currentScript;\n"
+            "  var el = s && s.previousElementSibling;\n"
+            "  if (!el || el.tagName !== \"IR4-SCREEN\") el = document.querySelector(\"ir4-screen\");\n"
+            "  if (el) el.setAttribute(\"data-bin\", \"");
+    write_base64(fp, bin.data, bin.len);
+    fprintf(fp, "\");\n})();\n");
+    free(bin.data);
+    return ferror(fp) == 0;
+}
+
+const Platform plat_bc_run = {"--run", &be_bc, 0x0100, NULL, true, NULL, NULL, NULL, bc_run_vm, "bin"};
+const Platform plat_bc32 = {"--bc32", &be_bc32, 0x0100, "bc", true, NULL, NULL, bc32_write, NULL, "bin"};
+const Platform plat_web = {"--web", &be_bc32, 0x0100, "web", true, NULL, NULL, web_write, NULL, "html"};
+const Platform plat_web_js = {"--web-js", &be_bc32, 0x0100, "web", true, NULL, NULL, web_js_write, NULL, "js"};

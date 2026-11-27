@@ -37,6 +37,9 @@ static const Platform *const platforms[] = {
 #if IR4_ENABLE_ELF
     &plat_rv32_virt, &plat_rv32_obj,
 #endif
+#if IR4_ENABLE_BC
+    &plat_bc32, &plat_web, &plat_web_js,
+#endif
     NULL};
 
 static void print_usage(void) {
@@ -79,7 +82,8 @@ int main(int argc, char **argv) {
 #endif
     const Platform *plat = NULL;
     const char *in_path = NULL;
-    const char *out_path = "out.bin";
+    const char *out_path = NULL;
+    char out_buf[32];
     const char *platform = NULL;
     int target_set = 0;
     int base_set = 0;
@@ -304,6 +308,12 @@ int main(int argc, char **argv) {
         if (!base_set) {
             base = plat->default_base;
         }
+    }
+
+    if (!out_path) {
+        const char *ext = (plat && plat->default_ext) ? plat->default_ext : "bin";
+        sprintf(out_buf, "out.%s", ext);
+        out_path = out_buf;
     }
 
     cb_reset(base);

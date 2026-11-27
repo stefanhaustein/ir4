@@ -500,4 +500,4 @@ static int x16gs_write(FILE *fp, size_t base) {
 }
 
 const Platform plat_65816_x16gs = {"--x16gs", &be_65816, 0x010200UL, "x16gs", 1,
-                                   x16gs_begin, x16gs_end, x16gs_write, NULL};
+                                   x16gs_begin, x16gs_end, x16gs_write, NULL, "prg"};

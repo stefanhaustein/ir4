@@ -1,0 +1,12 @@
+\ lib/web/system.ir4 - Web runtime system functions
+extern web_sysmillis ( -> :i32 )
+extern web_syssleep ( ms :i )
+extern web_sysexit ( code :i )
+
+fn sysargc ( -> :i ) 0 end
+fn sysargv ( idx :i buf :a max :i -> :i ) idx drop buf drop max drop -1 end
+fn sysenv ( name :a nlen :i buf :a max :i -> :i ) name drop nlen drop buf drop max drop -1 end
+fn syscwd ( buf :a max :i -> :i ) buf drop max drop -1 end
+fn sysmillis ( -> :i32 ) web_sysmillis end
+fn syssleep ( ms :i ) ms web_syssleep end
+fn sysexit ( code :i ) code web_sysexit end

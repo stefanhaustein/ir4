@@ -125,4 +125,4 @@ static void agon_end(int main_idx) {
 }
 
 const Platform plat_ez80_agon = {"--agon", &be_ez80, 0x040000UL, "agon", true,
-                                 agon_begin, agon_end, NULL, NULL};
+                                 agon_begin, agon_end, NULL, NULL, "bin"};

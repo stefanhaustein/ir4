@@ -1,0 +1,8 @@
+\ lib/web/sound.ir4 - WebAudio sound driver
+extern web_sfxplay ( ch :i freq :i vol :i wave :i dur_ms :i )
+extern web_sfxstop ( ch :i )
+
+fn sfxcount ( -> :i ) 4 end
+fn sfxplay ( ch :i freq :i vol :i wave :i dur_ms :i ) ch freq vol wave dur_ms web_sfxplay end
+fn sfxstop ( ch :i ) ch web_sfxstop end
+fn sfxtick ( ) end

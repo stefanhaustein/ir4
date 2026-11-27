@@ -1,0 +1,28 @@
+\ lib/web/stdio.ir4 - Web runtime stdio
+extern putchar ( c :i -> :i )
+extern web_inkey ( -> :i )
+extern web_key ( -> :i )
+
+fn emit ( c :i )
+  c putchar drop
+end
+
+fn xemit ( c :i )
+  c putchar drop
+end
+
+fn inkey ( -> :i )
+  web_inkey
+end
+
+fn key ( -> :i )
+  web_key
+end
+
+fn xinkey ( -> :i )
+  web_inkey
+end
+
+fn xkey ( -> :i )
+  web_key
+end

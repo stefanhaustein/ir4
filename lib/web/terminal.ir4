@@ -1,0 +1,26 @@
+\ lib/web/terminal.ir4 - Web runtime terminal
+extern web_termwidth ( -> :i )
+extern web_termheight ( -> :i )
+extern web_termx ( -> :i )
+extern web_termy ( -> :i )
+extern web_termclear ( )
+extern web_termcleareol ( )
+extern web_termcleareos ( )
+extern web_termgoto ( x :i y :i )
+extern web_termcursor ( visible :i )
+extern web_termfg ( c :i )
+extern web_termbg ( c :i )
+extern web_termreset ( )
+
+fn termwidth ( -> :i ) web_termwidth end
+fn termheight ( -> :i ) web_termheight end
+fn termx ( -> :i ) web_termx end
+fn termy ( -> :i ) web_termy end
+fn termclear ( ) web_termclear end
+fn termcleareol ( ) web_termcleareol end
+fn termcleareos ( ) web_termcleareos end
+fn termgoto ( x :i y :i ) x y web_termgoto end
+fn termcursor ( visible :i ) visible web_termcursor end
+fn termfg ( c :i ) c web_termfg end
+fn termbg ( c :i ) c web_termbg end
+fn termreset ( ) web_termreset end

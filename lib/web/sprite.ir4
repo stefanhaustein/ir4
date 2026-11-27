@@ -1,0 +1,28 @@
+\ lib/web/sprite.ir4 - Web runtime hardware-style sprites
+require "graphics.ir4"
+
+const sprcount 64 :i
+const sprdepth 24 :i
+const sprmaxw 64 :i
+const sprmaxh 64 :i
+
+extern web_sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
+extern web_sprset ( id :i img :i )
+extern web_sprpos ( id :i x :i y :i )
+extern web_sprshow ( id :i on :i )
+
+fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
+  img w h data pal ncolors web_sprimg
+end
+
+fn sprset ( id :i img :i )
+  id img web_sprset
+end
+
+fn sprpos ( id :i x :i y :i )
+  id x y web_sprpos
+end
+
+fn sprshow ( id :i on :i )
+  id on web_sprshow
+end

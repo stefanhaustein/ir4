@@ -303,6 +303,7 @@ typedef struct {
     void (*end)(int main_idx);
     int (*write)(FILE *fp, size_t base);
     void (*run)(size_t main_idx);
+    const char *default_ext;
 } Platform;
 
 extern const Backend be_z80;

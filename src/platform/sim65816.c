@@ -610,4 +610,4 @@ static void sim816_run(size_t main_idx) {
 }
 
 const Platform plat_65816_sim = {"--sim65816", &be_65816, 0x010000UL, "sim65816", true,
-                                 sim816_begin, sim816_end, sim816_write, sim816_run};
+                                 sim816_begin, sim816_end, sim816_write, sim816_run, "bin"};

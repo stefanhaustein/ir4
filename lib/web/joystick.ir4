@@ -1,0 +1,6 @@
+\ lib/web/joystick.ir4 - Web keyboard/gamepad joystick driver
+extern web_joycount ( -> :i )
+extern web_joystate ( port :i -> :i )
+
+fn joycount ( -> :i ) web_joycount end
+fn joystate ( port :i -> :i ) port web_joystate end

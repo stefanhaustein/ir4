@@ -9,7 +9,8 @@ fn main ( -> :i )
   target_c64 if cnt 3 <> if 2 return then then
   target_x16 if cnt 16 <> if 3 return then then
   target_agon if cnt 32 <> if 4 return then then
-  target_c64 target_x16 or target_agon or 0 = if
+  target_web if cnt 4 <> if 4 return then then
+  target_c64 target_x16 or target_agon or target_web or 0 = if
     cnt 0 <> if 5 return then
   then
 

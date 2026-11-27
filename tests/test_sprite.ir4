@@ -19,7 +19,7 @@ fn main ( -> :i )
   255 0 0 gfxrgb spr_pal 1 a+ i8!
   0 255 0 gfxrgb spr_pal 2 a+ i8!
 
-  target_c64 target_x16 or target_agon or -> var has_hw :i
+  target_c64 target_x16 or target_agon or target_web or -> var has_hw :i
   has_hw 0 = if
     sprcount 0 <> if 1 return then
     sprdepth 0 <> if 2 return then

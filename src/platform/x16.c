@@ -9,7 +9,7 @@ static void x16_begin(size_t base) { be_6502_cbm_begin(base, 1); }
 static void x16_end(int main_idx) { be_6502_cbm_end(main_idx, 1); }
 
 const Platform plat_6502_x16 = {"--x16",   &be_6502, 0x0801,            "x16", 1,
-                                x16_begin, x16_end,  be_6502_cbm_write, NULL};
+                                x16_begin, x16_end,  be_6502_cbm_write, NULL, "prg"};
 
 static u16 cart_bank_call_addr = 0;
 static u16 cart_kernal_call_addr = 0;
@@ -451,4 +451,4 @@ static int x16_cart_write(FILE *fp, size_t base) {
 }
 
 const Platform plat_6502_x16_cart = {"--x16-cart",   &be_6502,     0x0801,         "x16", 1,
-                                     x16_cart_begin, x16_cart_end, x16_cart_write, NULL};
+                                     x16_cart_begin, x16_cart_end, x16_cart_write, NULL, "bin"};

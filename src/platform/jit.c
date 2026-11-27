@@ -164,4 +164,4 @@ static void arm64_run_jit(size_t main_idx) {
 #endif
 
 const Platform plat_arm64_jit = {"--run", &be_arm64, 0x0000, NULL,         1,
-                                 NULL,    NULL,      NULL,   arm64_run_jit};
+                                 NULL,    NULL,      NULL,   arm64_run_jit, "bin"};

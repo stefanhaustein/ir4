@@ -137,4 +137,4 @@ static int zx81_write(FILE *fp, size_t base) {
 }
 
 const Platform plat_z80_zx81 = {"--zx81",   &be_z80,  ZX81_BASE,  "zx81", 1,
-                                zx81_begin, zx81_end, zx81_write, NULL};
+                                zx81_begin, zx81_end, zx81_write, NULL, "p"};

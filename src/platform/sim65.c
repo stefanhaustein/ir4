@@ -182,4 +182,4 @@ static void sim_end(int main_idx) {
 }
 
 const Platform plat_6502_sim = {"--sim65", &be_6502, 0x0200,    "sim65", 1,
-                                sim_begin, sim_end,  sim_write, NULL};
+                                sim_begin, sim_end,  sim_write, NULL, "bin"};

@@ -143,6 +143,8 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 | <img src="docs/img/sysinfo_zx81.png" alt="ZX81 sysinfo" width="260"> | <img src="docs/img/julia_zx81.png" alt="ZX81 Julia" width="260"> | — |
 | **Terminal (ANSI half-blocks)** | | |
 | <img src="docs/img/sysinfo_arm64.png" alt="ARM64 ANSI sysinfo" width="260"> | <img src="docs/img/julia_arm64.png" alt="ARM64 ANSI Julia" width="260"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="260"> |
+| **Web (32-bit bytecode VM)** | | |
+| <img src="docs/img/sysinfo_web.png" alt="Web sysinfo" width="260"> | <img src="docs/img/julia_web.png" alt="Web Julia" width="260"> | <img src="docs/img/testcard_web.png" alt="Web testcard" width="260"> |
 
 
 ## License

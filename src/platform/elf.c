@@ -373,6 +373,6 @@ static int obj_write(FILE *fp, size_t base) {
 }
 
 const Platform plat_rv32_virt = {"--virt",   &be_rv32, 0x0000,     "virt", 1,
-                                 virt_begin, virt_end, virt_write, NULL};
+                                 virt_begin, virt_end, virt_write, NULL, "elf"};
 
-const Platform plat_rv32_obj = {"--obj", &be_rv32, 0x0000, NULL, 0, NULL, obj_end, obj_write, NULL};
+const Platform plat_rv32_obj = {"--obj", &be_rv32, 0x0000, NULL, 0, NULL, obj_end, obj_write, NULL, "o"};

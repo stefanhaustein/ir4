@@ -137,6 +137,7 @@ typedef enum {
     BC_STORE16
 } BcOp;
 
+u16 bc_extern_count(void);
 const char *bc_extern_name(u16 id);
 
 /* Shared parameterized bytecode emitter helpers */
@@ -161,6 +162,10 @@ void bc_patch_fn_op(size_t patch_pc, size_t target_addr, u8 addr_bytes);
 void bc_patch_call_op(size_t call_pc, size_t target_addr, u8 addr_bytes);
 
 extern const Backend be_bc;
+extern const Backend be_bc32;
 extern const Platform plat_bc_run;
+extern const Platform plat_bc32;
+extern const Platform plat_web;
+extern const Platform plat_web_js;
 
 #endif

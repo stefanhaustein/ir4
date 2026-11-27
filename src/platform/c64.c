@@ -204,4 +204,4 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
 static void c64_end(int main_idx) { be_6502_cbm_end(main_idx, 0); }
 
 const Platform plat_6502_c64 = {"--c64",   &be_6502, 0x0801,            "c64", 1,
-                                c64_begin, c64_end,  be_6502_cbm_write, NULL};
+                                c64_begin, c64_end,  be_6502_cbm_write, NULL, "prg"};

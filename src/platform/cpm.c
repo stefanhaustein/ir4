@@ -103,4 +103,4 @@ static void cpm_end(int main_idx) {
     }
 }
 
-const Platform plat_z80_cpm = {"--cpm", &be_z80, 0x0100, "cpm", 1, cpm_begin, cpm_end, NULL, NULL};
+const Platform plat_z80_cpm = {"--cpm", &be_z80, 0x0100, "cpm", 1, cpm_begin, cpm_end, NULL, NULL, "com"};

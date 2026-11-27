@@ -13,7 +13,7 @@ AGON_EMU ?= $(HOME)/opt/fab-agon-emulator/fab-agon-emulator
 X16_EMU  ?= ./x16-emulator/build/x16emu
 X16_ROM  ?= $(HOME)/opt/x16emu_macos_m1-r49/rom.bin
 
-.PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 rt rt-z80 rt-ez80 rt-6502 rt-rv32 clean
+.PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 test-web docs-web rt rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web clean
 
 all: $(TARGET)
 
@@ -38,7 +38,7 @@ $(BUILD)/backend/ez80.o: src/codebuf.h src/backend/ez80.h src/backend/ez80_rt.h 
 $(BUILD)/backend/6502.o: src/codebuf.h src/backend/6502.h src/backend/6502_wozfp.h src/backend/bc.h src/vec.h
 $(BUILD)/backend/arm64.o: src/codebuf.h src/vec.h
 $(BUILD)/backend/rv32.o: src/codebuf.h src/backend/rv32.h src/backend/rv32_fp.h src/vec.h
-$(BUILD)/platform/bc.o: src/backend/bc.h src/codebuf.h src/frontend.h
+$(BUILD)/platform/bc.o: src/backend/bc.h src/codebuf.h src/frontend.h src/plat_web_vm.h src/vec.h
 $(BUILD)/platform/cpm.o: src/codebuf.h src/frontend.h src/backend/z80.h
 $(BUILD)/platform/zx81.o: src/codebuf.h src/frontend.h src/backend/z80.h
 $(BUILD)/platform/agon.o: src/codebuf.h src/frontend.h src/backend/ez80.h
@@ -306,7 +306,35 @@ test-rv32: $(TARGET) tests/test_*.ir4
 		echo "qemu-system-riscv32 not found; skipping RV32 execution"; \
 	fi
 
-rt: rt-z80 rt-ez80 rt-6502 rt-rv32
+rt: rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web
+
+rt-web:
+	python3 tools/web/gen_web_vm.py --input tools/web/ir4_vm.js --output src/plat_web_vm.h
+
+test-web: $(TARGET) tests/test_*.ir4
+	@js=""; \
+	if command -v node >/dev/null 2>&1; then \
+		js="node tools/web/ir4_vm.js"; \
+	elif [ -x /System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc ]; then \
+		js="/System/Library/Frameworks/JavaScriptCore.framework/Versions/A/Helpers/jsc tools/web/ir4_vm.js --"; \
+	fi; \
+	for name in fib core muldiv mem float req data ext math i32 fnptr peephole system rtl stdio terminal graphics joystick sound sprite; do \
+		./$(TARGET) -t bc32 --platform web -o $(BUILD)/$${name}_web.bin tests/test_$${name}.ir4 >/dev/null || exit 1; \
+		if [ -n "$$js" ]; then \
+			out=$$($$js $(BUILD)/$${name}_web.bin | tr -d '\r' | grep . | tail -n 1); \
+			echo "web test_$${name}.ir4 -> $$out"; \
+			test "$$out" = "0" || exit 1; \
+		fi; \
+	done
+	./$(TARGET) -t web -o $(BUILD)/hello_web.html examples/hello.ir4
+	./$(TARGET) -t web -o $(BUILD)/julia_web.html examples/julia.ir4
+	./$(TARGET) -t web -o $(BUILD)/spheres_web.html examples/spheres.ir4
+	./$(TARGET) -t web -o $(BUILD)/bricks_web.html examples/bricks.ir4
+
+docs-web: $(TARGET) tools/web/ir4_vm.js examples/spheres.ir4
+	mkdir -p docs/web
+	cp tools/web/ir4_vm.js docs/web/ir4_vm.js
+	./$(TARGET) -t web-js -o docs/web/spheres.js examples/spheres.ir4
 
 rt-ez80:
 	python3 tools/ez80/gen_ez80_rt.py --output src/be_ez80_rt.h

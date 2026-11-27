@@ -1,0 +1,61 @@
+\ lib/web/graphics.ir4 - Web Canvas pixel graphics
+extern web_gfxwidth ( -> :i )
+extern web_gfxheight ( -> :i )
+extern web_gfxdepth ( -> :i )
+extern web_gfxvsync ( )
+extern web_gfxticks ( -> :i )
+extern web_gfxmode ( mode :i )
+extern web_gfxdone ( )
+extern web_gfxinit ( w :i h :i depth :i )
+extern web_gfxrgb ( r :i g :i b :i -> :i )
+extern web_gfxcolor ( c :i )
+extern web_gfxpx ( x :i y :i )
+extern web_gfxgetpx ( x :i y :i -> :i )
+extern web_gfxhline ( x :i y :i w :i )
+extern web_gfxvline ( x :i y :i h :i )
+extern web_gfxline ( x1 :i y1 :i x2 :i y2 :i )
+extern web_gfxrect ( x :i y :i w :i h :i )
+extern web_gfxfillrect ( x :i y :i w :i h :i )
+extern web_gfxclear ( )
+extern web_gfxcircle ( cx :i cy :i r :i )
+extern web_gfxfill ( x :i y :i )
+extern web_gfxtext ( x :i y :i s :a len :i )
+
+var __web_modes :bytes 16
+
+fn gfxmodes ( -> :a :i )
+  0 __web_modes i16!
+  web_gfxwidth __web_modes 2 a+ i16!
+  web_gfxheight __web_modes 4 a+ i16!
+  24 __web_modes 6 a+ i16!
+  1 __web_modes 8 a+ i16!
+  web_gfxwidth __web_modes 10 a+ i16!
+  web_gfxheight __web_modes 12 a+ i16!
+  8 __web_modes 14 a+ i16!
+  __web_modes 2
+end
+
+fn gfxwidth ( -> :i ) web_gfxwidth end
+fn gfxheight ( -> :i ) web_gfxheight end
+fn gfxdepth ( -> :i ) web_gfxdepth end
+fn gfxvsync ( ) web_gfxvsync end
+fn gfxticks ( -> :i ) web_gfxticks end
+fn gfxmode ( mode :i ) mode web_gfxmode end
+fn gfxdone ( ) web_gfxdone end
+fn gfxinit ( w :i h :i depth :i ) w h depth web_gfxinit end
+fn gfxrgb ( r :i g :i b :i -> :i ) r g b web_gfxrgb end
+fn gfxcolor ( c :i ) c web_gfxcolor end
+fn gfxborder ( c :i ) c drop end
+fn gfxpx ( x :i y :i ) x y web_gfxpx end
+fn gfxgetpx ( x :i y :i -> :i ) x y web_gfxgetpx end
+fn gfxhline ( x :i y :i w :i ) x y w web_gfxhline end
+fn gfxvline ( x :i y :i h :i ) x y h web_gfxvline end
+fn gfxline ( x1 :i y1 :i x2 :i y2 :i ) x1 y1 x2 y2 web_gfxline end
+fn gfxrect ( x :i y :i w :i h :i ) x y w h web_gfxrect end
+fn gfxfillrect ( x :i y :i w :i h :i ) x y w h web_gfxfillrect end
+fn gfxclear ( ) web_gfxclear end
+fn gfxcircle ( cx :i cy :i r :i ) cx cy r web_gfxcircle end
+fn gfxfill ( x :i y :i ) x y web_gfxfill end
+fn gfxcharw ( -> :i ) 8 end
+fn gfxcharh ( -> :i ) 8 end
+fn gfxtext ( x :i y :i s :a len :i ) x y s len web_gfxtext end
