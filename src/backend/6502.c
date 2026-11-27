@@ -47,8 +47,6 @@ void be_6502_set_trampoline(u16 bank_call_addr, u16 kernal_call_addr) {
 
 static void ensure_6502_vm(void);
 static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type);
-static void m6502_bc_stack_op(StackOp op, StackType t1, StackType t2);
-static void m6502_bc_op(IrOp op);
 static void m6502_pop2(void);
 static void m6502_push2(void);
 
@@ -476,14 +474,7 @@ static void m6502_call_extern(const FuncSig *sig) {
 static void m6502_push_w(i32 val) {
     u16 v = (u16)val;
     if (m6502_compact) {
-        i16 sv = (i16)v;
-        if (sv >= 0 && sv <= 127) {
-            cb_emit8((u8)(BC_PUSH_IMM7_BASE | sv));
-        } else if (sv >= -128 && sv < 0) {
-            cb_emit8_8(BC_PUSH_I8, (u8)(sv & 0xFF));
-        } else {
-            cb_emit8_16(BC_PUSH_I16, v);
-        }
+        bc_emit_push_w(val, 2);
         return;
     }
     m6502_push2();
@@ -551,12 +542,7 @@ static void m6502_push_i32(i32 val) {
     u8 b;
     u32 u = (u32)val;
     if (m6502_compact) {
-        if (u == 0) {
-            cb_emit8(BC_PUSH_0_32);
-            return;
-        }
-        cb_emit8(BC_PUSH_I32);
-        cb_emit32(u);
+        bc_emit_push_i32(val);
         return;
     }
     for (b = 0; b < 4; b++)
@@ -571,8 +557,7 @@ static void m6502_push_data(size_t offset) {
     u16 lo_pos, hi_pos;
     if (m6502_compact) {
         cb_emit8(BC_PUSH_I16);
-        cb_add_data_reloc(cb_pc(), offset);
-        cb_emit16(0x0000);
+        bc_emit_data_reloc(offset, 2);
         return;
     }
     m6502_push2();
@@ -794,7 +779,7 @@ static void m6502_stack_op(StackOp op, StackType t1, StackType t2) {
     u8 sz2 = (t2 == TY_F || t2 == TY_I32) ? 4 : 2;
     u8 b;
     if (m6502_compact) {
-        m6502_bc_stack_op(op, t1, t2);
+        bc_emit_stack_op(op, t1, t2);
         return;
     }
     switch (op) {
@@ -1492,7 +1477,7 @@ static int m6502_mem_imm(IrOp op, i32 off) {
 
 static void m6502_op(IrOp op) {
     if (m6502_compact) {
-        m6502_bc_op(op);
+        bc_emit_op(op, 2);
         return;
     }
     switch (op) {
@@ -2004,12 +1989,8 @@ static int m6502_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
 
 static size_t m6502_emit_br_fwd(BranchCond cond) {
     u16 patch_pos;
-    if (m6502_compact) {
-        cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
-        patch_pos = cb_pc();
-        cb_emit16(0x0000);
-        return patch_pos;
-    }
+    if (m6502_compact)
+        return bc_emit_br_fwd_op(cond, 2);
     if (ir4_get_opt_level() && cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
         u8 n_inx = (u8)(m6502_cmp_pops * 2);
         u8 k;
@@ -2043,7 +2024,7 @@ static size_t m6502_emit_br_fwd(BranchCond cond) {
 
 static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
     if (m6502_compact) {
-        cb_emit8_16(cond == BR_JZ ? BC_JZ : BC_JMP, (u16)target_addr);
+        bc_emit_br_back_op(cond, target_addr, 2);
         return;
     }
     if (ir4_get_opt_level() && cond == BR_JZ && m6502_cmp_end_pc != 0 && cb_pc() == m6502_cmp_end_pc) {
@@ -2075,13 +2056,8 @@ static void m6502_emit_br_back(BranchCond cond, size_t target_addr) {
 static size_t m6502_emit_jtab(size_t count) {
     size_t lo_pc, hi_pc, tbl_off, k;
     u16 tbl_addr;
-    if (m6502_compact) {
-        cb_emit8(BC_JTAB);
-        tbl_off = cb_pc();
-        for (k = 0; k < count; k++)
-            cb_emit16(0);
-        return tbl_off;
-    }
+    if (m6502_compact)
+        return bc_emit_jtab_op(count, 2);
     if (count > 256)
         ir4_die("'jtab' supports at most 256 entries on 6502");
     be_6502_peep_fence();
@@ -2108,7 +2084,7 @@ static size_t m6502_emit_jtab(size_t count) {
 
 static void m6502_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     if (m6502_compact) {
-        cb_patch16(patch_offset + idx * 2, (u16)target_addr);
+        bc_patch_jtab_op(patch_offset, idx, target_addr, 2);
         return;
     }
     cb_patch8(patch_offset + idx, (u8)(target_addr & 0xFF));
@@ -2122,23 +2098,8 @@ static void m6502_patch_fwd(size_t patch_offset) {
 
 static int m6502_add_imm(i32 imm) {
     u16 d = (u16)(i16)imm;
-    if (m6502_compact) {
-        if (d == 0)
-            return 1;
-        if (d == 1) {
-            cb_emit8(BC_INC);
-            return 1;
-        }
-        if (d == 0xFFFF) {
-            cb_emit8(BC_DEC);
-            return 1;
-        }
-        if ((i16)d >= -128 && (i16)d <= 127) {
-            cb_emit8_8(BC_ADD_IMM8, (u8)(d & 0xFF));
-            return 1;
-        }
-        return 0;
-    }
+    if (m6502_compact)
+        return bc_emit_add_imm((i16)d);
     if (d == 0)
         return 1;
     cb_emit8(M6502_CLC);
@@ -2331,7 +2292,7 @@ static void m6502_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_add
     u16 sta_len = (stack_zp_base != 0) ? 2 : 3;
     (void)patch_addr;
     if (m6502_compact) {
-        cb_patch16(patch_pc, (u16)target_addr);
+        bc_patch_fn_op(patch_pc, target_addr, 2);
         return;
     }
     cb_patch8((u16)(patch_pc + 1), (u8)(target_addr & 0xFF));
@@ -2409,256 +2370,6 @@ static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type) {
             cb_emit8_8(sz == 4 ? BC_LOCAL_GET4 : BC_LOCAL_GET2, (u8)off);
         else
             cb_emit8_8(sz == 4 ? BC_LOCAL_SET4 : BC_LOCAL_SET2, (u8)off);
-    }
-}
-
-static void m6502_bc_stack_op(StackOp op, StackType t1, StackType t2) {
-    u8 s1 = (t1 == TY_F || t1 == TY_I32) ? 4 : 2;
-    u8 s2 = (t2 == TY_F || t2 == TY_I32) ? 4 : 2;
-    switch (op) {
-    case OP_DUP:
-        cb_emit8(s1 == 4 ? BC_DUP4 : BC_DUP2);
-        break;
-    case OP_DROP:
-        cb_emit8(s1 == 4 ? BC_DROP4 : BC_DROP2);
-        break;
-    case OP_SWAP:
-        if (s1 == 2 && s2 == 2)
-            cb_emit8(BC_SWAP22);
-        else if (s1 == 4 && s2 == 2)
-            cb_emit8(BC_SWAP24);
-        else if (s1 == 2 && s2 == 4)
-            cb_emit8(BC_SWAP42);
-        else
-            cb_emit8(BC_SWAP44);
-        break;
-    }
-}
-
-static void m6502_bc_op(IrOp op) {
-    switch (op) {
-    case OP_ADD:
-    case OP_AADD:
-        cb_emit8(BC_ADD);
-        break;
-    case OP_SUB:
-    case OP_ASUB:
-    case OP_ADIFF:
-        cb_emit8(BC_SUB);
-        break;
-    case OP_MUL:
-        cb_emit8(BC_MUL);
-        break;
-    case OP_DIV:
-        cb_emit8(BC_DIV);
-        break;
-    case OP_MOD:
-        cb_emit8(BC_MOD);
-        break;
-    case OP_UDIV:
-        cb_emit8(BC_UDIV);
-        break;
-    case OP_UMOD:
-        cb_emit8(BC_UMOD);
-        break;
-    case OP_AND:
-        cb_emit8(BC_AND);
-        break;
-    case OP_OR:
-        cb_emit8(BC_OR);
-        break;
-    case OP_XOR:
-        cb_emit8(BC_XOR);
-        break;
-    case OP_INVERT:
-        cb_emit8(BC_INVERT);
-        break;
-    case OP_LSHIFT:
-        cb_emit8(BC_LSHIFT);
-        break;
-    case OP_ARSHIFT:
-        cb_emit8(BC_ARSHIFT);
-        break;
-    case OP_RSHIFT:
-        cb_emit8(BC_RSHIFT);
-        break;
-    case OP_FADD:
-        cb_emit8(BC_FADD);
-        break;
-    case OP_FSUB:
-        cb_emit8(BC_FSUB);
-        break;
-    case OP_FMUL:
-        cb_emit8(BC_FMUL);
-        break;
-    case OP_FDIV:
-        cb_emit8(BC_FDIV);
-        break;
-    case OP_FNEG:
-        cb_emit8(BC_FNEG);
-        break;
-    case OP_ADD32:
-        cb_emit8(BC_ADD32);
-        break;
-    case OP_SUB32:
-        cb_emit8(BC_SUB32);
-        break;
-    case OP_AND32:
-        cb_emit8(BC_AND32);
-        break;
-    case OP_OR32:
-        cb_emit8(BC_OR32);
-        break;
-    case OP_XOR32:
-        cb_emit8(BC_XOR32);
-        break;
-    case OP_INV32:
-        cb_emit8(BC_INV32);
-        break;
-    case OP_EQ:
-    case OP_AEQ:
-        cb_emit8(BC_EQ);
-        break;
-    case OP_NE:
-    case OP_ANE:
-        cb_emit8(BC_NE);
-        break;
-    case OP_LT:
-        cb_emit8(BC_LT);
-        break;
-    case OP_GT:
-        cb_emit8(BC_GT);
-        break;
-    case OP_LE:
-        cb_emit8(BC_LE);
-        break;
-    case OP_GE:
-        cb_emit8(BC_GE);
-        break;
-    case OP_ULT:
-    case OP_ALT:
-        cb_emit8(BC_ULT);
-        break;
-    case OP_UGT:
-    case OP_AGT:
-        cb_emit8(BC_UGT);
-        break;
-    case OP_ULE:
-        cb_emit8(BC_ULE);
-        break;
-    case OP_UGE:
-        cb_emit8(BC_UGE);
-        break;
-    case OP_FEQ:
-        cb_emit8(BC_FEQ);
-        break;
-    case OP_FNE:
-        cb_emit8(BC_FNE);
-        break;
-    case OP_FLT:
-        cb_emit8(BC_FLT);
-        break;
-    case OP_FGT:
-        cb_emit8(BC_FGT);
-        break;
-    case OP_EQ32:
-        cb_emit8(BC_EQ32);
-        break;
-    case OP_NE32:
-        cb_emit8(BC_NE32);
-        break;
-    case OP_LT32:
-        cb_emit8(BC_LT32);
-        break;
-    case OP_GT32:
-        cb_emit8(BC_GT32);
-        break;
-    case OP_LE32:
-        cb_emit8(BC_LE32);
-        break;
-    case OP_GE32:
-        cb_emit8(BC_GE32);
-        break;
-    case OP_ULT32:
-        cb_emit8(BC_ULT32);
-        break;
-    case OP_UGT32:
-        cb_emit8(BC_UGT32);
-        break;
-    case OP_ULE32:
-        cb_emit8(BC_ULE32);
-        break;
-    case OP_UGE32:
-        cb_emit8(BC_UGE32);
-        break;
-    case OP_I8FETCH:
-        cb_emit8(BC_I8FETCH);
-        break;
-    case OP_U8FETCH:
-        cb_emit8(BC_U8FETCH);
-        break;
-    case OP_I8STORE:
-        cb_emit8(BC_I8STORE);
-        break;
-    case OP_SI8STORE:
-        cb_emit8(BC_SWAP22);
-        cb_emit8(BC_I8STORE);
-        break;
-    case OP_I16FETCH:
-    case OP_U16FETCH:
-    case OP_FETCH:
-    case OP_AFETCH:
-        cb_emit8(BC_FETCH16);
-        break;
-    case OP_I16STORE:
-    case OP_STORE:
-    case OP_ASTORE:
-        cb_emit8(BC_STORE16);
-        break;
-    case OP_SI16STORE:
-    case OP_SSTORE:
-    case OP_SASTORE:
-        cb_emit8(BC_SWAP22);
-        cb_emit8(BC_STORE16);
-        break;
-    case OP_FFETCH:
-    case OP_I32FETCH:
-        cb_emit8(BC_FETCH32);
-        break;
-    case OP_FSTORE:
-    case OP_I32STORE:
-        cb_emit8(BC_STORE32);
-        break;
-    case OP_SFSTORE:
-        cb_emit8(BC_SWAP24);
-        cb_emit8(BC_STORE32);
-        break;
-    case OP_BCOPY:
-        cb_emit8(BC_BCOPY);
-        break;
-    case OP_SEXT:
-        cb_emit8(BC_SEXT);
-        break;
-    case OP_W2A:
-    case OP_A2W:
-        break;
-    case OP_W2F:
-        cb_emit8(BC_W2F);
-        break;
-    case OP_F2W:
-        cb_emit8(BC_F2W);
-        break;
-    case OP_W2I32:
-        cb_emit8(BC_W2I32);
-        break;
-    case OP_U2I32:
-        cb_emit8(BC_U2I32);
-        break;
-    case OP_I322W:
-        cb_emit8(BC_I322W);
-        break;
-    default:
-        ir4_die("unimplemented 6502 compact op");
     }
 }
 

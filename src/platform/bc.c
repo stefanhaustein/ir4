@@ -776,6 +776,12 @@ static void bc_run_vm(size_t main_idx) {
             wr16(mem, sp, v);
             break;
         }
+        case BC_I16FETCH:
+        case BC_FETCH24:
+        case BC_STORE24:
+            fprintf(stderr, "24-bit opcode 0x%02X in 16-bit bc VM\n", op);
+            free(mem);
+            exit(1);
         }
     }
 }

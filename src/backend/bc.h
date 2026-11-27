@@ -129,10 +129,36 @@ typedef enum {
     BC_F2W,
     BC_W2I32,
     BC_U2I32,
-    BC_I322W
+    BC_I322W,
+
+    /* 24-bit word/address extensions (used by eZ80 compact mode) */
+    BC_I16FETCH,
+    BC_FETCH24,
+    BC_STORE24
 } BcOp;
 
 const char *bc_extern_name(u16 id);
+
+/* Shared parameterized bytecode emitter helpers */
+void bc_emit_addr(size_t val, u8 addr_bytes);
+void bc_patch_addr(size_t patch_off, size_t target, u8 addr_bytes);
+void bc_emit_data_reloc(size_t data_off, u8 addr_bytes);
+void bc_emit_push_w(i32 val, u8 word_bytes);
+void bc_emit_push_a(u32 val, u8 addr_bytes);
+void bc_emit_push_f(double val);
+void bc_emit_push_i32(i32 val);
+void bc_emit_push_data(size_t data_offset, u8 addr_bytes);
+void bc_emit_stack_op(StackOp op, StackType t1, StackType t2);
+void bc_emit_op(IrOp op, u8 word_bytes);
+int bc_emit_add_imm(i32 imm);
+size_t bc_emit_br_fwd_op(BranchCond cond, u8 addr_bytes);
+void bc_emit_br_back_op(BranchCond cond, size_t target_addr, u8 addr_bytes);
+void bc_patch_fwd_op(size_t patch_offset, u8 addr_bytes);
+size_t bc_emit_jtab_op(size_t count, u8 addr_bytes);
+void bc_patch_jtab_op(size_t patch_offset, size_t idx, size_t target_addr, u8 addr_bytes);
+size_t bc_emit_push_fn_op(size_t target_addr, u8 addr_bytes);
+void bc_patch_fn_op(size_t patch_pc, size_t target_addr, u8 addr_bytes);
+void bc_patch_call_op(size_t call_pc, size_t target_addr, u8 addr_bytes);
 
 extern const Backend be_bc;
 extern const Platform plat_bc_run;

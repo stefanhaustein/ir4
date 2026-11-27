@@ -124,25 +124,65 @@ static void bc_call_extern(const FuncSig *sig) {
     cb_emit16((u16)(extern_names.len - 1));
 }
 
-static void bc_push_w(i32 val) {
-    i16 v = (i16)val;
-    if (v >= 0 && v <= 127) {
-        cb_emit8((u8)(BC_PUSH_IMM7_BASE | v));
-    } else if (v >= -128 && v < 0) {
-        cb_emit8(BC_PUSH_I8);
-        cb_emit8((u8)(v & 0xFF));
+void bc_emit_addr(size_t val, u8 addr_bytes) {
+    if (addr_bytes == 3)
+        cb_emit24((u32)val);
+    else
+        cb_emit16((u16)val);
+}
+
+void bc_patch_addr(size_t patch_off, size_t target, u8 addr_bytes) {
+    if (addr_bytes == 3)
+        cb_patch24(patch_off, (u32)target);
+    else
+        cb_patch16(patch_off, (u16)target);
+}
+
+void bc_emit_data_reloc(size_t data_off, u8 addr_bytes) {
+    if (addr_bytes == 3) {
+        cb_add_data_reloc24(cb_pc(), data_off);
+        cb_emit24(0);
     } else {
-        cb_emit8(BC_PUSH_I16);
-        cb_emit16((u16)v);
+        cb_add_data_reloc(cb_pc(), data_off);
+        cb_emit16(0);
     }
 }
 
-static void bc_push_a(u32 val) {
-    cb_emit8(BC_PUSH_I16);
-    cb_emit16((u16)val);
+void bc_emit_push_w(i32 val, u8 word_bytes) {
+    if (word_bytes == 3) {
+        u32 u = (u32)val & 0xFFFFFFUL;
+        i32 sv = (u & 0x800000UL) ? (i32)(u | 0xFF000000UL) : (i32)u;
+        if (sv >= 0 && sv <= 127) {
+            cb_emit8((u8)(BC_PUSH_IMM7_BASE | sv));
+        } else if (sv >= -128 && sv < 0) {
+            cb_emit8_8(BC_PUSH_I8, (u8)(sv & 0xFF));
+        } else if (sv >= -32768 && sv <= 32767) {
+            cb_emit8_16(BC_PUSH_I16, (u16)(sv & 0xFFFF));
+        } else {
+            cb_emit8(BC_PUSH_DATA);
+            cb_emit24(u);
+        }
+    } else {
+        i16 v = (i16)val;
+        if (v >= 0 && v <= 127) {
+            cb_emit8((u8)(BC_PUSH_IMM7_BASE | v));
+        } else if (v >= -128 && v < 0) {
+            cb_emit8_8(BC_PUSH_I8, (u8)(v & 0xFF));
+        } else {
+            cb_emit8_16(BC_PUSH_I16, (u16)v);
+        }
+    }
 }
 
-static void bc_push_f(double val) {
+void bc_emit_push_a(u32 val, u8 addr_bytes) {
+    if (addr_bytes == 3) {
+        bc_emit_push_w((i32)val, 3);
+    } else {
+        cb_emit8_16(BC_PUSH_I16, (u16)val);
+    }
+}
+
+void bc_emit_push_f(double val) {
     float f = (float)val;
     u32 bits;
     memcpy(&bits, &f, 4);
@@ -154,7 +194,7 @@ static void bc_push_f(double val) {
     cb_emit32(bits);
 }
 
-static void bc_push_i32(i32 val) {
+void bc_emit_push_i32(i32 val) {
     if (val == 0) {
         cb_emit8(BC_PUSH_0_32);
         return;
@@ -163,13 +203,12 @@ static void bc_push_i32(i32 val) {
     cb_emit32((u32)val);
 }
 
-static void bc_push_data(size_t data_offset) {
+void bc_emit_push_data(size_t data_offset, u8 addr_bytes) {
     cb_emit8(BC_PUSH_DATA);
-    cb_add_data_reloc(cb_pc(), data_offset);
-    cb_emit16(0);
+    bc_emit_data_reloc(data_offset, addr_bytes);
 }
 
-static void bc_stack_op(StackOp op, StackType t1, StackType t2) {
+void bc_emit_stack_op(StackOp op, StackType t1, StackType t2) {
     u8 s1 = type_size(t1);
     u8 s2 = type_size(t2);
     switch (op) {
@@ -192,7 +231,14 @@ static void bc_stack_op(StackOp op, StackType t1, StackType t2) {
     }
 }
 
-static void bc_op(IrOp op) {
+static void bc_push_w(i32 val) { bc_emit_push_w(val, 2); }
+static void bc_push_a(u32 val) { bc_emit_push_a(val, 2); }
+static void bc_push_f(double val) { bc_emit_push_f(val); }
+static void bc_push_i32(i32 val) { bc_emit_push_i32(val); }
+static void bc_push_data(size_t data_offset) { bc_emit_push_data(data_offset, 2); }
+static void bc_stack_op(StackOp op, StackType t1, StackType t2) { bc_emit_stack_op(op, t1, t2); }
+
+void bc_emit_op(IrOp op, u8 word_bytes) {
     switch (op) {
     case OP_ADD:
     case OP_AADD:
@@ -392,21 +438,30 @@ static void bc_op(IrOp op) {
         cb_emit8(BC_I8STORE);
         break;
     case OP_I16FETCH:
+        cb_emit8(word_bytes == 3 ? BC_I16FETCH : BC_FETCH16);
+        break;
     case OP_U16FETCH:
-    case OP_FETCH:
-    case OP_AFETCH:
         cb_emit8(BC_FETCH16);
         break;
+    case OP_FETCH:
+    case OP_AFETCH:
+        cb_emit8(word_bytes == 3 ? BC_FETCH24 : BC_FETCH16);
+        break;
     case OP_I16STORE:
-    case OP_STORE:
-    case OP_ASTORE:
         cb_emit8(BC_STORE16);
         break;
+    case OP_STORE:
+    case OP_ASTORE:
+        cb_emit8(word_bytes == 3 ? BC_STORE24 : BC_STORE16);
+        break;
     case OP_SI16STORE:
+        cb_emit8(BC_SWAP22);
+        cb_emit8(BC_STORE16);
+        break;
     case OP_SSTORE:
     case OP_SASTORE:
         cb_emit8(BC_SWAP22);
-        cb_emit8(BC_STORE16);
+        cb_emit8(word_bytes == 3 ? BC_STORE24 : BC_STORE16);
         break;
     case OP_FFETCH:
     case OP_I32FETCH:
@@ -448,25 +503,28 @@ static void bc_op(IrOp op) {
     }
 }
 
-static int bc_add_imm(i32 imm) {
-    i16 d = (i16)imm;
-    if (d == 0)
+static void bc_op(IrOp op) { bc_emit_op(op, 2); }
+
+int bc_emit_add_imm(i32 imm) {
+    if (imm == 0)
         return 1;
-    if (d == 1) {
+    if (imm == 1) {
         cb_emit8(BC_INC);
         return 1;
     }
-    if (d == -1) {
+    if (imm == -1) {
         cb_emit8(BC_DEC);
         return 1;
     }
-    if (d >= -128 && d <= 127) {
+    if (imm >= -128 && imm <= 127) {
         cb_emit8(BC_ADD_IMM8);
-        cb_emit8((u8)(d & 0xFF));
+        cb_emit8((u8)(imm & 0xFF));
         return 1;
     }
     return 0;
 }
+
+static int bc_add_imm(i32 imm) { return bc_emit_add_imm((i16)imm); }
 
 static int bc_cmp_imm(IrOp op, i32 imm) {
     (void)op;
@@ -500,51 +558,68 @@ static int bc_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
     return 0;
 }
 
-static size_t bc_emit_br_fwd(BranchCond cond) {
+size_t bc_emit_br_fwd_op(BranchCond cond, u8 addr_bytes) {
     size_t pos;
     cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
     pos = cb_pc();
-    cb_emit16(0);
+    bc_emit_addr(0, addr_bytes);
     return pos;
 }
 
-static void bc_emit_br_back(BranchCond cond, size_t target_addr) {
+void bc_emit_br_back_op(BranchCond cond, size_t target_addr, u8 addr_bytes) {
     cb_emit8(cond == BR_JZ ? BC_JZ : BC_JMP);
-    cb_emit16((u16)target_addr);
+    bc_emit_addr(target_addr, addr_bytes);
 }
 
-static void bc_patch_fwd(size_t patch_offset) { cb_patch16(patch_offset, (u16)cb_cur_addr()); }
+void bc_patch_fwd_op(size_t patch_offset, u8 addr_bytes) {
+    bc_patch_addr(patch_offset, cb_cur_addr(), addr_bytes);
+}
 
-static size_t bc_emit_jtab(size_t count) {
+size_t bc_emit_jtab_op(size_t count, u8 addr_bytes) {
     size_t tbl_off, k;
     cb_emit8(BC_JTAB);
     tbl_off = cb_pc();
     for (k = 0; k < count; k++)
-        cb_emit16(0);
+        bc_emit_addr(0, addr_bytes);
     return tbl_off;
 }
 
-static void bc_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
-    (void)count;
-    cb_patch16(patch_offset + idx * 2, (u16)target_addr);
+void bc_patch_jtab_op(size_t patch_offset, size_t idx, size_t target_addr, u8 addr_bytes) {
+    bc_patch_addr(patch_offset + idx * addr_bytes, target_addr, addr_bytes);
 }
 
-static void bc_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
-    (void)call_addr;
-    cb_patch16(call_pc + 1, (u16)target_addr);
+void bc_patch_call_op(size_t call_pc, size_t target_addr, u8 addr_bytes) {
+    bc_patch_addr(call_pc + 1, target_addr, addr_bytes);
 }
 
-static size_t bc_push_fn(size_t target_addr) {
+size_t bc_emit_push_fn_op(size_t target_addr, u8 addr_bytes) {
     size_t pos;
     cb_emit8(BC_PUSH_FN);
     pos = cb_pc();
-    cb_emit16((u16)target_addr);
+    bc_emit_addr(target_addr, addr_bytes);
     return pos;
 }
 
+void bc_patch_fn_op(size_t patch_pc, size_t target_addr, u8 addr_bytes) {
+    bc_patch_addr(patch_pc, target_addr, addr_bytes);
+}
+
+static size_t bc_emit_br_fwd(BranchCond cond) { return bc_emit_br_fwd_op(cond, 2); }
+static void bc_emit_br_back(BranchCond cond, size_t target_addr) { bc_emit_br_back_op(cond, target_addr, 2); }
+static void bc_patch_fwd(size_t patch_offset) { bc_patch_fwd_op(patch_offset, 2); }
+static size_t bc_emit_jtab(size_t count) { return bc_emit_jtab_op(count, 2); }
+static void bc_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
+    (void)count;
+    bc_patch_jtab_op(patch_offset, idx, target_addr, 2);
+}
+static void bc_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
+    (void)call_addr;
+    bc_patch_call_op(call_pc, target_addr, 2);
+}
+static size_t bc_push_fn(size_t target_addr) { return bc_emit_push_fn_op(target_addr, 2); }
 static void bc_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     (void)patch_addr;
-    cb_patch16(patch_pc, (u16)target_addr);
+    bc_patch_fn_op(patch_pc, target_addr, 2);
 }
 
 static void bc_icall(void) { cb_emit8(BC_ICALL); }
