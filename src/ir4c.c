@@ -83,7 +83,7 @@ int main(int argc, char **argv) {
     const Platform *plat = NULL;
     const char *in_path = NULL;
     const char *out_path = NULL;
-    char out_buf[32];
+    char default_out[32];
     const char *platform = NULL;
     int target_set = 0;
     int base_set = 0;
@@ -247,6 +247,42 @@ int main(int argc, char **argv) {
         }
     }
 
+#ifdef IR4_INTERACTIVE_ARGS
+    if (!plat && !target_set && platforms[0] != NULL) {
+        plat = platforms[0];
+        be = plat->be;
+        if (!base_set)
+            base = plat->default_base;
+        if (!platform && plat->req_platform)
+            platform = plat->req_platform;
+    }
+#endif
+
+    if (plat) {
+#if IR4_ENABLE_JIT && IR4_ENABLE_BC
+        if (plat == &plat_arm64_jit && target_set && be == &be_bc) {
+            plat = &plat_bc_run;
+            if (!platform && plat->req_platform)
+                platform = plat->req_platform;
+        }
+#endif
+        if (!target_set) {
+            be = plat->be;
+        } else if (be != plat->be) {
+            fprintf(stderr, "%s requires -t %s\n", plat->flag, plat->be->name);
+            return 1;
+        }
+        if (!base_set) {
+            base = plat->default_base;
+        }
+    }
+
+    if (!out_path) {
+        const char *ext = (plat && plat->default_ext) ? plat->default_ext : "bin";
+        sprintf(default_out, "out.%s", ext);
+        out_path = default_out;
+    }
+
     if (!in_path) {
 #ifdef IR4_INTERACTIVE_ARGS
         static char in_buf[128];
@@ -288,32 +324,6 @@ int main(int argc, char **argv) {
     if (!in_fp) {
         fprintf(stderr, "ir4c: cannot open input %s\n", in_path);
         return 1;
-    }
-
-    if (plat) {
-#if IR4_ENABLE_JIT && IR4_ENABLE_BC
-        if (plat == &plat_arm64_jit && target_set && be == &be_bc) {
-            plat = &plat_bc_run;
-            if (!platform && plat->req_platform)
-                platform = plat->req_platform;
-        }
-#endif
-        if (!target_set) {
-            be = plat->be;
-        } else if (be != plat->be) {
-            fprintf(stderr, "%s requires -t %s\n", plat->flag, plat->be->name);
-            fclose(in_fp);
-            return 1;
-        }
-        if (!base_set) {
-            base = plat->default_base;
-        }
-    }
-
-    if (!out_path) {
-        const char *ext = (plat && plat->default_ext) ? plat->default_ext : "bin";
-        sprintf(out_buf, "out.%s", ext);
-        out_path = out_buf;
     }
 
     cb_reset(base);

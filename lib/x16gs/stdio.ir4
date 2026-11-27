@@ -68,12 +68,20 @@ fn inkey ( -> :i )
   0 0xFFE4 __x16gs_kernal
 end
 
+fn __x16gs_wai ( )
+  0xCB 0x045E i>a i8!
+  0x60 0x045F i>a i8!
+  0 0x045E __x16gs_kernal drop
+end
+
 fn key ( -> :i )
   0 -> var c :i
   begin
     inkey -> c
     c 0 =
-  while repeat
+  while
+    __x16gs_wai
+  repeat
   c
 end
 
@@ -96,7 +104,9 @@ fn xkey ( -> :i )
   begin
     xinkey -> c
     c 0 =
-  while repeat
+  while
+    __x16gs_wai
+  repeat
   c
 end
 

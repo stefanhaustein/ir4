@@ -10,6 +10,7 @@ static size_t sim816_base = 0x010000UL;
 
 static void sim816_begin(size_t base) {
     sim816_base = base;
+    be_65816_reset();
     /* Reserve JML entry_addr at base; patched in sim816_end() */
     cb_emit8(M816_JML);
     cb_emit24(0);

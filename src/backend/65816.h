@@ -139,6 +139,8 @@ enum {
 #define M816_DP_TMP2 0x14U  /* 4 bytes */
 #define M816_DP_RET  0x18U  /* 4 bytes */
 
+void be_65816_reset(void);
+void be_65816_invalidate_from(size_t addr);
 size_t be_65816_rstack_off(void);
 void be_65816_emit_zero_bss(void);
 

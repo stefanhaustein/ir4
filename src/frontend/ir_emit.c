@@ -1,5 +1,8 @@
 /* ir_emit.c - Reachability DCE and Pass 2 IR-to-backend lowering */
 #include "internal.h"
+#if IR4_ENABLE_65816
+#include "backend/65816.h"
+#endif
 #include "codebuf.h"
 #include "strpool.h"
 
@@ -170,6 +173,157 @@ static int ir_can_fuse(const WordIR *w, size_t i, size_t extra) {
     return 1;
 }
 
+static void emit_push_w_instr(const WordIR *w, size_t *ip, PendingBrVec *pending,
+                              const SizeVec *ir_addr) {
+    size_t i = *ip;
+    const IrInstr *ins = &w->ir.data[i];
+    if (ir_can_fuse(w, i, 1) && w->ir.data[i + 1].kind == IR_LOCAL_OP) {
+        const IrInstr *nins = &w->ir.data[i + 1];
+        if (nins->u.loc.op == LOCAL_ADD && be->local_add_imm &&
+            be->local_add_imm(nins->u.loc.slot, nins->u.loc.type, nins->u.loc.stack_bytes,
+                              ins->u.w)) {
+            *ip = i + 1;
+            return;
+        }
+    }
+    if (ir_can_fuse(w, i, 2) && w->ir.data[i + 1].kind == IR_ALU_OP &&
+        w->ir.data[i + 2].kind == IR_ALU_OP) {
+        IrOp aop = w->ir.data[i + 1].u.op;
+        IrOp mop = w->ir.data[i + 2].u.op;
+        if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH && mop <= OP_FSTORE &&
+            be->mem_imm) {
+            i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)ins->u.w) : ins->u.w;
+            if (be->mem_imm(mop, off)) {
+                *ip = i + 2;
+                return;
+            }
+        }
+    }
+    if (ir_can_fuse(w, i, 1) && w->ir.data[i + 1].kind == IR_ALU_OP) {
+        IrOp aop = w->ir.data[i + 1].u.op;
+        i32 imm = ins->u.w;
+        if (aop == OP_ADD || aop == OP_SUB || aop == OP_AADD || aop == OP_ASUB) {
+            i32 delta = (aop == OP_SUB || aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
+            if (be->add_imm && be->add_imm(delta)) {
+                *ip = i + 1;
+                return;
+            }
+        } else if (aop >= OP_EQ && aop <= OP_AGT) {
+            if (ir_can_fuse(w, i, 2)) {
+                const IrInstr *bins = &w->ir.data[i + 2];
+                if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ && be->cmp_br_fwd) {
+                    size_t patch_off = 0;
+                    if (be->cmp_br_fwd(aop, 1, imm, &patch_off)) {
+                        PendingBr *pb = VEC_ADD(*pending);
+                        pb->patch_offset = patch_off;
+                        pb->target_ir = bins->u.br.target;
+                        *ip = i + 2;
+                        return;
+                    }
+                } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
+                           be->cmp_br_back) {
+                    if (be->cmp_br_back(aop, 1, imm, ir_addr->data[bins->u.br.target])) {
+                        *ip = i + 2;
+                        return;
+                    }
+                }
+            }
+            if (aop <= OP_UGE && be->cmp_imm && be->cmp_imm(aop, imm)) {
+                *ip = i + 1;
+                return;
+            }
+        } else if (aop == OP_LSHIFT || aop == OP_RSHIFT || aop == OP_ARSHIFT ||
+                   aop == OP_SHL32 || aop == OP_RSHR32 || aop == OP_ASHR32) {
+            u8 max_sh = (aop >= OP_SHL32 || be->word_bytes == 4) ? 31
+                        : (be->word_bytes == 8)                  ? 63
+                                                                 : (u8)(be->word_bytes * 8 - 1);
+            if (imm >= 0 && imm <= (i32)max_sh && be->shift_imm && be->shift_imm(aop, (u8)imm)) {
+                *ip = i + 1;
+                return;
+            }
+        } else if (aop == OP_AND || aop == OP_OR || aop == OP_XOR) {
+            if (be->bit_imm && be->bit_imm(aop, imm)) {
+                *ip = i + 1;
+                return;
+            }
+        }
+    }
+    be->push_w(ins->u.w);
+}
+
+static void emit_local_instr(const WordIR *w, size_t *ip) {
+    size_t i = *ip;
+    const IrInstr *ins = &w->ir.data[i];
+    if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
+        if (ir_can_fuse(w, i, 3) && w->ir.data[i + 1].kind == IR_PUSH_W &&
+            w->ir.data[i + 2].kind == IR_ALU_OP && w->ir.data[i + 3].kind == IR_ALU_OP) {
+            IrOp aop = w->ir.data[i + 2].u.op;
+            IrOp mop = w->ir.data[i + 3].u.op;
+            if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH && mop <= OP_FSTORE) {
+                i32 imm = w->ir.data[i + 1].u.w;
+                i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
+                if (be->local_mem(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
+                    *ip = i + 3;
+                    return;
+                }
+            }
+        } else if (ir_can_fuse(w, i, 1) && w->ir.data[i + 1].kind == IR_ALU_OP) {
+            IrOp mop = w->ir.data[i + 1].u.op;
+            if (mop >= OP_I8FETCH && mop <= OP_FSTORE &&
+                be->local_mem(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
+                *ip = i + 1;
+                return;
+            }
+        }
+    }
+    be->local_op(ins->u.loc.op, ins->u.loc.slot, ins->u.loc.type, ins->u.loc.stack_bytes);
+}
+
+static void emit_call_instr(const WordIR *w, const FuncSig *sig, size_t *ip) {
+    size_t i = *ip;
+    size_t target = w->ir.data[i].u.func_idx;
+    size_t inl_len = 0;
+    if (funcs.data[target]->is_extern) {
+        be->call_extern(funcs.data[target]);
+        return;
+    }
+    if (can_inline_hot_code(target, &inl_len)) {
+        emit_raw_code_block(words.data[target]->raw_start, inl_len,
+                            words.data[target]->reloc_start, words.data[target]->reloc_cnt);
+        return;
+    }
+    if (funcs.data[target]->has_addr && be->tail_call && ir_can_fuse(w, i, 1) &&
+        w->ir.data[i + 1].kind == IR_FN_END) {
+#if IR4_ENABLE_6502
+        if (be == &be_6502) {
+            be_6502_set_call_bank(funcs.data[target]->bank);
+        }
+#endif
+        if (be->tail_call(funcs.data[target]->addr, sig, funcs.data[target], w->locals.data,
+                          w->locals.len)) {
+            *ip = i + 1;
+            return;
+        }
+    }
+    {
+        size_t call_addr = be->cur_addr();
+        size_t call_pc = cb_pc();
+#if IR4_ENABLE_6502
+        if (be == &be_6502) {
+            be_6502_set_call_bank(funcs.data[target]->bank);
+        }
+#endif
+        be->call(funcs.data[target]->addr);
+        if (!funcs.data[target]->has_addr) {
+            FwdCall *fc = VEC_ADD(fwd_calls);
+            fc->call_pc = call_pc;
+            fc->call_addr = call_addr;
+            fc->func_idx = target;
+            fc->is_fn_ptr = 0;
+        }
+    }
+}
+
 static void emit_word(size_t fidx) {
     static SizeVec ir_addr;
     FuncSig *sig = funcs.data[fidx];
@@ -206,6 +360,10 @@ static void emit_word(size_t fidx) {
     {
         int retried = 0;
         int is_816 = (strcmp(be->name, "65816") == 0);
+#if IR4_ENABLE_65816
+        if (is_816)
+            (void)be_65816_rstack_off();
+#endif
     retry_emit:
         {
             CbCheckpoint cp = cb_checkpoint();
@@ -239,84 +397,7 @@ static void emit_word(size_t fidx) {
                 be->fn_end(sig, w->locals.data, w->locals.len);
                 break;
             case IR_PUSH_W:
-                if (ir_can_fuse(w, i, 1) &&
-                    w->ir.data[i + 1].kind == IR_LOCAL_OP) {
-                    const IrInstr *nins = &w->ir.data[i + 1];
-                    if (nins->u.loc.op == LOCAL_ADD && be->local_add_imm &&
-                        be->local_add_imm(nins->u.loc.slot, nins->u.loc.type,
-                                          nins->u.loc.stack_bytes, ins->u.w)) {
-                        i++;
-                        break;
-                    }
-                }
-                if (ir_can_fuse(w, i, 2) &&
-                    w->ir.data[i + 1].kind == IR_ALU_OP &&
-                    w->ir.data[i + 2].kind == IR_ALU_OP) {
-                    IrOp aop = w->ir.data[i + 1].u.op;
-                    IrOp mop = w->ir.data[i + 2].u.op;
-                    if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
-                        mop <= OP_FSTORE && be->mem_imm) {
-                        i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)ins->u.w) : ins->u.w;
-                        if (be->mem_imm(mop, off)) {
-                            i += 2;
-                            break;
-                        }
-                    }
-                }
-                if (ir_can_fuse(w, i, 1) &&
-                    w->ir.data[i + 1].kind == IR_ALU_OP) {
-                    IrOp aop = w->ir.data[i + 1].u.op;
-                    i32 imm = ins->u.w;
-                    if (aop == OP_ADD || aop == OP_SUB || aop == OP_AADD || aop == OP_ASUB) {
-                        i32 delta = (aop == OP_SUB || aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
-                        if (be->add_imm && be->add_imm(delta)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop >= OP_EQ && aop <= OP_AGT) {
-                        if (ir_can_fuse(w, i, 2)) {
-                            const IrInstr *bins = &w->ir.data[i + 2];
-                            if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ &&
-                                be->cmp_br_fwd) {
-                                size_t patch_off = 0;
-                                if (be->cmp_br_fwd(aop, 1, imm, &patch_off)) {
-                                    PendingBr *pb = VEC_ADD(pending);
-                                    pb->patch_offset = patch_off;
-                                    pb->target_ir = bins->u.br.target;
-                                    i += 2;
-                                    break;
-                                }
-                            } else if (bins->kind == IR_BR_BACK && bins->u.br.cond == BR_JZ &&
-                                       be->cmp_br_back) {
-                                if (be->cmp_br_back(aop, 1, imm,
-                                                    ir_addr.data[bins->u.br.target])) {
-                                    i += 2;
-                                    break;
-                                }
-                            }
-                        }
-                        if (aop <= OP_UGE && be->cmp_imm && be->cmp_imm(aop, imm)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop == OP_LSHIFT || aop == OP_RSHIFT || aop == OP_ARSHIFT ||
-                               aop == OP_SHL32 || aop == OP_RSHR32 || aop == OP_ASHR32) {
-                        u8 max_sh = (aop >= OP_SHL32 || be->word_bytes == 4) ? 31
-                                    : (be->word_bytes == 8)                  ? 63
-                                                                             : (u8)(be->word_bytes * 8 - 1);
-                        if (imm >= 0 && imm <= (i32)max_sh && be->shift_imm &&
-                            be->shift_imm(aop, (u8)imm)) {
-                            i++;
-                            break;
-                        }
-                    } else if (aop == OP_AND || aop == OP_OR || aop == OP_XOR) {
-                        if (be->bit_imm && be->bit_imm(aop, imm)) {
-                            i++;
-                            break;
-                        }
-                    }
-                }
-                be->push_w(ins->u.w);
+                emit_push_w_instr(w, &i, &pending, &ir_addr);
                 break;
             case IR_PUSH_A:
                 be->push_a(ins->u.a);
@@ -349,34 +430,7 @@ static void emit_word(size_t fidx) {
                 break;
             }
             case IR_LOCAL_OP:
-                if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
-                    if (ir_can_fuse(w, i, 3) &&
-                        w->ir.data[i + 1].kind == IR_PUSH_W &&
-                        w->ir.data[i + 2].kind == IR_ALU_OP &&
-                        w->ir.data[i + 3].kind == IR_ALU_OP) {
-                        IrOp aop = w->ir.data[i + 2].u.op;
-                        IrOp mop = w->ir.data[i + 3].u.op;
-                        if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
-                            mop <= OP_FSTORE) {
-                            i32 imm = w->ir.data[i + 1].u.w;
-                            i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
-                            if (be->local_mem(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
-                                i += 3;
-                                break;
-                            }
-                        }
-                    } else if (ir_can_fuse(w, i, 1) &&
-                               w->ir.data[i + 1].kind == IR_ALU_OP) {
-                        IrOp mop = w->ir.data[i + 1].u.op;
-                        if (mop >= OP_I8FETCH && mop <= OP_FSTORE &&
-                            be->local_mem(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
-                            i += 1;
-                            break;
-                        }
-                    }
-                }
-                be->local_op(ins->u.loc.op, ins->u.loc.slot, ins->u.loc.type,
-                             ins->u.loc.stack_bytes);
+                emit_local_instr(w, &i);
                 break;
             case IR_STACK_OP:
                 be->stack_op(ins->u.stk.op, ins->u.stk.t1, ins->u.stk.t2);
@@ -403,51 +457,9 @@ static void emit_word(size_t fidx) {
                 }
                 be->op(ins->u.op);
                 break;
-            case IR_CALL: {
-                size_t target = ins->u.func_idx;
-                size_t inl_len = 0;
-                if (funcs.data[target]->is_extern) {
-                    be->call_extern(funcs.data[target]);
-                    break;
-                }
-                if (can_inline_hot_code(target, &inl_len)) {
-                    emit_raw_code_block(words.data[target]->raw_start, inl_len,
-                                        words.data[target]->reloc_start,
-                                        words.data[target]->reloc_cnt);
-                    break;
-                }
-                if (funcs.data[target]->has_addr && be->tail_call && ir_can_fuse(w, i, 1) &&
-                    w->ir.data[i + 1].kind == IR_FN_END) {
-#if IR4_ENABLE_6502
-                    if (be == &be_6502) {
-                        be_6502_set_call_bank(funcs.data[target]->bank);
-                    }
-#endif
-                    if (be->tail_call(funcs.data[target]->addr, sig, funcs.data[target],
-                                      w->locals.data, w->locals.len)) {
-                        i++;
-                        break;
-                    }
-                }
-                {
-                    size_t call_addr = be->cur_addr();
-                    size_t call_pc = cb_pc();
-#if IR4_ENABLE_6502
-                    if (be == &be_6502) {
-                        be_6502_set_call_bank(funcs.data[target]->bank);
-                    }
-#endif
-                    be->call(funcs.data[target]->addr);
-                    if (!funcs.data[target]->has_addr) {
-                        FwdCall *fc = VEC_ADD(fwd_calls);
-                        fc->call_pc = call_pc;
-                        fc->call_addr = call_addr;
-                        fc->func_idx = target;
-                        fc->is_fn_ptr = 0;
-                    }
-                }
+            case IR_CALL:
+                emit_call_instr(w, sig, &i);
                 break;
-            }
             case IR_PUSH_FN: {
                 size_t target = ins->u.func_idx;
                 size_t fn_addr = be->cur_addr();
@@ -511,6 +523,9 @@ static void emit_word(size_t fidx) {
                 ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
                 size_t pad = 0x10000UL - (start_addr & 0xFFFFUL);
                 cb_restore(cp);
+#if IR4_ENABLE_65816
+                be_65816_invalidate_from(start_addr);
+#endif
                 fwd_calls.len = fc_len;
                 pending.len = 0;
                 pending_jtab.len = 0;
@@ -518,6 +533,13 @@ static void emit_word(size_t fidx) {
                     cb_emit8(0);
                 retried = 1;
                 goto retry_emit;
+            }
+            if (is_816 && be->cur_addr() > start_addr &&
+                ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
+                ir4_status_clear();
+                fprintf(stderr, "ir4c: function '%s' (%lu bytes) exceeds 64 KB 65816 bank limit\n",
+                        sig->name, (unsigned long)(be->cur_addr() - start_addr));
+                exit(1);
             }
         }
     }

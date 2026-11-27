@@ -38,6 +38,51 @@ static void ensure_rt_data(void) {
     }
 }
 
+void be_65816_reset(void) {
+    m816_rstack_off = 0;
+    m816_rt_inited = 0;
+    m816_mul16_addr = 0;
+    m816_udivmod16_addr = 0;
+    m816_sdivmod16_addr = 0;
+    m816_shl16_addr = 0;
+    m816_shr16_addr = 0;
+    m816_ashr16_addr = 0;
+    m816_bcopy_addr = 0;
+    m816_fp_fadd_addr = 0;
+    m816_fp_fsub_addr = 0;
+    m816_fp_fmul_addr = 0;
+    m816_fp_fdiv_addr = 0;
+    m816_fp_w2f_addr = 0;
+    m816_fp_f2w_addr = 0;
+    m816_fp_fcmp_addr = 0;
+}
+
+void be_65816_invalidate_from(size_t addr) {
+    if (m816_mul16_addr >= addr)
+        m816_mul16_addr = 0;
+    if (m816_udivmod16_addr >= addr)
+        m816_udivmod16_addr = 0;
+    if (m816_sdivmod16_addr >= addr)
+        m816_sdivmod16_addr = 0;
+    if (m816_shl16_addr >= addr)
+        m816_shl16_addr = 0;
+    if (m816_shr16_addr >= addr)
+        m816_shr16_addr = 0;
+    if (m816_ashr16_addr >= addr)
+        m816_ashr16_addr = 0;
+    if (m816_bcopy_addr >= addr)
+        m816_bcopy_addr = 0;
+    if (m816_fp_w2f_addr >= addr || m816_fp_fadd_addr >= addr) {
+        m816_fp_fadd_addr = 0;
+        m816_fp_fsub_addr = 0;
+        m816_fp_fmul_addr = 0;
+        m816_fp_fdiv_addr = 0;
+        m816_fp_w2f_addr = 0;
+        m816_fp_f2w_addr = 0;
+        m816_fp_fcmp_addr = 0;
+    }
+}
+
 size_t be_65816_rstack_off(void) {
     ensure_rt_data();
     return m816_rstack_off;
@@ -374,15 +419,7 @@ static void m816_emit_fp_shl32(u8 dp_lo) {
     cb_emit8_8(M816_ROL_DP, (u8)(dp_lo + 2));
 }
 
-static void ensure_fp(void) {
-    size_t skip;
-    if (m816_fp_fadd_addr)
-        return;
-
-    cb_emit8(M816_JML);
-    skip = cb_pc();
-    cb_emit24(0);
-
+static void emit_fp_conv_cmp(void) {
     /* ---- w2f: DP_TMP0[0..1] (signed 16-bit) -> DP_TMP0 (32-bit f32) ---- */
     {
         size_t nz, pos, loop_pc;
@@ -563,7 +600,9 @@ static void ensure_fp(void) {
         emit8_16(M816_LDA_IMM, 1);
         cb_emit8(M816_RTL);
     }
+}
 
+static void emit_fp_fadd_fsub(void) {
     /* ---- fsub: negate b sign and fall through to fadd ---- */
     m816_fp_fsub_addr = cb_cur_addr();
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP1 + 2);
@@ -761,7 +800,9 @@ static void ensure_fp(void) {
         (void)pack_done;
         cb_emit8(M816_RTL);
     }
+}
 
+static void emit_fp_fmul_fdiv(void) {
     /* ---- fmul: DP_TMP0 * DP_TMP1 -> DP_TMP0 ----
      * 24x24 -> top 24 bits via 24-iteration shift-and-add on 32-bit accumulator */
     {
@@ -979,7 +1020,19 @@ static void ensure_fp(void) {
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
     }
+}
 
+static void ensure_fp(void) {
+    size_t skip;
+    if (m816_fp_fadd_addr)
+        return;
+
+    cb_emit8(M816_JML);
+    skip = cb_pc();
+    cb_emit24(0);
+    emit_fp_conv_cmp();
+    emit_fp_fadd_fsub();
+    emit_fp_fmul_fdiv();
     cb_patch24(skip, (u32)cb_cur_addr());
 }
 
@@ -1614,6 +1667,9 @@ static void emit_cmp32_result(IrOp op) {
     cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
 }
 
+static int m816_op_mem_conv(IrOp op);
+static int m816_op_32_fp(IrOp op);
+
 static void m816_op(IrOp op) {
     switch (op) {
     case OP_ADD:
@@ -1755,6 +1811,15 @@ static void m816_op(IrOp op) {
     case OP_AGT:
         emit_cmp24_a(op);
         break;
+    default:
+        if (!m816_op_mem_conv(op) && !m816_op_32_fp(op))
+            ir4_die("unsupported IR op in 65816 backend");
+        break;
+    }
+}
+
+static int m816_op_mem_conv(IrOp op) {
+    switch (op) {
     case OP_I8FETCH:
     case OP_U8FETCH:
         emit_pop_a_dp(M816_DP_PTR0);
@@ -1872,8 +1937,8 @@ static void m816_op(IrOp op) {
         ensure_bcopy();
         emit_pop_w_a();
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0);
-        emit_pop_a_dp(M816_DP_PTR1);
         emit_pop_a_dp(M816_DP_PTR0);
+        emit_pop_a_dp(M816_DP_PTR1);
         emit8_24(M816_JSL, (u32)m816_bcopy_addr);
         break;
     case OP_SEXT:
@@ -1916,6 +1981,14 @@ static void m816_op(IrOp op) {
         emit_inx_n(2);
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
         break;
+    default:
+        return 0;
+    }
+    return 1;
+}
+
+static int m816_op_32_fp(IrOp op) {
+    switch (op) {
     case OP_ADD32:
         cb_emit8(M816_CLC);
         emit8_16(M816_LDA_ABSX, M816_STACK_BASE + 4);
@@ -2052,9 +2125,9 @@ static void m816_op(IrOp op) {
         break;
     }
     default:
-        ir4_die("unsupported IR op in 65816 backend");
-        break;
+        return 0;
     }
+    return 1;
 }
 
 static size_t m816_emit_br_fwd(BranchCond cond) {
