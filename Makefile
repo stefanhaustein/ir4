@@ -12,8 +12,9 @@ OBJS    = $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 AGON_EMU ?= $(HOME)/opt/fab-agon-emulator/fab-agon-emulator
 X16_EMU  ?= ./x16-emulator/build/x16emu
 X16_ROM  ?= $(HOME)/opt/x16emu_macos_m1-r49/rom.bin
+LCC_RCC  ?= ./lcc/build/rcc
 
-.PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 test-web docs-web rt rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web clean
+.PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 test-web test-x16gs docs-web rt rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web agon x16gs clean
 
 all: $(TARGET)
 
@@ -372,6 +373,57 @@ agon: $(AGON_SRCS)
 	$(MAKE) -C $(BUILD)/agon-build; \
 	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin; \
 	echo "Built $(BUILD)/ir4c_agon.bin"
+
+X16GS_SRCS = src/vec.c src/strpool.c src/path.c src/codebuf.c \
+             src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c \
+             src/backend/65816.c src/platform/x16gs.c src/ir4c.c
+
+X16GS_CPP_FLAGS = -E -P -nostdinc -U__APPLE__ -Ilcc/include/ir4 -Isrc -Isrc/frontend \
+                  -D__IR4_16__ -D__IR4_16X24__ -DIR4_INTERACTIVE_ARGS -DIR4_MINIMAL \
+                  -DIR4_ENABLE_65816=1 -DIR4_ENABLE_SIM65816=0 -DIR4_ENABLE_X16GS=1
+
+x16gs: $(BUILD)/x16gs/ir4c.prg
+
+$(BUILD)/x16gs/ir4c.prg: $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/frontend.h src/frontend/internal.h src/backend/65816.h lcc/lib/libc.c lcc/lib/c.ir4
+	@if [ ! -x "$(LCC_RCC)" ]; then \
+		if [ -d lcc ]; then \
+			mkdir -p lcc/build && $(MAKE) -C lcc BUILDDIR=build rcc; \
+		else \
+			echo "$(LCC_RCC) not found (build lcc or set LCC_RCC=...)"; exit 1; \
+		fi; \
+	fi
+	@mkdir -p $(BUILD)/x16gs-build $(BUILD)/x16gs
+	@if [ ! -f lcc/lib/libc16x24.ir4 ] || [ lcc/lib/libc.c -nt lcc/lib/libc16x24.ir4 ] || [ "$(LCC_RCC)" -nt lcc/lib/libc16x24.ir4 ]; then \
+		$(CC) -E -P -nostdinc -U__APPLE__ -Ilcc/include/ir4 -D__IR4_16__ -D__IR4_16X24__ lcc/lib/libc.c -o $(BUILD)/x16gs-build/libc16x24.i && \
+		"$(LCC_RCC)" -target=ir4/16x24 $(BUILD)/x16gs-build/libc16x24.i lcc/lib/libc16x24.ir4; \
+	fi
+	@rm -f $(BUILD)/x16gs-build/ir4c_all.ir4; \
+	i=0; \
+	for s in $(X16GS_SRCS); do \
+		$(CC) $(X16GS_CPP_FLAGS) "$$s" -o "$(BUILD)/x16gs-build/m$$i.i" || exit 1; \
+		"$(LCC_RCC)" -target=ir4/16x24 -prefix="p$${i}_" "$(BUILD)/x16gs-build/m$$i.i" "$(BUILD)/x16gs-build/m$$i.ir4" || exit 1; \
+		echo "require \"m$$i.ir4\"" >> $(BUILD)/x16gs-build/ir4c_all.ir4; \
+		i=$$((i + 1)); \
+	done
+	./$(TARGET) -t x16gs -I lcc/lib -I $(BUILD)/x16gs-build -o $(BUILD)/x16gs/ir4c.prg $(BUILD)/x16gs-build/ir4c_all.ir4
+	@echo "Built $(BUILD)/x16gs/ir4c.prg + $(BUILD)/x16gs/IR4C.BIN"
+
+test-x16gs: $(BUILD)/x16gs/ir4c.prg examples/hello.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg examples/hello.ir4
+	@if [ -x "$(X16_EMU)" ] && [ -f "$(X16_ROM)" ]; then \
+		mkdir -p $(BUILD)/x16gs/lib; \
+		cp -R lib/* $(BUILD)/x16gs/lib/; \
+		cp examples/hello.ir4 $(BUILD)/x16gs/hello.ir4; \
+		rm -f $(BUILD)/x16gs/hello.prg; \
+		printf 'LOAD"IR4C.PRG"\nRUN\nHELLO.IR4\nHELLO.PRG\nLOAD"HELLO.PRG"\nRUN\nPOWEROFF\n' > $(BUILD)/x16gs/run_test.bas; \
+		"$(X16_EMU)" -gs -mhz 40 -rom "$(X16_ROM)" -fsroot $(BUILD)/x16gs -bas $(BUILD)/x16gs/run_test.bas -warp -echo raw -sound none > $(BUILD)/x16gs/test.log; \
+		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | tail -n 12; \
+		cmp -s $(BUILD)/x16gs/hello.prg $(BUILD)/hello_x16gs.prg || { echo "MISMATCH: $(BUILD)/x16gs/hello.prg != $(BUILD)/hello_x16gs.prg"; exit 1; }; \
+		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | tail -n 8 | grep -q "Hello, world!" || { echo "MISSING Hello, world! output"; exit 1; }; \
+		echo "OK (test-x16gs): self-hosted ir4c.prg compiled and ran HELLO.PRG byte-identically"; \
+	else \
+		echo "x16emu or rom.bin not found; skipping X16GS self-host execution"; \
+	fi
 
 clean:
 	rm -rf $(BUILD)
