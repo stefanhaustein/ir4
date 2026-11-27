@@ -517,15 +517,6 @@ static void emit_word(size_t fidx) {
                 }
                 break;
             }
-            case IR_INLINE: {
-                const InlineBlock *ib = &inline_blocks.data[ins->u.inl_idx];
-                if (strcmp(be->name, "bc") == 0)
-                    ir4_die("'inline' is not supported on bytecode target");
-                if (be->peep_fence)
-                    be->peep_fence();
-                emit_raw_code_block(ib->raw_start, ib->raw_len, ib->reloc_start, ib->reloc_cnt);
-                break;
-            }
             }
         }
     }
@@ -755,7 +746,7 @@ static Bool *select_compact_funcs(void) {
             size_t i;
             if (funcs.data[f]->is_extern || !w->reachable || w->is_code)
                 continue;
-            fn_compact[f] = !(funcs.data[f]->is_hot || w->has_inline);
+            fn_compact[f] = !funcs.data[f]->is_hot;
             if (funcs.data[f]->is_hot)
                 heat[f] += 10000;
             if (funcs.data[f]->is_recursive)

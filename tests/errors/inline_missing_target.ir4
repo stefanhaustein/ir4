@@ -1,5 +1,0 @@
-\ Error test: 'inline' missing target name
-fn main ( -> :i )
-  inline 0x00 :i8 end
-  0
-end

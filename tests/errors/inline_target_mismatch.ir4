@@ -1,5 +1,0 @@
-\ Error test: 'inline' target mismatch (compiled for arm64 in test-err)
-fn main ( -> :i )
-  inline z80 0x00 :i8 end
-  0
-end

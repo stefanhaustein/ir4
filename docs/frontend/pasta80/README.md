@@ -88,7 +88,7 @@ If you need a cartridge ROM image instead of a `.prg`, use `-t x16-cart`.
 | Agon Light / Console8 | `-t agon` | `.bin` (`0x040000`) | MOS ADL 24-bit executable |
 | CP/M-80 | `-t cpm` | `.com` (`0x0100`) | Run with `tnylpo` or on CP/M hardware |
 | ZX81 | `-t zx81` | `.p` | 32×22 display |
-| Commander X16GS | `-t x16gs` | `.bin` | 24-bit W65C816 |
+| Commander X16GS | `-t x16gs` | `.prg` | 24-bit W65C816 |
 | QEMU RISC-V `virt` | `-t virt` | `.elf` | Run with `qemu-system-riscv32` |
 | Bytecode VM | `-t bc --run` | `.ir4b` | Portable bytecode interpreter |
 

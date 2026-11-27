@@ -27,8 +27,7 @@ typedef enum {
     IR_ICALL,
     IR_BR_FWD,
     IR_BR_BACK,
-    IR_JTAB,
-    IR_INLINE
+    IR_JTAB
 } IrKind;
 
 typedef struct {
@@ -59,7 +58,6 @@ typedef struct {
             size_t start;
             size_t count;
         } jtab;
-        size_t inl_idx;
     } u;
 } IrInstr;
 
@@ -70,13 +68,6 @@ typedef struct {
     size_t addend;
     u8 kind; /* CODE_REL_* */
 } CodeReloc;
-
-typedef struct {
-    size_t raw_start;
-    size_t raw_len;
-    size_t reloc_start;
-    size_t reloc_cnt;
-} InlineBlock;
 
 VEC_OF(IrVec, IrInstr);
 
@@ -90,10 +81,8 @@ typedef struct {
     LocalVec locals;
     Bool reachable;
     Bool is_code;
-    Bool has_inline;
 } WordIR;
 
-VEC_OF(InlineVec, InlineBlock);
 VEC_OF(WordVec, WordIR *);
 VEC_OF(CodeRelocVec, CodeReloc);
 
@@ -118,7 +107,6 @@ extern WordVec words;
 extern SizeVec jtab_targets;
 extern ByteVec raw_code_buf;
 extern CodeRelocVec code_relocs;
-extern InlineVec inline_blocks;
 extern SizeVec init_funcs;
 
 size_t alloc_func(FuncSig **sig_out, WordIR **w_out);

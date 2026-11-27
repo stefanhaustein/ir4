@@ -33,7 +33,6 @@ WordVec words;
 SizeVec jtab_targets;
 ByteVec raw_code_buf;
 CodeRelocVec code_relocs;
-InlineVec inline_blocks;
 SizeVec init_funcs;
 
 static int ir4_opt_level = 1;
@@ -1940,20 +1939,6 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        if (strcmp(tok, "inline") == 0) {
-            InlineBlock ib;
-            expect_raw_target("inline");
-            parse_raw_code_body(&ib.raw_start, &ib.raw_len, &ib.reloc_start, &ib.reloc_cnt);
-            w->has_inline = 1;
-            if (!unreachable) {
-                IrInstr *ins = emit_ir(IR_INLINE, w);
-                ins->u.inl_idx = inline_blocks.len;
-                VEC_PUSH(inline_blocks, ib);
-                fold_fence = w->ir.len;
-            }
-            continue;
-        }
-
         if (handle_builtin(tok, w))
             continue;
 
@@ -2357,7 +2342,6 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
         }
     }
     raw_code_buf.len = 0;
-    inline_blocks.len = 0;
     code_relocs.len = 0;
     ir_emit_reset();
     init_funcs.len = 0;

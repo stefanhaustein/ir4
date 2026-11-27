@@ -22,7 +22,7 @@
 ## Backend Optimizations
 
 - **Static scalar locals:** Non-recursive functions place scalar locals in static RAM rather than `bfp` frames.
-- **Auto compact mode:** `hot` and `inline` functions emit native 6502 code while cold functions emit compact bytecode to fit larger programs in 64 KB.
+- **Auto compact mode:** `hot` functions emit native 6502 code while cold functions emit compact bytecode to fit larger programs in 64 KB.
 - **Peepholes & immediate lowering:** Eliminates redundant `INX; INX` / `DEX; DEX` pairs around stack pops, fuses compare-and-branch, and emits immediate/static-local memory ops (`add_imm`, `cmp_imm`, `shift_imm`, `bit_imm`, `mem_imm`, `data_mem`, `local_mem`, `local_add_imm`).
 - **Hot `code` inlining:** `hot` `code` words up to 16 bytes are inlined directly into callers.
 
