@@ -125,9 +125,12 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 - [docs/](docs/) — Platform documentation and screenshots
 
 
-## Screenshots & Videos 
 
-[YT Playlist](https://www.youtube.com/watch?v=o5TX4K9Wk3c&list=PLQKhMXcXxjVY) (The [spheres.ir4](examples/spheres.ir4) demo works similarily on Agon and X16 and with a reduced number of spheres on C64.)
+## Demos, Videos and Screenshots 
+
+- [YT Playlist](https://www.youtube.com/watch?v=o5TX4K9Wk3c&list=PLQKhMXcXxjVY) (The [spheres.ir4](examples/spheres.ir4) demo works similarily on Agon and X16 and with a reduced number of spheres on C64.)
+- [Live Web Spheres Demo](https://stefanhaustein.github.io/ir4/web/spheres.html)
+
 
 | Sysinfo ([sysinfo.ir4](examples/sysinfo.ir4)) | Julia Set ([julia.ir4](examples/julia.ir4)) | TV Test Card ([testcard.ir4](examples/testcard.ir4)) |
 |---|---|---|
@@ -145,6 +148,11 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 | <img src="docs/img/sysinfo_arm64.png" alt="ARM64 ANSI sysinfo" width="260"> | <img src="docs/img/julia_arm64.png" alt="ARM64 ANSI Julia" width="260"> | <img src="docs/img/testcard_ansi.png" alt="ANSI terminal testcard" width="260"> |
 | **Web (32-bit bytecode VM)** | | |
 | <img src="docs/img/sysinfo_web.png" alt="Web sysinfo" width="260"> | <img src="docs/img/julia_web.png" alt="Web Julia" width="260"> | <img src="docs/img/testcard_web.png" alt="Web testcard" width="260"> |
+
+
+## Acknowledgments
+
+Thanks to [Jörg Pleumann](https://github.com/pleumann) and [David Given](https://cowlark.com) for help and inspiration.
 
 
 ## License
