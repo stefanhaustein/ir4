@@ -153,6 +153,30 @@ fn test_bank_cross ( -> :i )
   0
 end
 
+\ 9. local_deref (LOCAL_GET :a + [const a+/a-] + @/!) static & recursive
+fn static_deref_ops ( p :a -> :i )
+  var q :a
+  p 2 a+ -> q
+  1234 p i16!
+  -5678 q i16!
+  -42 p 4 a+ i8!
+  0xAB q 3 a+ i8!
+  777 p 8 a+ !
+  p i16@ q i16@ + p 4 a+ i8@ + q 3 a+ u8@ + q 2 a- i16@ + p 8 a+ @ +
+end
+
+fn rec_deref_ops ( p :a depth :i -> :i )
+  var q :a
+  depth 0 > if p depth 1 - rec_deref_ops return then
+  p 2 a+ -> q
+  2000 p i16!
+  -500 q i16!
+  -10 p 4 a+ i8!
+  0xCD q 3 a+ i8!
+  333 p 8 a+ !
+  p i16@ q i16@ + p 4 a+ i8@ + q 3 a+ u8@ + q 2 a- i16@ + p 8 a+ @ +
+end
+
 fn main ( -> :i )
   10 1 hot_ladd 323 <> if 1 return then
   10 0 hot_ladd 11 <> if 2 return then
@@ -194,6 +218,10 @@ fn main ( -> :i )
 
   test_bank_cross -> var bc_err :i
   bc_err 0 <> if bc_err return then
+
+  var dbuf :bytes 16
+  dbuf static_deref_ops -2304 <> if 52 return then
+  dbuf 2 rec_deref_ops 4028 <> if 53 return then
 
   0
 end

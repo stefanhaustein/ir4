@@ -265,6 +265,7 @@ typedef struct {
     int (*mem_imm)(IrOp op, i32 off);
     int (*data_mem)(IrOp op, size_t data_offset);
     int (*local_mem)(size_t slot, i32 off, IrOp op, size_t stack_bytes);
+    int (*local_deref)(size_t slot, i32 off, IrOp op, size_t stack_bytes);
 
     size_t (*emit_br_fwd)(BranchCond cond);
     void (*emit_br_back)(BranchCond cond, size_t target_addr);

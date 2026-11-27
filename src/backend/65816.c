@@ -44,7 +44,7 @@ static void m816_peep_fence(void) {
 
 static void ensure_rt_data(void) {
     if (!m816_rt_inited) {
-        m816_rstack_off = cb_alloc_data(M816_RSTACK_BYTES, 1) + M816_RSTACK_BYTES;
+        m816_rstack_off = cb_alloc_data(M816_RSTACK_BYTES + 2, 1) + M816_RSTACK_BYTES;
         m816_rt_inited = 1;
     }
 }
@@ -1133,7 +1133,7 @@ static void m816_fn_begin(const char *name, size_t param_cnt, const LocalVar *lo
 
     if (!is_recursive) {
         if (m816_frame_bytes > 0)
-            m816_static_base = cb_alloc_data(m816_frame_bytes, 1);
+            m816_static_base = cb_alloc_data(m816_frame_bytes + 1, 1);
     } else if (m816_frame_bytes > 0) {
         /* Allocate frame downward so DP_LFP points directly to local offset 0 */
         cb_emit8(M816_SEC);
@@ -2706,6 +2706,43 @@ static int m816_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
     }
 }
 
+static int m816_local_deref(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+    (void)stack_bytes;
+    if (off < 0 || off > 0x7FF0)
+        return 0;
+    if (op < OP_I8FETCH || op > OP_I32STORE)
+        return 0;
+    if (!m816_cur_is_recursive) {
+        size_t addr_off = m816_static_base + m816_local_off[slot];
+        cb_emit8(M816_LDA_LONG);
+        cb_add_data_reloc24(cb_pc(), addr_off);
+        cb_emit24(0);
+        cb_emit8_8(M816_STA_DP, M816_DP_PTR0);
+        cb_emit8(M816_LDA_LONG);
+        cb_add_data_reloc24(cb_pc(), addr_off + 2);
+        cb_emit24(0);
+        cb_emit8_8(M816_STA_DP, M816_DP_PTR0 + 2);
+    } else {
+        u16 uoff = (u16)m816_local_off[slot];
+        if (uoff == 0) {
+            cb_emit8_8(M816_LDA_IDL, M816_DP_LFP);
+            cb_emit8_8(M816_STA_DP, M816_DP_PTR0);
+            emit8_16(M816_LDY_IMM, 2);
+            cb_emit8_8(M816_LDA_IDLY, M816_DP_LFP);
+            cb_emit8_8(M816_STA_DP, M816_DP_PTR0 + 2);
+        } else {
+            emit8_16(M816_LDY_IMM, uoff);
+            cb_emit8_8(M816_LDA_IDLY, M816_DP_LFP);
+            cb_emit8_8(M816_STA_DP, M816_DP_PTR0);
+            cb_emit8(M816_INY);
+            cb_emit8(M816_INY);
+            cb_emit8_8(M816_LDA_IDLY, M816_DP_LFP);
+            cb_emit8_8(M816_STA_DP, M816_DP_PTR0 + 2);
+        }
+    }
+    return m816_emit_dp_mem_off(M816_DP_PTR0, op, (u16)off);
+}
+
 static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
                             size_t *patch_offset) {
     size_t skip1 = 0, skip2 = 0;
@@ -3036,6 +3073,7 @@ const Backend be_65816 = {"65816",
                          m816_mem_imm,
                          m816_data_mem,
                          m816_local_mem,
+                         m816_local_deref,
                          m816_emit_br_fwd,
                          m816_emit_br_back,
                          m816_cmp_br_fwd,

@@ -257,7 +257,11 @@ static void emit_push_w_instr(const WordIR *w, size_t *ip, PendingBrVec *pending
 static void emit_local_instr(const WordIR *w, size_t *ip) {
     size_t i = *ip;
     const IrInstr *ins = &w->ir.data[i];
-    if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
+    int is_addr = (ins->u.loc.op == LOCAL_ADDR && be->local_mem != NULL);
+    int is_deref = (ins->u.loc.op == LOCAL_GET && ins->u.loc.type == TY_A &&
+                    be->local_deref != NULL);
+    if (is_addr || is_deref) {
+        int (*fn)(size_t, i32, IrOp, size_t) = is_addr ? be->local_mem : be->local_deref;
         if (ir_can_fuse(w, i, 3) && w->ir.data[i + 1].kind == IR_PUSH_W &&
             w->ir.data[i + 2].kind == IR_ALU_OP && w->ir.data[i + 3].kind == IR_ALU_OP) {
             IrOp aop = w->ir.data[i + 2].u.op;
@@ -266,7 +270,7 @@ static void emit_local_instr(const WordIR *w, size_t *ip) {
                 i32 imm = w->ir.data[i + 1].u.w;
                 i32 w_imm = (be->word_bytes == 2) ? (i32)(i16)(u16)imm : imm;
                 i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)w_imm) : w_imm;
-                if (be->local_mem(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
+                if (fn(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
                     *ip = i + 3;
                     return;
                 }
@@ -274,7 +278,7 @@ static void emit_local_instr(const WordIR *w, size_t *ip) {
         } else if (ir_can_fuse(w, i, 1) && w->ir.data[i + 1].kind == IR_ALU_OP) {
             IrOp mop = w->ir.data[i + 1].u.op;
             if (mop >= OP_I8FETCH && mop <= OP_I32STORE &&
-                be->local_mem(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
+                fn(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
                 *ip = i + 1;
                 return;
             }

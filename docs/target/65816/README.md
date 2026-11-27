@@ -31,7 +31,7 @@ Native-mode 16-bit word / 24-bit flat-address W65C816 backend (`src/backend/6581
 - **Static & direct-indexed frames:** Non-recursive scalar locals use direct 24-bit long loads/stores (`LDA/STA long`), while recursive frames index `[DP_LFP]` / `[DP_LFP],Y` directly.
 - **Stack & TOS-in-`A` peepholes:** Cancels adjacent `INX` / `DEX` adjustments across 2-, 3-, and 4-byte stack slots, elides redundant `STA $0200,X` + `LDA $0200,X` round-trips across `:i` expression chains, uses `STZ` for zero-word pushes, and pops 24-bit pointers into 4-byte Direct Page scratch slots in 16-bit mode without `SEP`/`REP` toggling.
 - **Bank-carry fast path:** Constant pointer offsets (`a+`, `a-`, `local_add_imm`) skip bank-byte adjustments via `BCC` / `BCS` when the low 16-bit addition does not cross a 64 KB boundary.
-- **Immediate & compare-branch fusion:** Fuses constant arithmetic, bitwise, shift, comparison, static/recursive local memory ops, zero-compare branches (`BEQ`/`BNE`/`BMI`/`BPL` without `CMP #0`), and compare-and-branch pairs.
+- **Immediate & compare-branch fusion:** Fuses constant arithmetic, bitwise, shift, comparison, static/recursive local memory ops, direct `:a`-local pointer dereferences (`local_deref`), zero-compare branches (`BEQ`/`BNE`/`BMI`/`BPL` without `CMP #0`), and compare-and-branch pairs.
 - **Native companion overrides (`lib/65816/`):** Provides native `code 65816` implementations for `i32<<`, `u32>>`, `i32>>`, `memfill`, `memcpy`, `memcmp`, `strlen0`, and `strcmp0`.
 
 ## Platforms
