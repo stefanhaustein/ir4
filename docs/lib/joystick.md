@@ -16,7 +16,7 @@ Bitmask returned by joystate:
 
   Read current button bitmask for *port* (0..joycount-1 = hardware ports, -1 = keyboard-as-joystick; returns 0 if unsupported)
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

@@ -15,7 +15,7 @@ Byte-slice memory operations
 
   Fill *len* bytes starting at *dst* with byte value *val*
 
-## Platforms
+## Platform Specifics
 
 ### 6502
 

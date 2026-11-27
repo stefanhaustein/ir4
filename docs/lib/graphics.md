@@ -96,7 +96,7 @@ Platform overrides implement the `default fn` entries below.
 - **gfxvsync** ( ) — Wait for vertical blank / next frame sync (default: no-op)
 - **gfxwidth** ( -> :i ) — Current graphics screen width in pixels
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

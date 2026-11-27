@@ -109,7 +109,7 @@ Sequential file I/O (fallback stubs + convenience wrappers)
 
   Write len bytes from buf to fd; returns bytes written or < 0 on error
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

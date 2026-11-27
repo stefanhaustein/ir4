@@ -150,7 +150,7 @@ def main():
         if plat_headers:
             if mod_out and mod_out[-1] != "":
                 mod_out.append("")
-            mod_out.append("## Platforms")
+            mod_out.append("## Platform Specifics")
             mod_out.append("")
             for plat, phdr in plat_headers:
                 mod_out.append(f"### {plat}")

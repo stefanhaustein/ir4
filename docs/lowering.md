@@ -4,11 +4,11 @@ Practical patterns for compiler and language frontends targeting IR4(th). For ex
 
 ## 1. Types & Portability
 
-- **`:i` (native word):** 16-bit on Z80/6502, 24-bit on eZ80, 32-bit on RV32, 64-bit on ARM64 (`size_i` bytes). Use `:i` for loop counters, small integers, booleans (`true` = `-1`, `false` = `0`), and `jtab` indices.
-- **`:i32` (fixed 32-bit):** Use when language semantics require 32-bit wraparound or range across 8/16-bit targets.
-- **`:a` (address):** Target pointer (`size_a` bytes). Pointer arithmetic uses `a+`, `a-`, and `adiff`.
+- **`:i` (native word):** 16-bit on Z80/6502/65816, 24-bit on eZ80, 32-bit on RV32 and `bc32` (Web), 64-bit on ARM64 and `bc` (`size_i` bytes). Use `:i` for loop counters, small integers, booleans (`true` = `-1`, `false` = `0`), and `jtab` indices.
+- **`:i32` (fixed 32-bit):** Use when language semantics require 32-bit wraparound or range across 8/16-bit targets (or 32-bit `size_t` / pointer offsets on `16x24` targets like 65816).
+- **`:a` (address):** Target pointer (`size_a` bytes: 16-bit on Z80/6502, 24-bit on 65816/eZ80, 32-bit on RV32/`bc32`, 64-bit on ARM64/`bc`). Pointer arithmetic uses `a+`, `a-`, and `adiff`.
 - **`:f` (float):** Target float (`size_f` bytes).
-- **Literal folding:** Casting an integer literal with `i>a`, `i>i32`, or `u>i32` folds at compile time with zero runtime cost.
+- **Literal folding:** Casting an integer literal with `i>a`, `i>i32`, or `i>u32` folds at compile time with zero runtime cost.
 
 ## 2. Structs, Arrays & Buffers
 

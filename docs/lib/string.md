@@ -13,7 +13,7 @@ String operations
 
 - **strlen0** ( s0 :a -> :i ) — Return length in bytes of NUL-terminated string *s0*
 
-## Platforms
+## Platform Specifics
 
 ### 65816
 

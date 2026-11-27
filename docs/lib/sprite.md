@@ -29,7 +29,7 @@ Hardware sprites
 
   Show (*on* <> 0) or hide (*on* = 0) sprite *id* (default: no-op)
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

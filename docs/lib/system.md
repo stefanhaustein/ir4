@@ -36,7 +36,7 @@ System, CLI arguments, environment, CWD, and clock API
 
 - **syssleep** ( ms :i ) — Sleep for approximately ms milliseconds
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

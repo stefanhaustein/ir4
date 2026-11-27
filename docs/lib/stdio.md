@@ -75,7 +75,7 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
   - *x16gs:* Blocking read using xinkey.
   - *zx81:* Blocking read using xinkey.
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

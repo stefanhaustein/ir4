@@ -43,7 +43,7 @@ Text screen & cursor control (ANSI defaults)
 
   Return current 0-based cursor row, or < 0 if cursor readback is unsupported
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

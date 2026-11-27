@@ -17,7 +17,7 @@ Waveforms: 0 = pulse/square, 1 = sawtooth, 2 = triangle, 3 = noise.
 
   Advance software duration timers once per frame (required on platforms without hardware duration, e.g. C64/X16; default: no-op).
 
-## Platforms
+## Platform Specifics
 
 ### agon
 

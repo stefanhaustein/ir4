@@ -63,8 +63,13 @@ make              # Build build/ir4c (C89)
 make test         # Compile tests for Z80, 6502, ARM64 and run ARM64 JIT tests
 make test-rv32    # Build QEMU virt ELF32 binaries and run them via qemu-system-riscv32 (if installed)
 make test-6502    # Build sim65 binaries and run them via sim65 (if installed)
+make test-65816   # Build W65C816 binaries and run them in the built-in sim65816 simulator
+make test-x16gs   # Run X16GS library tests and self-hosted ir4c.prg builds in x16emu -gs (if installed)
 make test-z80     # Build CP/M .com binaries and run them via tnylpo (if installed)
 make test-ez80    # Build Agon MOS binaries and run them via fab-agon-emulator (if installed)
+make test-web     # Build 32-bit Web VM binaries and run them via Node.js or JavaScriptCore
+make agon         # Cross-compile self-hosted build/ir4c_agon.bin via agondev
+make x16gs        # Cross-compile self-hosted build/x16gs/ir4c.prg via LCC (ir4/16x24)
 ```
 
 ## Usage
@@ -72,7 +77,7 @@ make test-ez80    # Build Agon MOS binaries and run them via fab-agon-emulator (
 Compile with `ir4c`:
 
 ```sh
-./build/ir4c [-t z80|ez80|6502|arm64|rv32|bc|cpm|zx81|agon|sim65|c64|x16|x16-cart|virt|obj] [-b hex_addr] [-o out.bin] [-I dir] [-O0|-O1] [--platform name] [--zp hex_addr] [--stack-zp hex_addr[:init_x]] [--no-stack-zp] [--run] <input.ir4>
+./build/ir4c [-t z80|ez80|6502|65816|arm64|rv32|bc|bc32|cpm|zx81|agon|sim65|sim65816|x16gs|c64|x16|x16-cart|virt|obj|web|web-js] [-b hex_addr] [-o out.bin] [-I dir] [-O0|-O1] [--platform name] [--zp hex_addr] [--stack-zp hex_addr[:init_x]] [--no-stack-zp] [--compact|--no-compact|--auto-compact] [--run] <input.ir4> [-- <args...>]
 ```
 
 Pass `-I dir` (repeatable) to add library search directories ahead of the built-in `lib/` directory.
@@ -80,12 +85,15 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 
 ## Architectures & Platforms
 
-- **[6502](docs/target/6502/README.md)** (-t 6502, configurable `--zp`, `--stack-zp`, `--no-stack-zp`)
+- **[6502](docs/target/6502/README.md)** (-t 6502, configurable `--zp`, `--stack-zp`, `--no-stack-zp`, `--compact`)
   - [c64](docs/target/c64/README.md) (-t c64) — Commodore 64 PRG
   - sim65 (-t sim65) — cc65 simulator
   - [x16](docs/target/x16/README.md) (-t x16, -t x16-cart) — Commander X16 PRG and banked CRT cartridges
+- **[65816](docs/target/65816/README.md)** (-t 65816) — W65C816 native mode (16-bit word, 24-bit flat address)
+  - sim65816 (-t sim65816) — built-in 24-bit W65C816 simulator
+  - [x16gs](docs/target/x16gs/README.md) (-t x16gs) — Commander X16GS SuperRAM executables
 - **ARM64** (-t arm64) — AArch64 machine code, with `--run` JIT on macOS Apple Silicon
-- **Bytecode VM** (-t bc) — IR4(th) bytecode, with `--run` in the built-in stack VM
+- **Bytecode VM & Web** (-t bc, -t bc32, -t web, -t web-js) — 64-bit host stack VM (`-t bc --run`) and 32-bit JavaScript/HTML5 Canvas + WebAudio VM (`-t web`, `-t web-js`, `-t bc32`)
 - **[eZ80](docs/target/ez80/README.md)** (-t ez80)
   - [agon](docs/target/agon/README.md) (-t agon) — Agon Light / Console8 24-bit ADL MOS executables
 - **RISC-V RV32IM** (-t rv32)
@@ -103,7 +111,7 @@ If your favourite obscure platform is missing, please file an issue or send a PR
 ## Frontends
 
 - **[PASTA/80 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
-- **[LCC (C89)](docs/frontend/lcc/README.md)** — Example integration of an IR4(th) backend into [LCC 4.2](https://github.com/stefanhaustein/lcc), supporting 16-, 32-, and 64-bit IR4(th) targets.
+- **[LCC (C89)](docs/frontend/lcc/README.md)** — Example integration of an IR4(th) backend into [LCC 4.2](https://github.com/stefanhaustein/lcc), supporting 16-, 16x24-, 32-, and 64-bit IR4(th) targets.
 
 If you have added IR4(th) as a backend somewhere, please file an issue and I'll link it here.
 

@@ -2,7 +2,7 @@
 
 **IR4(th)** (*Typed Forth as an Intermediate Representation*) is a minimal, statically typed, monomorphic concatenative intermediate language designed for retro-computing CPUs (such as the Z80 and 6502) and constrained embedded systems.
 
-IR4(th) compiles via direct 2-pass machine-code generation (with dead-code elimination) to native Z80, eZ80, 6502, RISC-V (RV32), and ARM64 binaries, as well as portable bytecode for the built-in VM.
+IR4(th) compiles via direct 2-pass machine-code generation (with dead-code elimination) to native Z80, eZ80, 6502, W65C816, RISC-V (RV32), and ARM64 binaries, as well as portable 64-bit and 32-bit bytecode for the built-in and Web VMs.
 
 ## 1. Lexical Structure
 
@@ -21,12 +21,12 @@ IR4(th) compiles via direct 2-pass machine-code generation (with dead-code elimi
 
 IR4(th) defines **four stack types** on a **single unified stack** with **explicitly typed operators** (no operator overloading). Nothing smaller than a native machine word `:i` exists on the stack; byte- and 16-bit memory accesses (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) implicitly widen to and truncate from `:i`.
 
-| Type Token | Name | Width & Semantics | Z80 / 6502 | eZ80 (ADL) | ARM32 / RISC-V32 | ARM64 / x86-64 / VM |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **`:i`** | Native Word | Target-native signed integer (`size_i` bytes) | 2 bytes (`i16`) | 3 bytes (`i24`) | 4 bytes (`i32`) | 8 bytes (`i64`) |
-| **`:i32`** | 32-bit Integer | Fixed-width 32-bit integer | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`, 8-byte slot) |
-| **`:a`** | Address | Target-width memory pointer (`size_a` bytes) | 2 bytes (`u16`) | 3 bytes (`u24`) | 4 bytes (`u32`) | 8 bytes (`u64`) |
-| **`:f`** | Float | Target-native floating-point (`size_f` bytes) | **6 bytes** (Z80) / **4 bytes** (6502) | **4 bytes** (IEEE-754 `binary32`) | **4 bytes** (IEEE-754 `binary32`) | **8 bytes** (IEEE-754 `binary64`) |
+| Type Token | Name | Width & Semantics | Z80 / 6502 | W65C816 | eZ80 (ADL) | RV32 / Web VM (`bc32`) | ARM64 / Host VM (`bc`) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **`:i`** | Native Word | Target-native signed integer (`size_i` bytes) | 2 bytes (`i16`) | 2 bytes (`i16`) | 3 bytes (`i24`) | 4 bytes (`i32`) | 8 bytes (`i64`) |
+| **`:i32`** | 32-bit Integer | Fixed-width 32-bit integer | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`) | 4 bytes (`i32`, 8-byte slot) |
+| **`:a`** | Address | Target-width memory pointer (`size_a` bytes) | 2 bytes (`u16`) | 3 bytes (`u24`) | 3 bytes (`u24`) | 4 bytes (`u32`) | 8 bytes (`u64`) |
+| **`:f`** | Float | Target-native floating-point (`size_f` bytes) | **6 bytes** (Z80) / **4 bytes** (6502) | **4 bytes** (IEEE-754 `binary32`) | **4 bytes** (IEEE-754 `binary32`) | **4 bytes** (IEEE-754 `binary32`) | **8 bytes** (IEEE-754 `binary64`) |
 
 ### 2.1 Literal Typing Rules
 * **Bare Integer Literals** (`0`, `1`, `-42`, `0x10`, `$FF`, `0b1010`) implicitly default to **`:i`**.
@@ -60,7 +60,7 @@ end
 * **Initialization Blocks (`init ... end`):**
   * One or more top-level `init ... end` blocks may be defined across the program and `require`d modules. Each behaves as an anonymous void function (`( )`) and runs once in source order before `main`.
 * **Machine-Code Words (`code ... end`):**
-  * `code <target> <name> ( <inputs> -> <outputs> ) <bytes> end` defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), `:as` (16-bit address relative to the 6502 data stack buffer), and `& <ident>` (`addr_bytes`-wide relocated address of a `var` or `data` symbol on 16-bit and 24-bit targets), following the target's `call` / `return` convention. `<target>` must be a valid architecture or platform name matching the active compilation target (`6502`, `z80`, `ez80`, `rv32`, `c64`, `x16`, `agon`, `cpm`, `zx81`, `sim65`, `virt`, etc.; not supported on `-t bc`). On 6502, Z80/eZ80, and RV32, `end` implicitly emits `RTS` (`0x60`), `RET` (`0xC9`), or `RET` (`0x00008067`) when the word is emitted out-of-line, and omits it when `hot code` is inlined into a caller.
+  * `code <target> <name> ( <inputs> -> <outputs> ) <bytes> end` defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), `:as` (16-bit address relative to the 6502 data stack buffer), and `& <ident>` (`size_a`-wide relocated address of a `var` or `data` symbol on 16-bit and 24-bit targets), following the target's `call` / `return` convention. `<target>` must be a valid architecture or platform name matching the active compilation target (`6502`, `65816`, `z80`, `ez80`, `rv32`, `arm64`, `bc32`, `c64`, `x16`, `x16gs`, `agon`, `cpm`, `zx81`, `sim65`, `sim65816`, `virt`, `web`, etc.; not supported on `-t bc`). On 6502, 65816, Z80/eZ80, and RV32, `end` implicitly emits `RTS` (`0x60`), `RTL` (`0x6B`), `RET` (`0xC9`), or `RET` (`0x00008067`) when the word is emitted out-of-line, and omits it when `hot code` is inlined into a caller.
 * **Inline Machine Code (`inline ... end`):**
   * Inside a `fn` or `init` body, `inline <target> <bytes> end` emits raw machine code bytes directly in place using the same `<target>` validation and `:i8`, `:i16`, `:i32`, `:ar` (relative to the start of the `inline` block), `:as`, and `& <ident>` tokens as `code`. It is assumed to be stack-neutral (`( -> )`) with respect to the static data stack, acts as an optimization/peephole fence, keeps the enclosing function native, and is not supported on the bytecode target (`-t bc`).
 
@@ -97,7 +97,7 @@ default const SCREEN_W 80 :i
 * Syntax: `const <name> <val> :<type>` (or `default const <name> <val> :<type>`). Integer literals are checked against `word_bytes` for `:i` or 32-bit range for `:i32`; `:a` accepts unsigned integer literals checked against `addr_bytes`; `:f` accepts floating-point or integer literals.
 * Referencing `<name>` inside a function pushes the literal directly onto the stack with its declared type (participating in constant folding and immediate instruction fusion). Unlike `fn`, `const` cannot be used with `&`.
 * Constants declared with `default const` may be overridden by a `const` with the same type — or 1:1 by a nullary `fn <name> ( -> :<type> )` — within the same `require` group; likewise, a `default fn <name> ( -> :<type> )` may be overridden by a matching `const` within the same `require` group (Uniform Access Principle).
-* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target `:i` byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `arm64`, `rv32`, `bc`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `c64`, `x16`, `virt`, `obj`, `jit`), with both the active `platform` and `architecture` set to `true`.
+* **Built-in Target Constants:** `size_i`, `size_a`, and `size_f` provide the target `:i` byte sizes of `:i`, `:a`, and `:f`. Boolean `target_<name>` constants (`true` / `false`) are predefined for each architecture (`z80`, `ez80`, `6502`, `65816`, `arm64`, `rv32`, `bc`, `bc32`) and platform (`cpm`, `zx81`, `agon`, `sim65`, `sim65816`, `x16gs`, `c64`, `x16`, `virt`, `obj`, `jit`, `web`), with both the active `platform` and `architecture` set to `true`.
 
 ### 3.4 Pre-Initialized Data (`data ... end`)
 Top-level read-only tables and constants can be defined outside word definitions:
@@ -181,7 +181,7 @@ Native `:i` operators are unprefixed; `:i32` operators use an `i32` prefix (`u32
 | `u>>` | `( :i :i -- :i )` | `u32>>` | `( :i32 :i -- :i32 )` | Logical (zero-filling) shift right (`a u>> b`) |
 
 ### 4.3 Address Arithmetic (`:a`)
-Because `:i` and `:a` always share the same register width, address offsets require no sign-extension.
+Byte offsets passed to `a+` and `a-` are signed `:i` values (sign-extended to `size_a` bytes on mixed-width targets such as W65C816 where `size_i < size_a`); `adiff` returns the signed `:i` byte distance between two nearby addresses.
 
 | Instruction | Stack Effect | Description |
 | :--- | :--- | :--- |
@@ -238,8 +238,8 @@ Fixed-width memory operations (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) wide
 | Instruction | Stack Effect | Description |
 | :--- | :--- | :--- |
 | `sext` | `( :i -- :i )` | Sign-extend low 8 bits of `:i` to full word width `:i` |
-| `i>a` | `( :i -- :a )` | Reinterpret native word `:i` as address `:a` |
-| `a>i` | `( :a -- :i )` | Reinterpret address `:a` as native word `:i` |
+| `i>a` | `( :i -- :a )` | Convert native word `:i` to address `:a` (sign-extended when `size_a > size_i`; literal `<u32> i>a` folds full `size_a` unsigned address) |
+| `a>i` | `( :a -- :i )` | Convert address `:a` to native word `:i` (truncates low `size_i` bytes when `size_a > size_i`) |
 | `i>f` | `( :i -- :f )` | Convert signed native word `:i` to float `:f` |
 | `f>i` | `( :f -- :i )` | Truncate float `:f` to signed native word `:i` |
 | `i>i32` | `( :i -- :i32 )` | Sign-extend (or truncate on 64-bit) `:i` to `:i32` |
@@ -254,4 +254,4 @@ Fixed-width memory operations (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) wide
 * **Jump Tables (`<idx :i> jtab <l0> <l1> ... <ln> end`):** Pops `:i` index `idx` and jumps to function-local label `l[idx]`. The remaining type stack must be empty (matching `jmp` and `::`). Bounds checking is the caller's responsibility; out-of-range indices are unchecked. At least one label is required.
 * **Calls & Early Return (`<word_name>`, `( <inputs> -> <outputs> )`, `return`):** Direct calls (`<word_name>`) validate the caller stack against callee inputs and push outputs. Indirect calls (`<args...> <fn :a> ( <inputs> -> <outputs> )`, where `<inputs>` and `<outputs>` are nameless type tokens) pop the `:a` target address and declared input types, call the address, and push the declared output types. `return` verifies the stack matches the word's declared output types after `->`.
 
-For complete runnable programs, see [examples/](examples/) and [tests/](tests/).
+For complete runnable programs, see [examples/](../examples/) and [tests/](../tests/).
