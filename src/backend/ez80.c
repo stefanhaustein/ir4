@@ -1657,7 +1657,8 @@ static void ez_op(IrOp op) {
     }
 }
 
-static int ez_add_imm(i32 imm) {
+static int ez_add_imm(int is_addr, i32 imm) {
+    (void)is_addr;
     if (ez_compact)
         return bc_emit_add_imm(imm);
     return 0;

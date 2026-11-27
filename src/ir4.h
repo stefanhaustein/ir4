@@ -258,7 +258,7 @@ typedef struct {
 
     void (*stack_op)(StackOp op, StackType t1, StackType t2);
     void (*op)(IrOp op);
-    int (*add_imm)(i32 imm);
+    int (*add_imm)(int is_addr, i32 imm);
     int (*cmp_imm)(IrOp op, i32 imm);
     int (*shift_imm)(IrOp op, u8 count);
     int (*bit_imm)(IrOp op, i32 imm);

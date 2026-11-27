@@ -834,7 +834,8 @@ static void a64_patch_fwd(size_t patch_offset) {
     }
 }
 
-static int a64_add_imm(i32 imm) {
+static int a64_add_imm(int is_addr, i32 imm) {
+    (void)is_addr;
     if (imm == 0)
         return 1;
     if (imm > 0 && imm <= 4095) {

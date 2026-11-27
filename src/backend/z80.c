@@ -1740,8 +1740,9 @@ static void z80_patch_fwd(size_t patch_offset) {
     cb_patch16(patch_offset, cb_cur_addr());
 }
 
-static int z80_add_imm(i32 imm) {
+static int z80_add_imm(int is_addr, i32 imm) {
     i16 d = (i16)imm;
+    (void)is_addr;
     z80_peep_barrier();
     if (d == 0)
         return 1;

@@ -2096,8 +2096,9 @@ static void m6502_patch_fwd(size_t patch_offset) {
     cb_patch16(patch_offset, (u16)cb_cur_addr());
 }
 
-static int m6502_add_imm(i32 imm) {
+static int m6502_add_imm(int is_addr, i32 imm) {
     u16 d = (u16)(i16)imm;
+    (void)is_addr;
     if (m6502_compact)
         return bc_emit_add_imm((i16)d);
     if (d == 0)

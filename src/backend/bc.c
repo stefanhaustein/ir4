@@ -558,7 +558,10 @@ int bc_emit_add_imm(i32 imm) {
     return 0;
 }
 
-static int bc_add_imm(i32 imm) { return bc_emit_add_imm((i16)imm); }
+static int bc_add_imm(int is_addr, i32 imm) {
+    (void)is_addr;
+    return bc_emit_add_imm((i16)imm);
+}
 
 static int bc_cmp_imm(IrOp op, i32 imm) {
     (void)op;
@@ -674,7 +677,10 @@ static void bc32_local_op(LocalOp op, size_t slot, StackType type, size_t stack_
     bc_local_op_w(op, slot, type, stack_bytes, 4);
 }
 static void bc32_op(IrOp op) { bc_emit_op(op, 4); }
-static int bc32_add_imm(i32 imm) { return bc_emit_add_imm(imm); }
+static int bc32_add_imm(int is_addr, i32 imm) {
+    (void)is_addr;
+    return bc_emit_add_imm(imm);
+}
 static size_t bc32_emit_br_fwd(BranchCond cond) { return bc_emit_br_fwd_op(cond, 4); }
 static void bc32_emit_br_back(BranchCond cond, size_t target_addr) {
     bc_emit_br_back_op(cond, target_addr, 4);

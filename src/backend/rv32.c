@@ -892,7 +892,8 @@ static void rv_patch_fwd(size_t patch_offset) {
     cb_patch32(patch_offset, enc_j(diff, RV_ZERO));
 }
 
-static int rv_add_imm(i32 imm) {
+static int rv_add_imm(int is_addr, i32 imm) {
+    (void)is_addr;
     if (imm == 0)
         return 1;
     if (imm < -2048 || imm > 2047)
