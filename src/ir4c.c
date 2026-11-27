@@ -45,7 +45,14 @@ static void print_usage(void) {
                     "[--zp hex_addr] [--stack-zp hex_addr] [--no-stack-zp] [--run] <input.ir4> [-- <args...>]\n");
 }
 
+#ifdef IR4_INTERACTIVE_ARGS
+int main(void) {
+    int argc = 1;
+    char *argv_buf[2];
+    char **argv = argv_buf;
+#else
 int main(int argc, char **argv) {
+#endif
 #if IR4_ENABLE_Z80
     const Backend *be = &be_z80;
     size_t base = 0x0100;
@@ -83,6 +90,10 @@ int main(int argc, char **argv) {
     FILE *in_fp;
     FILE *out_fp;
 
+#ifdef IR4_INTERACTIVE_ARGS
+    argv_buf[0] = "ir4c";
+    argv_buf[1] = NULL;
+#endif
     path_set_exe(argc > 0 ? argv[0] : NULL);
 
     for (i = 1; i < argc; i++) {

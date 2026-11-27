@@ -50,6 +50,8 @@ code x16gs __x16gs_kernal_xyc ( a_in :i x_in :i y_in :i addr :i -> :i )
   0xA9 :i8 0x00 :i8 0x00 :i8      \ LDA #$0000
   0x5B :i8                        \ TCD (D = $0000)
   0xE2 :i8 0x20 :i8               \ SEP #$20
+  0x8B :i8 0x68 :i8               \ PHB; PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ STA $00042A (save caller DBR)
   0xA9 :i8 0x00 :i8 0x48 :i8 0xAB :i8 \ LDA #$00; PHA; PLB (DBR = $00)
   0xC2 :i8 0x20 :i8               \ REP #$20
   0xA2 :i8 0xDF :i8 0x01 :i8 0x9A :i8 \ LDX #$01DF; TXS
@@ -61,7 +63,8 @@ code x16gs __x16gs_kernal_xyc ( a_in :i x_in :i y_in :i addr :i -> :i )
   0xC2 :i8 0x30 :i8               \ REP #$30
   0xA8 :i8                        \ TAY (save carry bit in Y)
   0xE2 :i8 0x20 :i8               \ SEP #$20
-  0xA9 :i8 0x07 :i8 0x48 :i8 0xAB :i8 \ LDA #$07; PHA; PLB (DBR = $07)
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ LDA $00042A (restore caller DBR)
+  0x48 :i8 0xAB :i8               \ PHA; PLB
   0xC2 :i8 0x20 :i8               \ REP #$20
   0xA9 :i8 0x00 :i8 0x04 :i8 0x5B :i8 \ LDA #$0400; TCD (D = $0400)
   0xA6 :i8 0x1E :i8               \ LDX $1E

@@ -203,9 +203,17 @@ static void emit_word(size_t fidx) {
     }
 
     VEC_ENSURE(ir_addr, w->ir.len + 1);
-    sig->addr = be->cur_addr();
-    sig->has_addr = 1;
-    be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
+    {
+        int retried = 0;
+        int is_816 = (strcmp(be->name, "65816") == 0);
+    retry_emit:
+        {
+            CbCheckpoint cp = cb_checkpoint();
+            size_t fc_len = fwd_calls.len;
+            size_t start_addr = be->cur_addr();
+            sig->addr = start_addr;
+            sig->has_addr = 1;
+            be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
 
     for (i = 0; i <= w->ir.len; i++) {
         if (be->peep_fence && ir_is_br_target(w, i))
@@ -496,6 +504,20 @@ static void emit_word(size_t fidx) {
                 emit_raw_code_block(ib->raw_start, ib->raw_len, ib->reloc_start, ib->reloc_cnt);
                 break;
             }
+            }
+        }
+    }
+            if (is_816 && !retried && be->cur_addr() > start_addr &&
+                ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
+                size_t pad = 0x10000UL - (start_addr & 0xFFFFUL);
+                cb_restore(cp);
+                fwd_calls.len = fc_len;
+                pending.len = 0;
+                pending_jtab.len = 0;
+                while (pad-- > 0)
+                    cb_emit8(0);
+                retried = 1;
+                goto retry_emit;
             }
         }
     }

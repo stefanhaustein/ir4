@@ -23,6 +23,17 @@ void cb_emit8_16(u8 a, u16 w);
 void cb_emit8_8_8(u8 a, u8 b, u8 c);
 void cb_rewind(size_t n);
 
+typedef struct {
+    size_t code_len;
+    size_t data_len;
+    size_t relocs_len;
+    size_t data_init_relocs_len;
+    size_t ext_relocs_len;
+} CbCheckpoint;
+
+CbCheckpoint cb_checkpoint(void);
+void cb_restore(CbCheckpoint cp);
+
 void cb_patch8(size_t patch_offset, u8 val);
 void cb_patch16(size_t patch_offset, u16 target_addr);
 void cb_patch24(size_t patch_offset, u32 target_addr);

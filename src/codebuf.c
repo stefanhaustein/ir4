@@ -117,6 +117,24 @@ void cb_rewind(size_t n) {
     }
 }
 
+CbCheckpoint cb_checkpoint(void) {
+    CbCheckpoint cp;
+    cp.code_len = code_buf.len;
+    cp.data_len = data_buf.len;
+    cp.relocs_len = relocs.len;
+    cp.data_init_relocs_len = data_init_relocs.len;
+    cp.ext_relocs_len = ext_relocs.len;
+    return cp;
+}
+
+void cb_restore(CbCheckpoint cp) {
+    code_buf.len = cp.code_len;
+    data_buf.len = cp.data_len;
+    relocs.len = cp.relocs_len;
+    data_init_relocs.len = cp.data_init_relocs_len;
+    ext_relocs.len = cp.ext_relocs_len;
+}
+
 void cb_patch8(size_t patch_offset, u8 val) {
     if (patch_offset >= code_buf.len) {
         ir4_die("patch offset out of bounds");

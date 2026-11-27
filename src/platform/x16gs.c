@@ -61,9 +61,15 @@ static void x16gs_end(int main_idx) {
     cb_emit16(0x0400);
     cb_emit8(M816_TCD);
 
-    /* DBR = $07 so $0200,X data stack lives at $07:0200..$07:0E00 (clear of Bank $00 & $01..$06) */
-    cb_emit8_8(M816_SEP, 0x20);
-    cb_emit8_8(M816_LDA_IMM, 0x07);
+    /* Place $0200,X data stack in a bank above code + init data + BSS (min $07) */
+    {
+        u32 end_addr = (u32)(cb_cur_addr() + cb_init_data_size() + 0x10000UL);
+        u8 stack_bank = (u8)((end_addr + 0xFFFFUL) >> 16);
+        if (stack_bank < 0x07)
+            stack_bank = 0x07;
+        cb_emit8_8(M816_SEP, 0x20);
+        cb_emit8_8(M816_LDA_IMM, stack_bank);
+    }
     cb_emit8(M816_PHA);
     cb_emit8(M816_PLB);
     cb_emit8_8(M816_REP, 0x20);
@@ -279,9 +285,13 @@ static int x16gs_write_streaming(FILE *fp, size_t base, u32 sz, u32 sz_even) {
     char bin_path[512];
     char bin_name[64];
     FILE *bin_fp;
-    u16 fname_addr = (u16)(0x080D + 0x77);
+    u8 loader[256];
+    size_t n = 0;
+    size_t bcs1_pos, bcs2_pos, bcs3_pos, beq_done1, beq_done2, bne_full;
+    size_t bra_mac, bcc_noinc, loop_off, fail_off, done_off, mvn_bank_off, fname_off;
+    size_t setnam_lo_off, setnam_hi_off, mvn_patch_lo_off, mvn_patch_hi_off;
+    u16 fname_addr;
     u8 fname_len;
-    u8 loader[0x77];
 
     x16gs_build_bin_paths(x16gs_out_path, bin_path, sizeof(bin_path), bin_name, sizeof(bin_name));
     fname_len = (u8)strlen(bin_name);
@@ -301,76 +311,127 @@ static int x16gs_write_streaming(FILE *fp, size_t base, u32 sz, u32 sz_even) {
     }
     fclose(bin_fp);
 
-    /* Emulation-mode KERNAL CHRIN -> STA [$02] streaming loader at $080D */
-    loader[0x00] = 0xA9; loader[0x01] = 0x02;                   /* LDA #$02 (LFN 2) */
-    loader[0x02] = 0xA2; loader[0x03] = 0x08;                   /* LDX #$08 (dev 8) */
-    loader[0x04] = 0xA0; loader[0x05] = 0x02;                   /* LDY #$02 (SA 2) */
-    loader[0x06] = 0x20; loader[0x07] = 0xBA; loader[0x08] = 0xFF; /* JSR SETLFS */
-    loader[0x09] = 0xA9; loader[0x0A] = fname_len;              /* LDA #fname_len */
-    loader[0x0B] = 0xA2; loader[0x0C] = (u8)(fname_addr & 0xFFU); /* LDX #<fname */
-    loader[0x0D] = 0xA0; loader[0x0E] = (u8)(fname_addr >> 8);  /* LDY #>fname */
-    loader[0x0F] = 0x20; loader[0x10] = 0xBD; loader[0x11] = 0xFF; /* JSR SETNAM */
-    loader[0x12] = 0x20; loader[0x13] = 0xC0; loader[0x14] = 0xFF; /* JSR OPEN */
-    loader[0x15] = 0xB0; loader[0x16] = 0x42;                   /* BCS fail (0x59) */
-    loader[0x17] = 0xA2; loader[0x18] = 0x02;                   /* LDX #$02 */
-    loader[0x19] = 0x20; loader[0x1A] = 0xC6; loader[0x1B] = 0xFF; /* JSR CHKIN */
-    loader[0x1C] = 0xB0; loader[0x1D] = 0x3B;                   /* BCS fail (0x59) */
-    loader[0x1E] = 0xA9; loader[0x1F] = (u8)(base & 0xFFU);     /* dst $02..$04 = base */
-    loader[0x20] = 0x85; loader[0x21] = 0x02;
-    loader[0x22] = 0xA9; loader[0x23] = (u8)((base >> 8) & 0xFFU);
-    loader[0x24] = 0x85; loader[0x25] = 0x03;
-    loader[0x26] = 0xA9; loader[0x27] = (u8)((base >> 16) & 0xFFU);
-    loader[0x28] = 0x85; loader[0x29] = 0x04;
-    loader[0x2A] = 0xA9; loader[0x2B] = (u8)(sz_even & 0xFFU);  /* cnt $05..$07 = sz_even */
-    loader[0x2C] = 0x85; loader[0x2D] = 0x05;
-    loader[0x2E] = 0xA9; loader[0x2F] = (u8)((sz_even >> 8) & 0xFFU);
-    loader[0x30] = 0x85; loader[0x31] = 0x06;
-    loader[0x32] = 0xA9; loader[0x33] = (u8)((sz_even >> 16) & 0xFFU);
-    loader[0x34] = 0x85; loader[0x35] = 0x07;
-    /* loop (0x36): */
-    loader[0x36] = 0xA5; loader[0x37] = 0x05;                   /* LDA $05 */
-    loader[0x38] = 0xD0; loader[0x39] = 0x0C;                   /* BNE dec05 (0x46) */
-    loader[0x3A] = 0xA5; loader[0x3B] = 0x06;                   /* LDA $06 */
-    loader[0x3C] = 0xD0; loader[0x3D] = 0x06;                   /* BNE dec06 (0x44) */
-    loader[0x3E] = 0xA5; loader[0x3F] = 0x07;                   /* LDA $07 */
-    loader[0x40] = 0xF0; loader[0x41] = 0x20;                   /* BEQ done (0x62) */
-    loader[0x42] = 0xC6; loader[0x43] = 0x07;                   /* DEC $07 */
-    loader[0x44] = 0xC6; loader[0x45] = 0x06;                   /* dec06: DEC $06 */
-    loader[0x46] = 0xC6; loader[0x47] = 0x05;                   /* dec05: DEC $05 */
-    loader[0x48] = 0x20; loader[0x49] = 0xCF; loader[0x4A] = 0xFF; /* JSR CHRIN */
-    loader[0x4B] = 0x87; loader[0x4C] = 0x02;                   /* STA [$02] */
-    loader[0x4D] = 0xE6; loader[0x4E] = 0x02;                   /* INC $02 */
-    loader[0x4F] = 0xD0; loader[0x50] = 0xE5;                   /* BNE loop (0x36) */
-    loader[0x51] = 0xE6; loader[0x52] = 0x03;                   /* INC $03 */
-    loader[0x53] = 0xD0; loader[0x54] = 0xE1;                   /* BNE loop (0x36) */
-    loader[0x55] = 0xE6; loader[0x56] = 0x04;                   /* INC $04 */
-    loader[0x57] = 0x80; loader[0x58] = 0xDD;                   /* BRA loop (0x36) */
-    /* fail (0x59): */
-    loader[0x59] = 0x20; loader[0x5A] = 0xCC; loader[0x5B] = 0xFF; /* JSR CLRCHN */
-    loader[0x5C] = 0xA9; loader[0x5D] = 0x02;                   /* LDA #$02 */
-    loader[0x5E] = 0x20; loader[0x5F] = 0xC3; loader[0x60] = 0xFF; /* JSR CLOSE */
-    loader[0x61] = 0x60;                                        /* RTS */
-    /* done (0x62): */
-    loader[0x62] = 0x20; loader[0x63] = 0xCC; loader[0x64] = 0xFF; /* JSR CLRCHN */
-    loader[0x65] = 0xA9; loader[0x66] = 0x02;                   /* LDA #$02 */
-    loader[0x67] = 0x20; loader[0x68] = 0xC3; loader[0x69] = 0xFF; /* JSR CLOSE */
-    loader[0x6A] = 0x78;                                        /* SEI */
-    loader[0x6B] = 0x18;                                        /* CLC */
-    loader[0x6C] = 0xFB;                                        /* XCE */
-    loader[0x6D] = 0xC2; loader[0x6E] = 0x30;                   /* REP #$30 */
-    loader[0x6F] = 0x22;                                        /* JSL base */
-    loader[0x70] = (u8)(base & 0xFFU);
-    loader[0x71] = (u8)((base >> 8) & 0xFFU);
-    loader[0x72] = (u8)((base >> 16) & 0xFFU);
-    loader[0x73] = 0x38;                                        /* SEC */
-    loader[0x74] = 0xFB;                                        /* XCE */
-    loader[0x75] = 0x58;                                        /* CLI */
-    loader[0x76] = 0x60;                                        /* RTS */
+    /* Emulation-mode MACPTR ($FF44, 256B -> $00:1000) + native MVN -> Bank $01+ */
+#define EMIT8(b)  (loader[n++] = (u8)(b))
+#define EMIT16(w) (EMIT8((w) & 0xFFU), EMIT8(((w) >> 8) & 0xFFU))
+#define EMIT24(a) (EMIT16(a), EMIT8(((a) >> 16) & 0xFFU))
+
+    EMIT8(0xA9); EMIT8(0x02);                   /* LDA #$02 (LFN 2) */
+    EMIT8(0xA2); EMIT8(0x08);                   /* LDX #$08 (dev 8) */
+    EMIT8(0xA0); EMIT8(0x02);                   /* LDY #$02 (SA 2) */
+    EMIT8(0x20); EMIT16(0xFFBA);                /* JSR SETLFS */
+    EMIT8(0xA9); EMIT8(fname_len);              /* LDA #fname_len */
+    EMIT8(0xA2); setnam_lo_off = n; EMIT8(0);   /* LDX #<fname */
+    EMIT8(0xA0); setnam_hi_off = n; EMIT8(0);   /* LDY #>fname */
+    EMIT8(0x20); EMIT16(0xFFBD);                /* JSR SETNAM */
+    EMIT8(0x20); EMIT16(0xFFC0);                /* JSR OPEN */
+    EMIT8(0xB0); bcs1_pos = n; EMIT8(0);        /* BCS fail */
+    EMIT8(0xA2); EMIT8(0x02);                   /* LDX #$02 */
+    EMIT8(0x20); EMIT16(0xFFC6);                /* JSR CHKIN */
+    EMIT8(0xB0); bcs2_pos = n; EMIT8(0);        /* BCS fail */
+
+    EMIT8(0xA9); EMIT8(base & 0xFFU); EMIT8(0x85); EMIT8(0x02);
+    EMIT8(0xA9); EMIT8((base >> 8) & 0xFFU); EMIT8(0x85); EMIT8(0x03);
+    EMIT8(0xA9); EMIT8((base >> 16) & 0xFFU); EMIT8(0x85); EMIT8(0x04);
+    EMIT8(0xA9); EMIT8(sz_even & 0xFFU); EMIT8(0x85); EMIT8(0x05);
+    EMIT8(0xA9); EMIT8((sz_even >> 8) & 0xFFU); EMIT8(0x85); EMIT8(0x06);
+    EMIT8(0xA9); EMIT8((sz_even >> 16) & 0xFFU); EMIT8(0x85); EMIT8(0x07);
+
+    loop_off = n;
+    EMIT8(0xA5); EMIT8(0x06);                   /* LDA $06 */
+    EMIT8(0x05); EMIT8(0x07);                   /* ORA $07 */
+    EMIT8(0xD0); bne_full = n; EMIT8(0);        /* BNE full_256 */
+    EMIT8(0xA5); EMIT8(0x05);                   /* LDA $05 */
+    EMIT8(0xF0); beq_done1 = n; EMIT8(0);       /* BEQ done */
+    EMIT8(0x80); bra_mac = n; EMIT8(0);         /* BRA do_macptr */
+
+    loader[bne_full] = (u8)(n - (bne_full + 1));
+    EMIT8(0xA9); EMIT8(0x00);                   /* full_256: LDA #$00 (256 bytes) */
+
+    loader[bra_mac] = (u8)(n - (bra_mac + 1));
+    EMIT8(0xA2); EMIT8(0x00);                   /* LDX #$00 */
+    EMIT8(0xA0); EMIT8(0x10);                   /* LDY #$10 ($00:1000) */
+    EMIT8(0x18);                                /* CLC (advance addr) */
+    EMIT8(0x20); EMIT16(0xFF44);                /* JSR MACPTR */
+    EMIT8(0xB0); bcs3_pos = n; EMIT8(0);        /* BCS fail */
+    EMIT8(0x86); EMIT8(0x08);                   /* STX $08 (cnt_lo) */
+    EMIT8(0x84); EMIT8(0x09);                   /* STY $09 (cnt_hi) */
+    EMIT8(0x8A);                                /* TXA */
+    EMIT8(0x05); EMIT8(0x09);                   /* ORA $09 */
+    EMIT8(0xF0); beq_done2 = n; EMIT8(0);       /* BEQ done */
+
+    /* rem -= cnt */
+    EMIT8(0x38);                                /* SEC */
+    EMIT8(0xA5); EMIT8(0x05); EMIT8(0xE5); EMIT8(0x08); EMIT8(0x85); EMIT8(0x05);
+    EMIT8(0xA5); EMIT8(0x06); EMIT8(0xE5); EMIT8(0x09); EMIT8(0x85); EMIT8(0x06);
+    EMIT8(0xA5); EMIT8(0x07); EMIT8(0xE9); EMIT8(0x00); EMIT8(0x85); EMIT8(0x07);
+
+    /* Patch MVN dst_bank operand */
+    EMIT8(0xA5); EMIT8(0x04);                   /* LDA $04 */
+    EMIT8(0x8D); mvn_patch_lo_off = n; EMIT8(0); mvn_patch_hi_off = n; EMIT8(0);
+
+    /* Native 16-bit MVN copy from $00:1000 -> dst_bank:dst_lo16 */
+    EMIT8(0x78);                                /* SEI */
+    EMIT8(0x18); EMIT8(0xFB);                   /* CLC; XCE */
+    EMIT8(0xC2); EMIT8(0x30);                   /* REP #$30 */
+    EMIT8(0xA5); EMIT8(0x08);                   /* LDA $08 (cnt) */
+    EMIT8(0x3A);                                /* DEC A (cnt - 1) */
+    EMIT8(0xA2); EMIT16(0x1000);                /* LDX #$1000 */
+    EMIT8(0xA4); EMIT8(0x02);                   /* LDY $02 */
+    EMIT8(0x54); mvn_bank_off = n; EMIT8(0x01); EMIT8(0x00); /* MVN dst_bank, $00 */
+
+    /* Restore DBR=$00, advance $02..$04 by cnt, return to E=1 */
+    EMIT8(0xE2); EMIT8(0x20);                   /* SEP #$20 */
+    EMIT8(0xA9); EMIT8(0x00); EMIT8(0x48); EMIT8(0xAB); /* LDA #0; PHA; PLB */
+    EMIT8(0xC2); EMIT8(0x20);                   /* REP #$20 */
+    EMIT8(0x18);                                /* CLC */
+    EMIT8(0xA5); EMIT8(0x02);                   /* LDA $02 */
+    EMIT8(0x65); EMIT8(0x08);                   /* ADC $08 */
+    EMIT8(0x85); EMIT8(0x02);                   /* STA $02 */
+    EMIT8(0x90); bcc_noinc = n; EMIT8(0);       /* BCC +3 */
+    EMIT8(0xE2); EMIT8(0x20);                   /* SEP #$20 */
+    EMIT8(0xE6); EMIT8(0x04);                   /* INC $04 */
+    loader[bcc_noinc] = (u8)(n - (bcc_noinc + 1));
+    EMIT8(0x38); EMIT8(0xFB);                   /* SEC; XCE */
+    EMIT8(0x58);                                /* CLI */
+    EMIT8(0x4C); EMIT16((u16)(0x080D + loop_off)); /* JMP loop */
+
+    fail_off = n;
+    EMIT8(0x20); EMIT16(0xFFCC);                /* JSR CLRCHN */
+    EMIT8(0xA9); EMIT8(0x02); EMIT8(0x20); EMIT16(0xFFC3); /* CLOSE 2 */
+    EMIT8(0x60);                                /* RTS */
+
+    done_off = n;
+    EMIT8(0x20); EMIT16(0xFFCC);                /* JSR CLRCHN */
+    EMIT8(0xA9); EMIT8(0x02); EMIT8(0x20); EMIT16(0xFFC3); /* CLOSE 2 */
+    EMIT8(0x78); EMIT8(0x18); EMIT8(0xFB);      /* SEI; CLC; XCE */
+    EMIT8(0xC2); EMIT8(0x30);                   /* REP #$30 */
+    EMIT8(0x22); EMIT24((u32)base);             /* JSL base */
+    EMIT8(0x38); EMIT8(0xFB); EMIT8(0x58); EMIT8(0x60); /* SEC; XCE; CLI; RTS */
+
+    fname_off = n;
+    fname_addr = (u16)(0x080D + fname_off);
+    loader[setnam_lo_off] = (u8)(fname_addr & 0xFFU);
+    loader[setnam_hi_off] = (u8)(fname_addr >> 8);
+    {
+        u16 mvn_addr = (u16)(0x080D + mvn_bank_off);
+        loader[mvn_patch_lo_off] = (u8)(mvn_addr & 0xFFU);
+        loader[mvn_patch_hi_off] = (u8)(mvn_addr >> 8);
+    }
+    loader[bcs1_pos] = (u8)(fail_off - (bcs1_pos + 1));
+    loader[bcs2_pos] = (u8)(fail_off - (bcs2_pos + 1));
+    loader[bcs3_pos] = (u8)(fail_off - (bcs3_pos + 1));
+    loader[beq_done1] = (u8)(done_off - (beq_done1 + 1));
+    loader[beq_done2] = (u8)(done_off - (beq_done2 + 1));
+
+#undef EMIT8
+#undef EMIT16
+#undef EMIT24
 
     fputc(0x01, fp);
     fputc(0x08, fp);
     fwrite(basic_stub, 1, sizeof(basic_stub), fp);
-    fwrite(loader, 1, sizeof(loader), fp);
+    fwrite(loader, 1, n, fp);
     fwrite(bin_name, 1, fname_len, fp);
     return ferror(fp) ? 0 : 1;
 }
