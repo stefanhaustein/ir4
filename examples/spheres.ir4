@@ -4,6 +4,7 @@
 
 require "stdio.ir4"
 require "sprite.ir4"
+require "sound.ir4"
 
 var spr_buf  :bytes 441
 var spec_buf :bytes 25
@@ -173,6 +174,7 @@ hot fn step_balls ( floor8 :i )
     y8 floor8 >= if
       floor8 -> y8
       bbounce off a+ i16@ -> vy
+      0 110 i 7 and 12 * + 10 2 65 sfxplay
     then
     vy pvy i16!
     y8 py i16!
@@ -202,6 +204,7 @@ hot fn run_loop ( floor8 :i )
   begin inkey 0 = while
     floor8 step_balls
     gfxvsync
+    sfxtick
     gfxticks -> var now_t :i
     now_t prev_t - 255 and -> var dt :i
     now_t -> prev_t
@@ -246,6 +249,7 @@ fn main ( -> :i )
   gfxheight 39 - 5 << -> var floor8 :i
   add_ball
   floor8 run_loop
+  0 sfxstop
   0 -> var i :i
   begin i active 1 << < while
     i 0 sprshow

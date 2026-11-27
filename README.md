@@ -105,13 +105,10 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 
 ## Companion Library
 
-IR4(th) includes a minimal companion library in [lib/](lib/). 
+IR4(th) includes a companion library resolved via `require` along a platform → architecture → generic fallback chain (`lib/<platform>/` → `lib/<arch>/` → `lib/`):
 
-The companion library is included for tests and convenience and (apart from stdio) should
-not be considered a core part of this project. Generally, it's aimed at test / demo
-code portability rather than being a dedicated high capabilites platform abstraction.
-
-It uses `require` with a platform → architecture → generic fallback chain (`lib/<platform>/` → `lib/<arch>/` → `lib/`).
+- **Core System & Runtime** ([stdio](docs/lib/stdio.md), [file](docs/lib/file.md), [system](docs/lib/system.md), [memory](docs/lib/memory.md), [string](docs/lib/string.md), [heap](docs/lib/heap.md), [math](docs/lib/math.md), [i32](docs/lib/i32.md)) — Official frontend-facing primitives covering console I/O, files, CLI args, clock, dynamic memory, and math.
+- **Retro Hardware & Demo Extensions** ([terminal](docs/lib/terminal.md), [graphics](docs/lib/graphics.md), [sprite](docs/lib/sprite.md), [sound](docs/lib/sound.md), [joystick](docs/lib/joystick.md)) — Optional, minimal-footprint abstractions intended for portable tests and demos rather than a full-featured platform SDK.
 
 See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 
