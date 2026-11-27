@@ -230,8 +230,33 @@ int main(int argc, char **argv) {
     }
 
     if (!in_path) {
+#ifdef IR4_INTERACTIVE_ARGS
+        static char in_buf[128];
+        static char out_buf[128];
+        size_t len;
+        printf("Input (.ir4): ");
+        fflush(stdout);
+        if (!fgets(in_buf, sizeof(in_buf), stdin))
+            return 1;
+        len = strlen(in_buf);
+        while (len > 0 && (in_buf[len - 1] == '\n' || in_buf[len - 1] == '\r'))
+            in_buf[--len] = '\0';
+        if (len == 0)
+            return 1;
+        in_path = in_buf;
+        printf("Output [%s]: ", out_path);
+        fflush(stdout);
+        if (fgets(out_buf, sizeof(out_buf), stdin)) {
+            len = strlen(out_buf);
+            while (len > 0 && (out_buf[len - 1] == '\n' || out_buf[len - 1] == '\r'))
+                out_buf[--len] = '\0';
+            if (len > 0)
+                out_path = out_buf;
+        }
+#else
         print_usage();
         return 1;
+#endif
     }
 
 #if IR4_ENABLE_JIT
@@ -310,6 +335,9 @@ int main(int argc, char **argv) {
     }
 
     if (plat && plat->write) {
+#if IR4_ENABLE_X16GS
+        x16gs_set_out_path(out_path);
+#endif
         if (!plat->write(out_fp, base)) {
             ir4_status_clear();
             fprintf(stderr, "ir4c: write failed: %s\n", out_path);

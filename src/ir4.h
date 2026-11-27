@@ -318,6 +318,9 @@ extern const Platform plat_ez80_agon;
 extern const Platform plat_6502_sim;
 extern const Platform plat_65816_sim;
 extern const Platform plat_65816_x16gs;
+#if IR4_ENABLE_X16GS
+void x16gs_set_out_path(const char *path);
+#endif
 extern const Platform plat_6502_c64;
 extern const Platform plat_6502_x16;
 extern const Platform plat_6502_x16_cart;

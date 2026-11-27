@@ -10,6 +10,8 @@ SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/i
 OBJS    = $(patsubst src/%.c,$(BUILD)/%.o,$(SRCS))
 
 AGON_EMU ?= $(HOME)/opt/fab-agon-emulator/fab-agon-emulator
+X16_EMU  ?= ./x16-emulator/build/x16emu
+X16_ROM  ?= $(HOME)/opt/x16emu_macos_m1-r49/rom.bin
 
 .PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 rt rt-z80 rt-ez80 rt-6502 rt-rv32 clean
 

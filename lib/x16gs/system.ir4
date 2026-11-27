@@ -74,3 +74,48 @@ fn syssleep ( ms :i )
     dt dur i32<
   while repeat
 end
+
+\ Bank-0 Golden RAM argument mailbox at $00:0500..$00:05FF:
+\   $0500..$0503 = "IR4A" (0x49, 0x52, 0x34, 0x41)
+\   $0504        = argc (u8, 0..31)
+\   $0505..$05FF = NUL-terminated argument strings
+fn __x16gs_args_valid ( -> :i )
+  0x0500 i>a u8@ 0x49 <> if 0 return then
+  0x0501 i>a u8@ 0x52 <> if 0 return then
+  0x0502 i>a u8@ 0x34 <> if 0 return then
+  0x0503 i>a u8@ 0x41 <> if 0 return then
+  1
+end
+
+fn sysargc ( -> :i )
+  __x16gs_args_valid 0 = if 0 return then
+  0x0504 i>a u8@
+end
+
+fn sysargv ( idx :i buf :a max :i -> :i )
+  idx 0 < max 0 < or if -1 return then
+  __x16gs_args_valid 0 = if -1 return then
+  0x0504 i>a u8@ -> var argc :i
+  idx argc >= if -1 return then
+  0x0505 -> var addr :i
+  0 -> var cur :i
+  begin cur idx < while
+    begin
+      addr 0x0600 >= if -1 return then
+      addr i>a u8@ -> var ch :i
+      1 +-> addr
+      ch 0 <>
+    while repeat
+    1 +-> cur
+  repeat
+  0 -> var n :i
+  begin
+    addr 0x0600 < if addr i>a u8@ else 0 then -> var c :i
+    c 0 <>
+  while
+    n max < if c buf n a+ i8! 1 +-> n then
+    1 +-> addr
+  repeat
+  n max < if 0 buf n a+ i8! then
+  n
+end
