@@ -76,6 +76,7 @@ Platform overrides implement the `default fn` entries below.
   Map 8-bit RGB (*r*, *g*, *b* in 0..255) to the platform's native color value for gfxcolor. On attribute-cell targets (gfxdepth = 1), non-zero colors may still set per-cell attributes.
   - *agon:* Map 8-bit RGB (0..255) to Agon default palette (1-bpp, 2-bpp, or 16-color VGA 0..15)
   - *x16:* Map 8-bit RGB to X16 default 6x6x6 palette cube (indices 16..231)
+  - *x16gs:* Map 8-bit RGB to X16 default 6x6x6 palette cube (indices 16..231)
 
 - **gfxtext** ( x :i y :i s :a len :i )
 
@@ -84,6 +85,7 @@ Platform overrides implement the `default fn` entries below.
   - *c64:* Pixel-positioned 8x8 text from C64 Char ROM ($D800) using `xemit` ASCII mapping.
   - *cpm:* Snaps (*x*, *y*) to VT52 character cell (`x, y`) via `type`.
   - *x16:* Pixel-positioned 8x8 text from VERA VRAM ($1F000) using ISO ASCII font loaded by `gfxmode`.
+  - *x16gs:* Pixel-positioned 8x8 text from VERA VRAM ($1F000) using ISO ASCII font loaded by `gfxmode`.
   - *zx81:* Snaps (*x*, *y*) to the nearest 2x2 cell (`x/2, y/2`) in `D_FILE` via `type`.
 
 - **gfxticks** ( -> :i ) — Return platform tick counter (wraps monotonically; default: 0)
@@ -123,9 +125,17 @@ gfxcolor <> bg sets bitmap bits and updates the 8x8 cell's foreground (high) nib
 
 CP/M VT52 ASCII brightness graphics (80x24, 8 shades)
 
+### web
+
+Web Canvas pixel graphics
+
 ### x16
 
 Commander X16 VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
+
+### x16gs
+
+Commander X16GS VERA 8bpp bitmap modes (320x240 and 160x120 via Mode $80)
 
 ### zx81
 

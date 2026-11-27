@@ -39,6 +39,14 @@ Agon VDP hardware sprites
 
 Commodore 64 VIC-II hardware sprites (hires 24x21 or multicolor 12x21, 1x scale)
 
+### web
+
+Web runtime hardware-style sprites
+
 ### x16
 
 Commander X16 VERA 8-bpp hardware sprites
+
+### x16gs
+
+Commander X16GS VERA 8-bpp hardware sprites

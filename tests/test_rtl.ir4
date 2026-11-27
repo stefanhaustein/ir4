@@ -7,6 +7,9 @@ require "heap.ir4"
 require "string.ir4"
 
 data s_exp "HiWorld" 0 :i8 end
+data s_short "Hi" 0 :i8 end
+data s_hi 0xFF :i8 0 :i8 end
+data s_lo 0x01 :i8 0 :i8 end
 data s_empty 0 :i8 end
 data c_msg "RTL:" 0 :i8 end
 
@@ -16,6 +19,52 @@ var buf2 :bytes 16
 fn assert_eq ( got :i expected :i code :i -> :i )
   got expected = if 0 return then
   code
+end
+
+fn test_rtl_bank_cross ( -> :i )
+  var base :a
+  var bndry :a
+  var lo :i
+  var rem :i
+  target_65816 0 = if 0 return then
+  __heap_start 256 a+ -> base
+  base a>i -> lo
+  0 lo - 0x7FFF and -> rem
+  lo 0x8000 and 0 = if
+    base 32767 a+ 1 a+ rem a+ -> bndry
+  else
+    base rem a+ -> bndry
+  then
+  \ memfill odd length straddling $xx:FFFF <-> $(xx+1):0000
+  bndry 5 a- 11 0x5A memfill
+  bndry 5 a- u8@ 0x5A 40 assert_eq
+  dup 0 <> if return then drop
+  bndry 1 a- u8@ 0x5A 41 assert_eq
+  dup 0 <> if return then drop
+  bndry u8@ 0x5A 42 assert_eq
+  dup 0 <> if return then drop
+  bndry 5 a+ u8@ 0x5A 43 assert_eq
+  dup 0 <> if return then drop
+  \ memcpy forward + memcmp across boundary
+  bndry 3 a- s_exp 8 memcpy
+  bndry 3 a- s_exp 8 memcmp 0 44 assert_eq
+  dup 0 <> if return then drop
+  \ strlen0 + strcmp0 across boundary ("HiWorld\0" starts at bndry-3, crosses bndry)
+  bndry 3 a- strlen0 7 45 assert_eq
+  dup 0 <> if return then drop
+  bndry 3 a- s_exp strcmp0 0 46 assert_eq
+  dup 0 <> if return then drop
+  bndry 3 a- s_short strcmp0 0 > -1 47 assert_eq
+  dup 0 <> if return then drop
+  \ backward overlapping memcpy (+1 shift of 7 bytes across boundary)
+  bndry 2 a- bndry 3 a- 7 memcpy
+  bndry 2 a- s_exp 7 memcmp 0 48 assert_eq
+  dup 0 <> if return then drop
+  \ forward overlapping memcpy (-1 shift back across boundary)
+  bndry 3 a- bndry 2 a- 7 memcpy
+  bndry 3 a- s_exp 7 memcmp 0 49 assert_eq
+  dup 0 <> if return then drop
+  0
 end
 
 fn mutate_copy ( b :bytes 16 -> :i )
@@ -52,12 +101,42 @@ fn main ( -> :i )
   buf1 buf2 8 memcmp 0 < -1 4 assert_eq
   dup 0 <> if return then drop
 
-  \ overlapping memcpy (dst > src, e.g. shifting "HiWorld" right by 2)
+  \ overlapping memcpy (dst > src, e.g. shifting "HiWorld" right by 2 and by 1)
   buf2 s_exp 7 memcpy
   buf2 2 a+ buf2 7 memcpy
   buf2 2 a+ u8@ 72 15 assert_eq
   dup 0 <> if return then drop
   buf2 6 a+ u8@ 114 16 assert_eq
+  dup 0 <> if return then drop
+  buf2 s_exp 7 memcpy
+  buf2 1 a+ buf2 7 memcpy
+  buf2 1 a+ s_exp 7 memcmp 0 25 assert_eq
+  dup 0 <> if return then drop
+  \ overlapping memcpy (dst < src, shifting left by 1) + self copy + len <= 0
+  buf2 buf2 1 a+ 7 memcpy
+  buf2 s_exp 7 memcmp 0 26 assert_eq
+  dup 0 <> if return then drop
+  buf2 buf2 7 memcpy
+  buf2 s_exp 7 memcmp 0 27 assert_eq
+  dup 0 <> if return then drop
+  buf2 0 99 memfill
+  buf2 -3 99 memfill
+  buf2 u8@ 72 28 assert_eq
+  dup 0 <> if return then drop
+  \ memcmp odd tail & unsigned high-bit bytes (0xFF vs 0x01)
+  buf1 s_exp 7 memcpy
+  buf2 s_exp 7 memcpy
+  buf1 buf2 7 memcmp 0 29 assert_eq
+  dup 0 <> if return then drop
+  0xFF buf1 6 a+ i8!
+  0x01 buf2 6 a+ i8!
+  buf1 buf2 7 memcmp 0 > -1 30 assert_eq
+  dup 0 <> if return then drop
+  buf2 buf1 7 memcmp 0 < -1 31 assert_eq
+  dup 0 <> if return then drop
+  buf1 buf2 0 memcmp 0 32 assert_eq
+  dup 0 <> if return then drop
+  buf1 buf2 -2 memcmp 0 33 assert_eq
   dup 0 <> if return then drop
 
   \ heap.ir4: heapalloc / heapfree (with coalescing) / heapreset
@@ -99,5 +178,17 @@ fn main ( -> :i )
   dup 0 <> if return then drop
   p1 s_empty a= -1 24 assert_eq
   dup 0 <> if return then drop
+  s_exp s_exp strcmp0 0 34 assert_eq
+  dup 0 <> if return then drop
+  s_short s_exp strcmp0 0 < -1 35 assert_eq
+  dup 0 <> if return then drop
+  s_exp s_short strcmp0 0 > -1 36 assert_eq
+  dup 0 <> if return then drop
+  s_hi s_lo strcmp0 0 > -1 37 assert_eq
+  dup 0 <> if return then drop
+  s_lo s_hi strcmp0 0 < -1 38 assert_eq
+  dup 0 <> if return then drop
+  test_rtl_bank_cross -> var berr :i
+  berr 0 <> if berr return then
   0
 end

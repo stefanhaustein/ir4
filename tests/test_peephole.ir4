@@ -96,6 +96,63 @@ fn test_peep_fence_cold ( c :i -> :i )
   dup +
 end
 
+\ 8. 24-bit+ pointer bank-crossing tests (static +->, recursive +->, variable +->, imm a+/a-)
+fn rec_step_a ( p :a n :i d :i -> :a )
+  n 0 <= if p return then
+  d 0 > if
+    1 +-> p
+  else
+    -1 +-> p
+  then
+  p n 1 - d rec_step_a
+end
+
+fn test_bank_cross ( -> :i )
+  var base_buf :bytes 4
+  var bndry :a
+  var p :a
+  var lo :i
+  var rem :i
+  var one :i
+  var neg1 :i
+  size_a 3 < if 0 return then
+  base_buf a>i -> lo
+  0 lo - 0x7FFF and -> rem
+  lo 0x8000 and 0 = if
+    base_buf 32767 a+ 1 a+ rem a+ -> bndry
+  else
+    base_buf rem a+ -> bndry
+  then
+  \ Static local_add_imm across $xx:FFFF <-> $(xx+1):0000
+  bndry 2 a- -> p
+  1 +-> p
+  p bndry a< 0 = if 40 return then
+  1 +-> p
+  p bndry a= 0 = if 41 return then
+  1 +-> p
+  p bndry 1 a+ a= 0 = if 42 return then
+  -1 +-> p
+  p bndry a= 0 = if 43 return then
+  -1 +-> p
+  p bndry 1 a- a= 0 = if 44 return then
+  \ Recursive local_add_imm across boundary
+  bndry 2 a- 3 1 rec_step_a bndry 1 a+ a= 0 = if 45 return then
+  bndry 1 a+ 3 -1 rec_step_a bndry 2 a- a= 0 = if 46 return then
+  \ Variable LOCAL_ADD across boundary
+  1 -> one
+  -1 -> neg1
+  bndry 1 a- -> p
+  one +-> p
+  p bndry a= 0 = if 47 return then
+  neg1 +-> p
+  p bndry 1 a- a= 0 = if 48 return then
+  \ Constant add_imm across boundary (including -32768)
+  bndry 1 a- 1 a+ bndry a= 0 = if 49 return then
+  bndry 1 a- 1 a+ bndry a<> if 50 return then
+  bndry -32768 a+ 32767 a+ 1 a+ bndry a= 0 = if 51 return then
+  0
+end
+
 fn main ( -> :i )
   10 1 hot_ladd 323 <> if 1 return then
   10 0 hot_ladd 11 <> if 2 return then
@@ -134,6 +191,9 @@ fn main ( -> :i )
   0 test_peep_fence_hot 60 <> if 31 return then
   1 test_peep_fence_cold 42 <> if 32 return then
   0 test_peep_fence_cold 60 <> if 33 return then
+
+  test_bank_cross -> var bc_err :i
+  bc_err 0 <> if bc_err return then
 
   0
 end

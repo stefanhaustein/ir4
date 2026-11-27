@@ -97,7 +97,7 @@ fn main ( -> :i )
   target_c64 if __test_c64 return then
 
   \ Fallback targets without a filesystem return < 0 on fsopen
-  target_arm64 target_cpm or target_agon or target_x16 or 0 = if 0 return then
+  target_arm64 target_cpm or target_agon or target_x16 or target_x16gs or 0 = if 0 return then
 
   \ Ensure clean starting state
   test_fname fsdelete0 drop
@@ -192,7 +192,7 @@ fn main ( -> :i )
   then
 
   \ Directory lifecycle + 3-int fsdirread
-  target_arm64 target_agon or target_x16 or if
+  target_arm64 target_agon or target_x16 or target_x16gs or if
     test_dfile fsdelete0 drop
     test_dsub fsrmdir0 drop
     test_dname fsrmdir0 drop

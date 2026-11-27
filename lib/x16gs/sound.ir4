@@ -1,0 +1,60 @@
+\ lib/x16gs/sound.ir4 - Commander X16GS VERA PSG sound effects (16 channels at VRAM $1F9C0)
+
+const __SFX_VERA_ADDR_L 0x9F20 :a
+const __SFX_VERA_ADDR_M 0x9F21 :a
+const __SFX_VERA_ADDR_H 0x9F22 :a
+const __SFX_VERA_DATA0  0x9F23 :a
+const __SFX_VERA_CTRL   0x9F25 :a
+
+var __x16gs_sfx_tmr :bytes 32
+
+data __x16gs_sfx_waves
+  0x3F :i8 0x7F :i8 0xBF :i8 0xFF :i8
+end
+
+fn sfxcount ( -> :i ) 16 end
+
+fn sfxplay ( ch :i freq :i vol :i wave :i dur_ms :i )
+  ch 0 < ch 15 > or if return then
+  vol 0 < if 0 -> vol then
+  vol 15 > if 15 -> vol then
+  freq 1 << dup 3 / + -> var vf :i
+  0 __SFX_VERA_CTRL i8!
+  0xC0 ch 2 << + __SFX_VERA_ADDR_L i8!
+  0xF9 __SFX_VERA_ADDR_M i8!
+  0x11 __SFX_VERA_ADDR_H i8!
+  vf 255 and __SFX_VERA_DATA0 i8!
+  vf 8 u>> 255 and __SFX_VERA_DATA0 i8!
+  vol 0 = if 0 else 0xC0 vol 2 << or vol 2 u>> or then __SFX_VERA_DATA0 i8!
+  __x16gs_sfx_waves wave 3 and a+ u8@ __SFX_VERA_DATA0 i8!
+  0 -> var ticks :i
+  dur_ms 0 > if
+    dur_ms 4 u>> -> ticks
+    ticks 1 < if 1 -> ticks then
+  then
+  ticks __x16gs_sfx_tmr ch 1 << a+ i16!
+end
+
+fn sfxstop ( ch :i )
+  ch 0 < ch 15 > or if return then
+  0 __SFX_VERA_CTRL i8!
+  0xC2 ch 2 << + __SFX_VERA_ADDR_L i8!
+  0xF9 __SFX_VERA_ADDR_M i8!
+  0x01 __SFX_VERA_ADDR_H i8!
+  0 __SFX_VERA_DATA0 i8!
+  0 __x16gs_sfx_tmr ch 1 << a+ i16!
+end
+
+fn sfxtick ( )
+  0 -> var ch :i
+  begin ch 16 < while
+    __x16gs_sfx_tmr ch 1 << a+ -> var p :a
+    p i16@ -> var t :i
+    t 0 > if
+      -1 +-> t
+      t p i16!
+      t 0 = if ch sfxstop then
+    then
+    1 +-> ch
+  repeat
+end

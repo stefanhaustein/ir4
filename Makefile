@@ -123,6 +123,7 @@ test-examples: $(TARGET)
 		./$(TARGET) -t arm64 -o $(BUILD)/ex_arm64.bin $$f >/dev/null; \
 		./$(TARGET) -t c64   -o $(BUILD)/ex_c64.prg   $$f >/dev/null; \
 		./$(TARGET) -t x16   -o $(BUILD)/ex_x16.prg   $$f >/dev/null; \
+		./$(TARGET) -t x16gs -o $(BUILD)/ex_x16gs.prg $$f >/dev/null; \
 		./$(TARGET) -t cpm   -o $(BUILD)/ex_cpm.com   $$f >/dev/null; \
 		echo "OK (examples): $$f"; \
 	done
@@ -259,15 +260,21 @@ test-65816: $(TARGET) tests/test_*.ir4
 		echo "sim65816 test_$${name}.ir4 -> $$out"; \
 		test "$$out" = "0" || exit 1; \
 	done
-	@for name in rtl stdio; do \
+	@for name in rtl stdio terminal graphics sprite; do \
 		out=$$(./$(TARGET) -t sim65816 -o $(BUILD)/$${name}_65816.bin tests/test_$${name}.ir4 | tr -d '\r' | grep . | tail -n 1); \
 		echo "sim65816 test_$${name}.ir4 -> $$out"; \
 		test "$$out" = "0" || exit 1; \
 	done
-	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg  examples/hello.ir4
-	./$(TARGET) -t x16gs -o $(BUILD)/stdio_x16gs.prg  tests/test_stdio.ir4
-	./$(TARGET) -t x16gs -o $(BUILD)/rtl_x16gs.prg    tests/test_rtl.ir4
-	./$(TARGET) -t x16gs -o $(BUILD)/system_x16gs.prg tests/test_system.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg    examples/hello.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/stdio_x16gs.prg    tests/test_stdio.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/rtl_x16gs.prg      tests/test_rtl.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/system_x16gs.prg   tests/test_system.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/file_x16gs.prg     tests/test_file.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/terminal_x16gs.prg tests/test_terminal.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/graphics_x16gs.prg tests/test_graphics.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/sprite_x16gs.prg   tests/test_sprite.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/sound_x16gs.prg    tests/test_sound.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/joystick_x16gs.prg tests/test_joystick.ir4
 
 test-rv32: $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t virt -o $(BUILD)/fib_rv32.elf      tests/test_fib.ir4
@@ -384,7 +391,7 @@ X16GS_CPP_FLAGS = -E -P -nostdinc -U__APPLE__ -Ilcc/include/ir4 -Isrc -Isrc/fron
 
 x16gs: $(BUILD)/x16gs/ir4c.prg
 
-$(BUILD)/x16gs/ir4c.prg: $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/frontend.h src/frontend/internal.h src/backend/65816.h lcc/lib/libc.c lcc/lib/c.ir4
+$(BUILD)/x16gs/ir4c.prg: $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/frontend.h src/frontend/internal.h src/backend/65816.h lcc/lib/libc.c lcc/lib/c.ir4 lib/*.ir4 lib/65816/*.ir4 lib/x16gs/*.ir4
 	@if [ ! -x "$(LCC_RCC)" ]; then \
 		if [ -d lcc ]; then \
 			mkdir -p lcc/build && $(MAKE) -C lcc BUILDDIR=build rcc; \
@@ -408,19 +415,36 @@ $(BUILD)/x16gs/ir4c.prg: $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/fro
 	./$(TARGET) -t x16gs -I lcc/lib -I $(BUILD)/x16gs-build -o $(BUILD)/x16gs/ir4c.prg $(BUILD)/x16gs-build/ir4c_all.ir4
 	@echo "Built $(BUILD)/x16gs/ir4c.prg + $(BUILD)/x16gs/IR4C.BIN"
 
-test-x16gs: $(BUILD)/x16gs/ir4c.prg examples/hello.ir4
-	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg examples/hello.ir4
+test-x16gs: $(BUILD)/x16gs/ir4c.prg test-65816 examples/hello.ir4 examples/spheres.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/hello_x16gs.prg   examples/hello.ir4
+	./$(TARGET) -t x16gs -o $(BUILD)/spheres_x16gs.prg examples/spheres.ir4
 	@if [ -x "$(X16_EMU)" ] && [ -f "$(X16_ROM)" ]; then \
 		mkdir -p $(BUILD)/x16gs/lib; \
 		cp -R lib/* $(BUILD)/x16gs/lib/; \
+		: > $(BUILD)/x16gs/run_libs.bas; \
+		for name in stdio rtl system terminal graphics sprite sound joystick file; do \
+			uname=$$(echo $$name | tr 'a-z' 'A-Z'); \
+			cp $(BUILD)/$${name}_x16gs.prg $(BUILD)/x16gs/t_$${name}.prg; \
+			printf 'LOAD"T_%s.PRG"\nRUN\n\n\n\nPRINT"@@%s"\n' "$$uname" "$$uname" >> $(BUILD)/x16gs/run_libs.bas; \
+		done; \
+		printf 'POWEROFF\n' >> $(BUILD)/x16gs/run_libs.bas; \
+		SDL_VIDEODRIVER=dummy "$(X16_EMU)" -gs -mhz 40 -rom "$(X16_ROM)" -fsroot $(BUILD)/x16gs -bas $(BUILD)/x16gs/run_libs.bas -warp -echo raw -sound none > $(BUILD)/x16gs/libs.log; \
+		for name in stdio rtl system terminal graphics sprite sound joystick file; do \
+			uname=$$(echo $$name | tr 'a-z' 'A-Z'); \
+			res=$$(LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/libs.log | LC_ALL=C tr -cd '\12\40-\176' | LC_ALL=C awk -v tag="@@$$uname" '$$0 == tag { print prev } match($$0, /-?[0-9]+$$/) { prev = substr($$0, RSTART, RLENGTH) }'); \
+			echo "x16emu -gs $${name}_x16gs.prg -> $$res"; \
+			test "$$res" = "0" || { LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/libs.log | LC_ALL=C tr -cd '\12\40-\176' | tail -n 30; exit 1; }; \
+		done; \
 		cp examples/hello.ir4 $(BUILD)/x16gs/hello.ir4; \
-		rm -f $(BUILD)/x16gs/hello.prg; \
-		printf 'LOAD"IR4C.PRG"\nRUN\nHELLO.IR4\nHELLO.PRG\nLOAD"HELLO.PRG"\nRUN\nPOWEROFF\n' > $(BUILD)/x16gs/run_test.bas; \
-		"$(X16_EMU)" -gs -mhz 40 -rom "$(X16_ROM)" -fsroot $(BUILD)/x16gs -bas $(BUILD)/x16gs/run_test.bas -warp -echo raw -sound none > $(BUILD)/x16gs/test.log; \
-		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | tail -n 12; \
+		cp examples/spheres.ir4 $(BUILD)/x16gs/spheres.ir4; \
+		rm -f $(BUILD)/x16gs/hello.prg $(BUILD)/x16gs/spheres.prg; \
+		printf 'LOAD"IR4C.PRG"\nRUN\nHELLO.IR4\nHELLO.PRG\nLOAD"HELLO.PRG"\nRUN\nLOAD"IR4C.PRG"\nRUN\nSPHERES.IR4\nSPHERES.PRG\nPOWEROFF\n' > $(BUILD)/x16gs/run_test.bas; \
+		SDL_VIDEODRIVER=dummy "$(X16_EMU)" -gs -mhz 40 -rom "$(X16_ROM)" -fsroot $(BUILD)/x16gs -bas $(BUILD)/x16gs/run_test.bas -warp -echo raw -sound none > $(BUILD)/x16gs/test.log; \
+		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | tail -n 20; \
 		cmp -s $(BUILD)/x16gs/hello.prg $(BUILD)/hello_x16gs.prg || { echo "MISMATCH: $(BUILD)/x16gs/hello.prg != $(BUILD)/hello_x16gs.prg"; exit 1; }; \
-		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | tail -n 8 | grep -q "Hello, world!" || { echo "MISSING Hello, world! output"; exit 1; }; \
-		echo "OK (test-x16gs): self-hosted ir4c.prg compiled and ran HELLO.PRG byte-identically"; \
+		cmp -s $(BUILD)/x16gs/spheres.prg $(BUILD)/spheres_x16gs.prg || { echo "MISMATCH: $(BUILD)/x16gs/spheres.prg != $(BUILD)/spheres_x16gs.prg"; exit 1; }; \
+		LC_ALL=C tr '\r' '\n' < $(BUILD)/x16gs/test.log | grep -q "Hello, world!" || { echo "MISSING Hello, world! output"; exit 1; }; \
+		echo "OK (test-x16gs): all 9 X16GS lib tests + self-hosted HELLO.PRG and SPHERES.PRG verified"; \
 	else \
 		echo "x16emu or rom.bin not found; skipping X16GS self-host execution"; \
 	fi

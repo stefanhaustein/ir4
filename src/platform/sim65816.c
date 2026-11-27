@@ -4,7 +4,7 @@
 #include "frontend.h"
 
 #define SIM816_PUTC_ADDR 0x00FFF0UL
-#define SIM816_MEM_SIZE  (512UL * 1024UL)
+#define SIM816_MEM_SIZE  (2UL * 1024UL * 1024UL)
 
 static size_t sim816_base = 0x010000UL;
 
@@ -199,8 +199,9 @@ typedef struct {
     u8 *mem;
     size_t mem_sz;
     int halted;
-    u32 trace_pc[16];
-    u8 trace_op[16];
+    u32 trace_pc[256];
+    u16 trace_s[256];
+    u8 trace_op[256];
     u8 trace_idx;
 } Cpu816;
 
@@ -358,8 +359,9 @@ static void sim816_step(Cpu816 *c) {
     int m8 = (c->p & F_M) != 0;
     int x8 = (c->p & F_X) != 0;
     u32 ea;
-    c->trace_pc[c->trace_idx & 15] = cur;
-    c->trace_op[c->trace_idx & 15] = op;
+    c->trace_pc[c->trace_idx] = cur;
+    c->trace_s[c->trace_idx] = c->s;
+    c->trace_op[c->trace_idx] = op;
     c->trace_idx++;
     switch (op) {
     case 0x18: c->p &= (u8)~F_C; break; /* CLC */
@@ -449,10 +451,13 @@ static void sim816_step(Cpu816 *c) {
     case 0x69: ea = ((u32)c->pbr << 16) | c->pc; c->pc += m8 ? 1 : 2; do_adc(c, ea); break;
     case 0x65: do_adc(c, addr_dp(c)); break;
     case 0x67: do_adc(c, addr_idl(c)); break;
+    case 0x77: do_adc(c, addr_idly(c)); break;
     case 0x7D: do_adc(c, addr_absx(c)); break;
     case 0x6F: do_adc(c, addr_long(c)); break;
     case 0xE9: ea = ((u32)c->pbr << 16) | c->pc; c->pc += m8 ? 1 : 2; do_sbc(c, ea); break;
     case 0xE5: do_sbc(c, addr_dp(c)); break;
+    case 0xE7: do_sbc(c, addr_idl(c)); break;
+    case 0xF7: do_sbc(c, addr_idly(c)); break;
     case 0xFD: do_sbc(c, addr_absx(c)); break;
 
     /* AND / ORA / EOR */
@@ -481,9 +486,13 @@ static void sim816_step(Cpu816 *c) {
     /* CMP / CPX / CPY */
     case 0xC9: ea = ((u32)c->pbr << 16) | c->pc; c->pc += m8 ? 1 : 2; do_cmp(c, c->a, ea, m8); break;
     case 0xC5: do_cmp(c, c->a, addr_dp(c), m8); break;
+    case 0xC7: do_cmp(c, c->a, addr_idl(c), m8); break;
+    case 0xD7: do_cmp(c, c->a, addr_idly(c), m8); break;
     case 0xDD: do_cmp(c, c->a, addr_absx(c), m8); break;
     case 0xE0: ea = ((u32)c->pbr << 16) | c->pc; c->pc += x8 ? 1 : 2; do_cmp(c, c->x, ea, x8); break;
+    case 0xE4: do_cmp(c, c->x, addr_dp(c), x8); break;
     case 0xC0: ea = ((u32)c->pbr << 16) | c->pc; c->pc += x8 ? 1 : 2; do_cmp(c, c->y, ea, x8); break;
+    case 0xC4: do_cmp(c, c->y, addr_dp(c), x8); break;
 
     /* INC / DEC / Shifts */
     case 0x1A: if (m8) { u8 v = (u8)(c->a + 1); c->a = (c->a & 0xFF00) | v; set_nz8(c, v); } else { c->a++; set_nz16(c, c->a); } break;
@@ -554,10 +563,11 @@ static void sim816_step(Cpu816 *c) {
         int ti;
         fprintf(stderr, "sim65816: unimplemented opcode 0x%02X at %02X:%04X (S=%04X X=%04X A=%04X P=%02X)\n",
                 op, c->pbr, (u16)(c->pc - 1), c->s, c->x, c->a, c->p);
-        for (ti = 0; ti < 16; ti++) {
-            u8 k = (u8)((c->trace_idx + ti) & 15);
-            fprintf(stderr, "  %02X:%04X op=%02X\n",
-                    (u8)(c->trace_pc[k] >> 16), (u16)(c->trace_pc[k] & 0xFFFF), c->trace_op[k]);
+        for (ti = 0; ti < 256; ti++) {
+            u8 k = (u8)(c->trace_idx + ti);
+            fprintf(stderr, "  %02X:%04X op=%02X S=%04X\n",
+                    (u8)(c->trace_pc[k] >> 16), (u16)(c->trace_pc[k] & 0xFFFF),
+                    c->trace_op[k], c->trace_s[k]);
         }
         exit(1);
     }
@@ -601,8 +611,15 @@ static void sim816_run(size_t main_idx) {
                     cpu.a, cpu.x, cpu.y, cpu.s, cpu.p);
         }
         sim816_step(&cpu);
-        if (++steps > 50000000UL) {
-            fprintf(stderr, "sim65816: cycle limit exceeded at %02X:%04X\n", cpu.pbr, cpu.pc);
+        if (++steps > 500000000UL) {
+            int ti;
+            fprintf(stderr, "sim65816: cycle limit exceeded at %02X:%04X (S=%04X X=%04X A=%04X P=%02X)\n",
+                    cpu.pbr, cpu.pc, cpu.s, cpu.x, cpu.a, cpu.p);
+            for (ti = 0; ti < 16; ti++) {
+                u8 k = (u8)((cpu.trace_idx + ti) & 15);
+                fprintf(stderr, "  %02X:%04X op=%02X\n",
+                        (u8)(cpu.trace_pc[k] >> 16), (u16)(cpu.trace_pc[k] & 0xFFFF), cpu.trace_op[k]);
+            }
             free(cpu.mem);
             exit(1);
         }

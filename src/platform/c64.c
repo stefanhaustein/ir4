@@ -152,13 +152,19 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         cb_emit16(0x0000);
     }
 
-    if (!is_x16) {
+    if (is_x16) {
+        /* Restore native PETSCII charset ($8F ISO off, $8E upper/gfx) before returning to BASIC */
+        cb_emit8_8(M6502_LDA_IMM, 0x8F);
+        cb_emit8_16(M6502_JSR, C64_CHROUT);
+        cb_emit8_8(M6502_LDA_IMM, 0x8E);
+        cb_emit8_16(M6502_JMP, C64_CHROUT);
+    } else {
         /* Restore BASIC ROM before returning to READY. */
         cb_emit8_8(M6502_LDA_ZP, 0x01);
         cb_emit8_8(M6502_ORA_IMM, 0x01);
         cb_emit8_8(M6502_STA_ZP, 0x01);
+        cb_emit8(M6502_RTS);
     }
-    cb_emit8(M6502_RTS);
 
     if (sig->out_types.len == 1) {
         print_u16_addr = cb_cur_addr();

@@ -1,0 +1,50 @@
+\ lib/65816/string.ir4 - Native W65C816 NUL-terminated string primitives
+
+code 65816 strlen0 ( s0 :a -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8   \ 00: LDA $0200,X (s0 lo/hi)
+  0x85 :i8 0x00 :i8            \ 03: STA $00
+  0xBD :i8 0x02 :i8 0x02 :i8   \ 05: LDA $0202,X (s0 bank)
+  0x85 :i8 0x02 :i8            \ 08: STA $02
+  0xE8 :i8                     \ 0A: INX (3B :a -> 2B :i)
+  0xA0 :i8 0x00 :i8 0x00 :i8   \ 0B: LDY #$0000
+  0xE2 :i8 0x20 :i8            \ 0E: SEP #$20
+  0xB7 :i8 0x00 :i8            \ 10: loop: LDA [$00],Y
+  0xF0 :i8 0x03 :i8            \ 12: BEQ done (17)
+  0xC8 :i8                     \ 14: INY
+  0xD0 :i8 0xF9 :i8            \ 15: BNE loop (10)
+  0xC2 :i8 0x20 :i8            \ 17: done: REP #$20
+  0x98 :i8                     \ 19: TYA
+  0x9D :i8 0x00 :i8 0x02 :i8   \ 1A: STA $0200,X
+end
+
+code 65816 strcmp0 ( a0 :a b0 :a -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8   \ 00: LDA $0200,X (b0 lo/hi)
+  0x85 :i8 0x04 :i8            \ 03: STA $04
+  0xBD :i8 0x02 :i8 0x02 :i8   \ 05: LDA $0202,X (b0 bank)
+  0x85 :i8 0x06 :i8            \ 08: STA $06
+  0xBD :i8 0x03 :i8 0x02 :i8   \ 0A: LDA $0203,X (a0 lo/hi)
+  0x85 :i8 0x00 :i8            \ 0D: STA $00
+  0xBD :i8 0x05 :i8 0x02 :i8   \ 0F: LDA $0205,X (a0 bank)
+  0x85 :i8 0x02 :i8            \ 12: STA $02
+  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 \ 14: INX x4 (6B -> 2B :i)
+  0xA0 :i8 0x00 :i8 0x00 :i8   \ 18: LDY #$0000
+  0xE2 :i8 0x20 :i8            \ 1B: SEP #$20
+  0xB7 :i8 0x00 :i8            \ 1D: loop: LDA [$00],Y
+  0xD7 :i8 0x04 :i8            \ 1F: CMP [$04],Y
+  0xD0 :i8 0x0E :i8            \ 21: BNE diff (31)
+  0xC9 :i8 0x00 :i8            \ 23: CMP #$00
+  0xF0 :i8 0x03 :i8            \ 25: BEQ eq (2A)
+  0xC8 :i8                     \ 27: INY
+  0xD0 :i8 0xF3 :i8            \ 28: BNE loop (1D)
+  0xC2 :i8 0x20 :i8            \ 2A: eq: REP #$20
+  0x9E :i8 0x00 :i8 0x02 :i8   \ 2C: STZ $0200,X
+  0x80 :i8 0x0F :i8            \ 2F: BRA end (40)
+  0x38 :i8                     \ 31: diff: SEC
+  0xF7 :i8 0x04 :i8            \ 32: SBC [$04],Y
+  0x9D :i8 0x00 :i8 0x02 :i8   \ 34: STA $0200,X
+  0xA9 :i8 0x00 :i8            \ 37: LDA #$00
+  0xE9 :i8 0x00 :i8            \ 39: SBC #$00
+  0x9D :i8 0x01 :i8 0x02 :i8   \ 3B: STA $0201,X
+  0xC2 :i8 0x20 :i8            \ 3E: REP #$20
+                               \ 40: end:
+end

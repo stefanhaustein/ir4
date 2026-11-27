@@ -1,0 +1,163 @@
+\ lib/x16gs/joystick.ir4 - Commander X16GS KERNAL joystick (ports 0..4) + Bank-0 KEYHDL keyboard-as-joystick (port -1)
+
+require "memory.ir4"
+require "stdio.ir4"
+
+\ Bank-0 Golden RAM layout ($00:0600..$00:064D) for emulation-mode KEYHDL ($032E):
+\   $00:0600..$00:0607 : 8-byte bit mask table (1..128)
+\   $00:0608..$00:0617 : 16-byte active-high key state bitmap (keycodes 0..127)
+\   $00:0618..$00:064D : 54-byte 65C02 KEYHDL ISR (preserves A/X/Y, returns via RTS)
+const __X16GS_KEYVEC   0x032E :a
+const __X16GS_BIT_RAM  0x0600 :a
+const __X16GS_KEYS_RAM 0x0608 :a
+const __X16GS_KHDL_RAM 0x0618 :a
+const __X16GS_IRQ_NOP  0x045E :a
+
+data __x16gs_bit_tbl
+  1 :i8 2 :i8 4 :i8 8 :i8 16 :i8 32 :i8 64 :i8 128 :i8
+end
+
+data __x16gs_keyhdl_rom
+  0x48 :i8                    \ PHA (orig A)
+  0x8A :i8 0x48 :i8           \ TXA; PHA
+  0x98 :i8 0x48 :i8           \ TYA; PHA
+  0xBA :i8                    \ TSX
+  0xBD :i8 0x03 :i8 0x01 :i8  \ LDA $0103,X (orig A)
+  0x29 :i8 0x7F :i8           \ AND #$7F
+  0x4A :i8 0x4A :i8 0x4A :i8  \ LSR A x3 (byte idx 0..15)
+  0xA8 :i8                    \ TAY
+  0xBD :i8 0x03 :i8 0x01 :i8  \ LDA $0103,X (orig A)
+  0x30 :i8 0x0E :i8           \ BMI key_up (+14)
+  \ key_down:
+  0x29 :i8 0x07 :i8           \ AND #$07
+  0xAA :i8                    \ TAX
+  0xBD :i8 0x00 :i8 0x06 :i8  \ LDA $0600,X (__X16GS_BIT_RAM,X)
+  0x19 :i8 0x08 :i8 0x06 :i8  \ ORA $0608,Y (__X16GS_KEYS_RAM,Y)
+  0x99 :i8 0x08 :i8 0x06 :i8  \ STA $0608,Y
+  0x80 :i8 0x0E :i8           \ BRA done (+14)
+  \ key_up:
+  0x29 :i8 0x07 :i8           \ AND #$07
+  0xAA :i8                    \ TAX
+  0xBD :i8 0x00 :i8 0x06 :i8  \ LDA $0600,X
+  0x49 :i8 0xFF :i8           \ EOR #$FF
+  0x39 :i8 0x08 :i8 0x06 :i8  \ AND $0608,Y
+  0x99 :i8 0x08 :i8 0x06 :i8  \ STA $0608,Y
+  \ done:
+  0x68 :i8 0xA8 :i8           \ PLA; TAY
+  0x68 :i8 0xAA :i8           \ PLA; TAX
+  0x68 :i8                    \ PLA
+  0x60 :i8                    \ RTS
+end
+
+init
+  __X16GS_BIT_RAM __x16gs_bit_tbl 8 memcpy
+  __X16GS_KEYS_RAM 16 0 memfill
+  __X16GS_KHDL_RAM __x16gs_keyhdl_rom 54 memcpy
+  0x0618 __X16GS_KEYVEC i16!
+end
+
+fn __x16gs_poll_irq ( )
+  0x60 __X16GS_IRQ_NOP i8!
+  0 0x045E __x16gs_kernal drop
+end
+
+\ Calls Bank-0 KERNAL JOYSTICK_GET ($FF56).
+\ Returns active-high (byte1 << 8) | byte0, or 0 if not present (Y == $FF).
+code x16gs __x16gs_joy_get ( port :i -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8          \ LDA $0200,X (port)
+  0xA8 :i8                            \ TAY (hold port in Y across trampoline setup)
+  0x86 :i8 0x1E :i8                   \ STX $1E (save data stack X)
+  0x3B :i8                            \ TSC
+  0x85 :i8 0x1C :i8                   \ STA $1C (save native S)
+  0xE2 :i8 0x20 :i8                   \ SEP #$20
+  0xA9 :i8 0x38 :i8                   \ LDA #$38 (SEC)
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ STA $000450
+  0xA9 :i8 0xFB :i8                   \ LDA #$FB (XCE)
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8 \ STA $000451
+  0xA9 :i8 0x58 :i8                   \ LDA #$58 (CLI)
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8 \ STA $000452
+  0xA9 :i8 0x20 :i8                   \ LDA #$20 (JSR)
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8 \ STA $000453
+  0xA9 :i8 0x56 :i8                   \ LDA #$56 ($FF56 lo)
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8 \ STA $000454
+  0xA9 :i8 0xFF :i8                   \ LDA #$FF ($FF56 hi)
+  0x8F :i8 0x55 :i8 0x04 :i8 0x00 :i8 \ STA $000455
+  0xA9 :i8 0x78 :i8                   \ LDA #$78 (SEI)
+  0x8F :i8 0x56 :i8 0x04 :i8 0x00 :i8 \ STA $000456
+  0xA9 :i8 0x18 :i8                   \ LDA #$18 (CLC)
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8 \ STA $000457
+  0xA9 :i8 0xFB :i8                   \ LDA #$FB (XCE)
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8 \ STA $000458
+  0xA9 :i8 0x6B :i8                   \ LDA #$6B (RTL)
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8 \ STA $000459
+  0x8B :i8 0x68 :i8                   \ PHB; PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ STA $00042A (save caller DBR)
+  0xA9 :i8 0x00 :i8 0x48 :i8 0xAB :i8 \ LDA #$00; PHA; PLB (DBR = $00)
+  0xC2 :i8 0x20 :i8                   \ REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8 0x5B :i8 \ LDA #$0000; TCD (D = $0000)
+  0xA2 :i8 0xDF :i8 0x01 :i8 0x9A :i8 \ LDX #$01DF; TXS
+  0x98 :i8                            \ TYA (port -> A)
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ JSL $000450
+  0x49 :i8 0xFF :i8                   \ EOR #$FF (active-high byte0)
+  0x8F :i8 0x20 :i8 0x04 :i8 0x00 :i8 \ STA $000420
+  0x8A :i8                            \ TXA (byte1)
+  0x49 :i8 0xFF :i8                   \ EOR #$FF (active-high byte1)
+  0x8F :i8 0x21 :i8 0x04 :i8 0x00 :i8 \ STA $000421
+  0x98 :i8                            \ TYA (presence flag: $FF = absent)
+  0x8F :i8 0x22 :i8 0x04 :i8 0x00 :i8 \ STA $000422
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ LDA $00042A (restore caller DBR)
+  0x48 :i8 0xAB :i8                   \ PHA; PLB
+  0xC2 :i8 0x30 :i8                   \ REP #$30
+  0xA9 :i8 0x00 :i8 0x04 :i8 0x5B :i8 \ LDA #$0400; TCD (D = $0400)
+  0xA6 :i8 0x1E :i8                   \ LDX $1E (restore data stack X)
+  0xA5 :i8 0x1C :i8 0x1B :i8          \ LDA $1C; TCS (restore native S)
+  0xA5 :i8 0x22 :i8                   \ LDA $22
+  0x29 :i8 0xFF :i8 0x00 :i8          \ AND #$00FF
+  0xC9 :i8 0xFF :i8 0x00 :i8          \ CMP #$00FF (absent?)
+  0xD0 :i8 0x05 :i8                   \ BNE +5
+  0xA9 :i8 0x00 :i8 0x00 :i8          \ LDA #$0000
+  0x80 :i8 0x02 :i8                   \ BRA +2
+  0xA5 :i8 0x20 :i8                   \ LDA $20
+  0x9D :i8 0x00 :i8 0x02 :i8          \ STA $0200,X
+end
+
+fn joycount ( -> :i ) 5 end
+
+data __x16gs_dpad_tbl
+  0 :i8 8 :i8 4 :i8 12 :i8 2 :i8 10 :i8 6 :i8 14 :i8
+  1 :i8 9 :i8 5 :i8 13 :i8 3 :i8 11 :i8 7 :i8 15 :i8
+end
+
+data __x16gs_btn_tbl
+  0  :i8 128 :i8 64 :i8 192 :i8 0  :i8 128 :i8 64 :i8 192 :i8
+  16 :i8 144 :i8 80 :i8 208 :i8 16 :i8 144 :i8 80 :i8 208 :i8
+end
+
+data __x16gs_joy_keys
+  0x53 :i8  1 :i8  0x12 :i8  1 :i8
+  0x54 :i8  2 :i8  0x20 :i8  2 :i8
+  0x4F :i8  4 :i8  0x1F :i8  4 :i8
+  0x59 :i8  8 :i8  0x21 :i8  8 :i8
+  0x3D :i8 16 :i8
+end
+
+fn joystate ( port :i -> :i )
+  port -1 = if
+    __x16gs_poll_irq
+    0 -> var out :i
+    0 -> var i :i
+    begin i 18 < while
+      __x16gs_joy_keys i a+ u8@ -> var k :i
+      __X16GS_KEYS_RAM k 3 u>> a+ u8@ __x16gs_bit_tbl k 7 and a+ u8@ and if
+        out __x16gs_joy_keys i 1 + a+ u8@ or -> out
+      then
+      2 +-> i
+    repeat
+    out return
+  then
+  port 0 < port 4 > or if 0 return then
+  port __x16gs_joy_get -> var raw :i
+  __x16gs_dpad_tbl raw 15 and a+ u8@
+  __x16gs_btn_tbl raw 4 u>> 15 and a+ u8@ or
+  raw 0 < if 32 or then
+end

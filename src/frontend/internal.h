@@ -103,6 +103,7 @@ typedef struct {
     u32 line_num;
     u16 req_group;
     u8 req_rank;
+    u8 can_reopen;
     u8 buf[512];
     size_t buf_pos;
     size_t buf_len;

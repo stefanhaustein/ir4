@@ -20,12 +20,20 @@ Bitmask returned by joystate:
 
 ### agon
 
-Agon Light keyboard-mapped joystick (via MOS sysvars inkey)
+Agon Light keyboard-mapped joystick (via MOS $1E mos_getkbmap)
 
 ### c64
 
 Commodore 64 joystick ports (port 0 = CIA1 Port 2 `$DC00`, port 1 = Port 1 `$DC01`, port -1 = keyboard)
 
+### web
+
+Web keyboard/gamepad joystick driver
+
 ### x16
 
 Commander X16 KERNAL joystick (ports 0..4) + KEYHDL keyboard-as-joystick (port -1)
+
+### x16gs
+
+Commander X16GS KERNAL joystick (ports 0..4) + Bank-0 KEYHDL keyboard-as-joystick (port -1)

@@ -277,10 +277,10 @@ static int x16gs_write_streaming(FILE *fp, size_t base, u32 sz, u32 sz_even) {
     static const u8 basic_stub[12] = {
         0x0B, 0x08, 0x0A, 0x00, 0x9E, '2', '0', '6', '1', 0x00, 0x00, 0x00
     };
-    /* 184-byte streaming loader at $080D: MACPTR ($FF44 -> $00:1000) + native MVN -> Bank $01+ */
-    static const u8 loader_tmpl[184] = {
+    /* 193-byte streaming loader at $080D: MACPTR ($FF44 -> $00:1000) + native MVN -> Bank $01+ */
+    static const u8 loader_tmpl[193] = {
         0xA9, 0x02, 0xA2, 0x08, 0xA0, 0x02, 0x20, 0xBA, 0xFF, 0xA9, 0x00, 0xA2,
-        0xC5, 0xA0, 0x08, 0x20, 0xBD, 0xFF, 0x20, 0xC0, 0xFF, 0xB0, 0x83, 0xA2,
+        0xCE, 0xA0, 0x08, 0x20, 0xBD, 0xFF, 0x20, 0xC0, 0xFF, 0xB0, 0x83, 0xA2,
         0x02, 0x20, 0xC6, 0xFF, 0xB0, 0x7C, 0xA9, 0x00, 0x85, 0x02, 0xA9, 0x00,
         0x85, 0x03, 0xA9, 0x00, 0x85, 0x04, 0xA9, 0x00, 0x85, 0x05, 0xA9, 0x00,
         0x85, 0x06, 0xA9, 0x00, 0x85, 0x07, 0xA5, 0x06, 0x05, 0x07, 0xD0, 0x06,
@@ -294,12 +294,13 @@ static int x16gs_write_streaming(FILE *fp, size_t base, u32 sz, u32 sz_even) {
         0xE2, 0x20, 0xE6, 0x04, 0x38, 0xFB, 0x58, 0x4C, 0x43, 0x08, 0x20, 0xCC,
         0xFF, 0xA9, 0x02, 0x20, 0xC3, 0xFF, 0x60, 0x20, 0xCC, 0xFF, 0xA9, 0x02,
         0x20, 0xC3, 0xFF, 0x78, 0x18, 0xFB, 0xC2, 0x30, 0x22, 0x00, 0x00, 0x00,
-        0x38, 0xFB, 0x58, 0x60
+        0x38, 0xFB, 0x58, 0xA9, 0x8F, 0x20, 0xD2, 0xFF, 0xA9, 0x8E, 0x4C, 0xD2,
+        0xFF
     };
     char bin_path[512];
     char bin_name[64];
     FILE *bin_fp;
-    u8 loader[184];
+    u8 loader[193];
     u8 fname_len;
 
     x16gs_build_bin_paths(x16gs_out_path, bin_path, sizeof(bin_path), bin_name, sizeof(bin_name));
@@ -345,15 +346,15 @@ static int x16gs_write(FILE *fp, size_t base) {
     static const u8 basic_stub[12] = {
         0x0B, 0x08, 0x0A, 0x00, 0x9E, '2', '0', '6', '1', 0x00, 0x00, 0x00
     };
-    /* 31-byte 65C816 long-indexed word-copy loader at $080D
+    /* 40-byte 65C816 long-indexed word-copy loader at $080D
      * (uses 24-bit LDA $00xxxx,X because ROM -gs far-RAM probe leaves DBR != $00):
      *   SEI; CLC; XCE; REP #$30; LDX #0;
-     *   lp: LDA $00082C,X; STA $011000,X; INX; INX; CPX #sz_even; BCC lp;
-     *   JSL $011000; SEC; XCE; CLI; RTS */
+     *   lp: LDA $000835,X; STA $011000,X; INX; INX; CPX #sz_even; BCC lp;
+     *   JSL $011000; SEC; XCE; CLI; LDA #$8F; JSR $FFD2; LDA #$8E; JMP $FFD2 */
     u32 sz = (u32)(cb_pc() + cb_init_data_size());
     u32 sz_even = (sz + 1U) & ~1U;
-    u16 src = 0x080D + 31; /* $082C */
-    u8 loader[31];
+    u16 src = 0x080D + 40; /* $0835 */
+    u8 loader[40];
 
     if (sz_even > (u32)(0x9F00 - src))
         return x16gs_write_streaming(fp, base, sz, sz_even);
@@ -386,9 +387,18 @@ static int x16gs_write(FILE *fp, size_t base) {
     loader[25] = (u8)((base >> 8) & 0xFFU);
     loader[26] = (u8)((base >> 16) & 0xFFU);
     loader[27] = 0x38; /* SEC */
-    loader[28] = 0xFB; /* XCE (back to E=1 inside Bank $00!) */
+    loader[28] = 0xFB; /* XCE (back to E=1 inside Bank $00) */
     loader[29] = 0x58; /* CLI */
-    loader[30] = 0x60; /* RTS */
+    loader[30] = 0xA9; /* LDA #$8F (exit ISO mode) */
+    loader[31] = 0x8F;
+    loader[32] = 0x20; /* JSR $FFD2 */
+    loader[33] = 0xD2;
+    loader[34] = 0xFF;
+    loader[35] = 0xA9; /* LDA #$8E (PETSCII upper/gfx) */
+    loader[36] = 0x8E;
+    loader[37] = 0x4C; /* JMP $FFD2 (returns via RTS) */
+    loader[38] = 0xD2;
+    loader[39] = 0xFF;
 
     /* Write PRG 2-byte load address $0801 */
     fputc(0x01, fp);

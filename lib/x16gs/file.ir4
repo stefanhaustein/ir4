@@ -74,6 +74,73 @@ code x16gs __x16gs_kernal_xyc ( a_in :i x_in :i y_in :i addr :i -> :i )
   0x9D :i8 0x00 :i8 0x02 :i8      \ STA $0200,X
 end
 
+\ Call Bank-0 KERNAL MACPTR ($FF44) or MCIOUT ($FEB1) on $00:0700..$00:07FF with C=0, A=cnt_a;
+\ returns (Y_out << 8) | X_out on C=0, or -1 if Carry=1 (unsupported).
+code x16gs __x16gs_block_io ( cnt_a :i addr :i -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8          \ LDA $0200,X (addr)
+  0x8F :i8 0x55 :i8 0x04 :i8 0x00 :i8 \ STA $000455 (16-bit addr at $0455..$0456)
+  0xE8 :i8 0xE8 :i8                   \ INX; INX
+  0xBD :i8 0x00 :i8 0x02 :i8          \ LDA $0200,X (cnt_a)
+  0x85 :i8 0x24 :i8                   \ STA $24 ($0424)
+  0x86 :i8 0x1E :i8                   \ STX $1E (save data stack X)
+  0x3B :i8                            \ TSC
+  0x85 :i8 0x1C :i8                   \ STA $1C (save native S)
+  0xE2 :i8 0x20 :i8                   \ SEP #$20
+  0xA9 :i8 0x38 :i8                   \ LDA #$38 (SEC)
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ STA $000450
+  0xA9 :i8 0xFB :i8                   \ LDA #$FB (XCE)
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8 \ STA $000451
+  0xA9 :i8 0x58 :i8                   \ LDA #$58 (CLI)
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8 \ STA $000452
+  0xA9 :i8 0x18 :i8                   \ LDA #$18 (CLC)
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8 \ STA $000453
+  0xA9 :i8 0x20 :i8                   \ LDA #$20 (JSR)
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8 \ STA $000454
+  0xA9 :i8 0x78 :i8                   \ LDA #$78 (SEI)
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8 \ STA $000457
+  0xA9 :i8 0xA9 :i8                   \ LDA #$A9 (LDA #0)
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8 \ STA $000458
+  0xA9 :i8 0x00 :i8
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8 \ STA $000459
+  0xA9 :i8 0x2A :i8                   \ LDA #$2A (ROL A)
+  0x8F :i8 0x5A :i8 0x04 :i8 0x00 :i8 \ STA $00045A
+  0xA9 :i8 0x18 :i8                   \ LDA #$18 (CLC)
+  0x8F :i8 0x5B :i8 0x04 :i8 0x00 :i8 \ STA $00045B
+  0xA9 :i8 0xFB :i8                   \ LDA #$FB (XCE)
+  0x8F :i8 0x5C :i8 0x04 :i8 0x00 :i8 \ STA $00045C
+  0xA9 :i8 0x6B :i8                   \ LDA #$6B (RTL)
+  0x8F :i8 0x5D :i8 0x04 :i8 0x00 :i8 \ STA $00045D
+  0x8B :i8 0x68 :i8                   \ PHB; PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ STA $00042A (save caller DBR)
+  0xA9 :i8 0x00 :i8 0x48 :i8 0xAB :i8 \ LDA #$00; PHA; PLB (DBR = $00)
+  0xC2 :i8 0x20 :i8                   \ REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8 0x5B :i8 \ LDA #$0000; TCD (D = $0000)
+  0xA2 :i8 0xDF :i8 0x01 :i8 0x9A :i8 \ LDX #$01DF; TXS
+  0xE2 :i8 0x30 :i8                   \ SEP #$30 (8-bit A, X, Y)
+  0xAD :i8 0x24 :i8 0x04 :i8          \ LDA $0424 (cnt_a)
+  0xA2 :i8 0x00 :i8                   \ LDX #$00 ($0700 lo)
+  0xA0 :i8 0x07 :i8                   \ LDY #$07 ($0700 hi)
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ JSL $000450
+  0x8F :i8 0x22 :i8 0x04 :i8 0x00 :i8 \ STA $000422 (carry 0 or 1)
+  0x8A :i8                            \ TXA (X_out)
+  0x8F :i8 0x20 :i8 0x04 :i8 0x00 :i8 \ STA $000420
+  0x98 :i8                            \ TYA (Y_out)
+  0x8F :i8 0x21 :i8 0x04 :i8 0x00 :i8 \ STA $000421
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ LDA $00042A (restore caller DBR)
+  0x48 :i8 0xAB :i8                   \ PHA; PLB
+  0xC2 :i8 0x30 :i8                   \ REP #$30
+  0xA9 :i8 0x00 :i8 0x04 :i8 0x5B :i8 \ LDA #$0400; TCD (D = $0400)
+  0xA6 :i8 0x1E :i8                   \ LDX $1E (restore data stack X)
+  0xA5 :i8 0x1C :i8 0x1B :i8          \ LDA $1C; TCS (restore native S)
+  0xA5 :i8 0x22 :i8                   \ LDA $22
+  0x29 :i8 0x01 :i8 0x00 :i8          \ AND #$0001
+  0xF0 :i8 0x05 :i8                   \ BEQ +5
+  0xA9 :i8 0xFF :i8 0xFF :i8          \ LDA #$FFFF (-1)
+  0x80 :i8 0x02 :i8                   \ BRA +2
+  0xA5 :i8 0x20 :i8                   \ LDA $20 ((Y_out << 8) | X_out)
+  0x9D :i8 0x00 :i8 0x02 :i8          \ STA $0200,X
+end
+
 fn __x16_readst ( -> :i )
   0 0xFFB7 __x16gs_kernal
 end
@@ -121,11 +188,15 @@ fn __x16_ckout ( lfn :i -> :i )
   0 swap -
 end
 
-\ 4 open file slots (LFNs 2..5, SA 2..5) + 1 directory slot (LFN 6, SA 0)
-var __x16_fmode   :bytes 4
-var __x16_feof    :bytes 4
-var __x16_fpos    :bytes 8
-var __x16_fsize   :bytes 8
+\ 8 open file slots (LFNs 2..9, SA 2..9) + 1 directory slot (LFN 10, SA 0) + lookup/cwd (LFN 11)
+const __X16GS_IO_BUF 0x0700 :a
+var __x16_fmode     :bytes 8
+var __x16_feof      :bytes 8
+var __x16_fsz_known :bytes 8
+var __x16_fplen     :bytes 8
+var __x16_fpos      :bytes 16
+var __x16_fsize     :bytes 16
+var __x16_fpath     :bytes 640
 var __x16_diropen :bytes 1
 var __x16_dircd   :bytes 1
 var __x16_cmdopen :bytes 1
@@ -295,7 +366,7 @@ fn __x16_dir_next_lfn ( lfn :i buf :a max :i -> :i :i :i )
 end
 
 fn __x16_dir_next ( buf :a max :i -> :i :i :i )
-  6 buf max __x16_dir_next_lfn
+  10 buf max __x16_dir_next_lfn
 end
 
 fwd __x16_save_cwd ( )
@@ -334,25 +405,25 @@ fn __x16_lookup_entry ( name :a nlen :i -> :i :i )
   76 __x16_name 2 a+ i8!
   58 __x16_name 3 a+ i8!
   __x16_name 4 a+ base blen __x16_copy_name
-  7 8 0 __x16_setlfs
+  11 8 0 __x16_setlfs
   __x16_name blen 4 + __x16_setnam
   __x16_open 0 <> if
     did_cd 0 <> if __x16_restore_cwd then
     0 0 return
   then
-  7 __x16_chkin 0 <> if
+  11 __x16_chkin 0 <> if
     __x16_clrchn
-    7 __x16_close
+    11 __x16_close
     did_cd 0 <> if __x16_restore_cwd then
     0 0 return
   then
   __x16_chrin drop
   __x16_chrin drop
   __x16_clrchn
-  7 0 i>a 128 __x16_dir_next_lfn -> var sz :i -> var fl :i -> var ln :i
+  11 0 i>a 128 __x16_dir_next_lfn -> var sz :i -> var fl :i -> var ln :i
   fl drop
   __x16_clrchn
-  7 __x16_close
+  11 __x16_close
   did_cd 0 <> if __x16_restore_cwd then
   ln 0 > sz 0 < if 0 else sz then
 end
@@ -399,15 +470,16 @@ fn fsopen ( path :a len :i mode :i -> :i )
   mode 0 < mode 3 > or len 1 < or len 80 > or if -1 return then
   0 -> var fd :i
   begin
-    fd 4 < if __x16_fmode fd a+ u8@ 0 <> else false then
+    fd 8 < if __x16_fmode fd a+ u8@ 0 <> else false then
   while
     1 +-> fd
   repeat
-  fd 4 >= if -1 return then
+  fd 8 >= if -1 return then
   fd 2 + -> var lfn :i
   0 -> var smode :i
   0 -> var sz :i
   0 -> var pos :i
+  1 -> var sz_known :i
   mode 1 = if
     83 __x16_name i8!
     58 __x16_name 1 a+ i8!
@@ -431,19 +503,22 @@ fn fsopen ( path :a len :i mode :i -> :i )
     lfn path len 77 __x16_open_lfn 0 <> if -1 return then
     3 -> smode
   else
-    path len __x16_lookup_size -> sz
     lfn path len 82 __x16_open_lfn 0 <> if -1 return then
+    __x16_fpath fd 80 * a+ path len memcpy
+    len __x16_fplen fd a+ i8!
+    0 -> sz_known
     1 -> smode
   then then then
   smode __x16_fmode fd a+ i8!
   0 __x16_feof fd a+ i8!
+  sz_known __x16_fsz_known fd a+ i8!
   pos __x16_fpos fd 1 << a+ !
   sz __x16_fsize fd 1 << a+ !
   fd
 end
 
 fn fsclose ( fd :i -> :i )
-  fd 0 < fd 3 > or if -1 return then
+  fd 0 < fd 7 > or if -1 return then
   __x16_fmode fd a+ u8@ 0 = if -1 return then
   __x16_clrchn
   fd 2 + __x16_close
@@ -453,7 +528,7 @@ fn fsclose ( fd :i -> :i )
 end
 
 fn fsread ( fd :i buf :a len :i -> :i )
-  fd 0 < fd 3 > or len 0 < or if -1 return then
+  fd 0 < fd 7 > or len 0 < or if -1 return then
   __x16_fmode fd a+ u8@ -> var fm :i
   fm 0 = fm 2 = or if -1 return then
   len 0 = if 0 return then
@@ -463,16 +538,34 @@ fn fsread ( fd :i buf :a len :i -> :i )
   begin
     total len < if __x16_feof fd a+ u8@ 0 = else false then
   while
-    __x16_chrin -> var b :i
-    __x16_readst -> var st :i
-    st 131 and 0 <> if
-      1 __x16_feof fd a+ i8!
-      __x16_clrchn
-      total 0 > if total else -1 then return
+    len total - -> var rem :i
+    rem 256 > if 256 else rem then -> var chunk :i
+    chunk 256 = if 0 else chunk then 0xFF44 __x16gs_block_io -> var got :i
+    got 0 < if
+      __x16_chrin -> var b :i
+      __x16_readst -> var st :i
+      st 131 and 0 <> if
+        1 __x16_feof fd a+ i8!
+        __x16_clrchn
+        total 0 > if total else -1 then return
+      then
+      st 64 and 0 <> if 1 __x16_feof fd a+ i8! then
+      b buf total a+ i8!
+      1 +-> total
+    else
+      __x16_readst -> var st2 :i
+      got 0 > if
+        buf total a+ __X16GS_IO_BUF got memcpy
+        got +-> total
+      then
+      st2 64 and 0 <> got chunk < or if
+        1 __x16_feof fd a+ i8!
+      then
+      st2 131 and 0 <> st2 64 and 0 = and if
+        __x16_clrchn
+        total 0 > if total else -1 then return
+      then
     then
-    st 64 and 0 <> if 1 __x16_feof fd a+ i8! then
-    b buf total a+ i8!
-    1 +-> total
   repeat
   __x16_clrchn
   __x16_fpos fd 1 << a+ @ total + __x16_fpos fd 1 << a+ !
@@ -480,31 +573,45 @@ fn fsread ( fd :i buf :a len :i -> :i )
 end
 
 fn fswrite ( fd :i buf :a len :i -> :i )
-  fd 0 < fd 3 > or len 0 < or if -1 return then
+  fd 0 < fd 7 > or len 0 < or if -1 return then
   __x16_fmode fd a+ u8@ -> var fm :i
   fm 0 = fm 1 = or if -1 return then
   len 0 = if 0 return then
   fd 2 + __x16_ckout 0 <> if __x16_clrchn -1 return then
   0 -> var total :i
   begin total len < while
-    buf total a+ u8@ __x16_chrout
-    __x16_readst 131 and 0 <> if
-      __x16_clrchn
-      -1 return
+    len total - -> var wrem :i
+    wrem 256 > if 256 else wrem then -> var wchunk :i
+    __X16GS_IO_BUF buf total a+ wchunk memcpy
+    wchunk 256 = if 0 else wchunk then 0xFEB1 __x16gs_block_io -> var wput :i
+    wput 0 < if
+      buf total a+ u8@ __x16_chrout
+      __x16_readst 131 and 0 <> if
+        __x16_clrchn
+        -1 return
+      then
+      1 +-> total
+    else
+      __x16_readst 131 and 0 <> wput 0 <= or if
+        __x16_clrchn
+        -1 return
+      then
+      wput +-> total
     then
-    1 +-> total
   repeat
   __x16_clrchn
   __x16_fpos fd 1 << a+ @ total + -> var npos :i
   npos __x16_fpos fd 1 << a+ !
-  npos __x16_fsize fd 1 << a+ @ > if
-    npos __x16_fsize fd 1 << a+ !
+  __x16_fsz_known fd a+ u8@ 0 <> if
+    npos __x16_fsize fd 1 << a+ @ > if
+      npos __x16_fsize fd 1 << a+ !
+    then
   then
   total
 end
 
 fn fsseek ( fd :i pos :i -> :i )
-  fd 0 < fd 3 > or pos 0 < or if -1 return then
+  fd 0 < fd 7 > or pos 0 < or if -1 return then
   __x16_fmode fd a+ u8@ 0 = if -1 return then
   fd 2 + pos __x16_seek_sa 0 <> if -1 return then
   pos __x16_fpos fd 1 << a+ !
@@ -513,19 +620,25 @@ fn fsseek ( fd :i pos :i -> :i )
 end
 
 fn fspos ( fd :i -> :i )
-  fd 0 < fd 3 > or if -1 return then
+  fd 0 < fd 7 > or if -1 return then
   __x16_fmode fd a+ u8@ 0 = if -1 return then
   __x16_fpos fd 1 << a+ @
 end
 
 fn fssize ( fd :i -> :i )
-  fd 0 < fd 3 > or if -1 return then
+  fd 0 < fd 7 > or if -1 return then
   __x16_fmode fd a+ u8@ 0 = if -1 return then
+  __x16_fsz_known fd a+ u8@ 0 = if
+    __x16_fpath fd 80 * a+ __x16_fplen fd a+ u8@ __x16_lookup_size -> var lsz :i
+    lsz __x16_fsize fd 1 << a+ !
+    1 __x16_fsz_known fd a+ i8!
+    lsz return
+  then
   __x16_fsize fd 1 << a+ @
 end
 
 fn fsflush ( fd :i -> :i )
-  fd 0 < fd 3 > or if -1 return then
+  fd 0 < fd 7 > or if -1 return then
   __x16_fmode fd a+ u8@ 0 = if -1 return then
   0
 end
@@ -559,10 +672,10 @@ fn __x16_save_cwd ( )
   36 __x16_name i8!
   61 __x16_name 1 a+ i8!
   67 __x16_name 2 a+ i8!
-  7 8 0 __x16_setlfs
+  11 8 0 __x16_setlfs
   __x16_name 3 __x16_setnam
   __x16_open 0 = if
-    7 __x16_chkin 0 = if
+    11 __x16_chkin 0 = if
       __x16_chrin drop
       __x16_chrin drop
       0 -> var line :i
@@ -618,7 +731,7 @@ fn __x16_save_cwd ( )
       while repeat
       __x16_clrchn
     then
-    7 __x16_close
+    11 __x16_close
   then
   p 100 = if
     99 -> p
@@ -648,20 +761,20 @@ fn fsdiropen ( path :a len :i -> :i )
   36 __x16_name i8!
   61 __x16_name 1 a+ i8!
   76 __x16_name 2 a+ i8!
-  6 8 0 __x16_setlfs
+  10 8 0 __x16_setlfs
   __x16_name 3 __x16_setnam
   __x16_open 0 <> if
     used_cd 0 <> if __x16_restore_cwd then
     -1 return
   then
   __x16_dos_ok 0 <> if
-    6 __x16_close
+    10 __x16_close
     used_cd 0 <> if __x16_restore_cwd then
     -1 return
   then
-  6 __x16_chkin 0 <> if
+  10 __x16_chkin 0 <> if
     __x16_clrchn
-    6 __x16_close
+    10 __x16_close
     used_cd 0 <> if __x16_restore_cwd then
     -1 return
   then
@@ -681,7 +794,7 @@ end
 fn fsdirclose ( dd :i -> :i )
   dd 0 <> __x16_diropen u8@ 0 = or if -1 return then
   __x16_clrchn
-  6 __x16_close
+  10 __x16_close
   0 __x16_diropen i8!
   __x16_dircd u8@ 0 <> if
     0 __x16_dircd i8!

@@ -29,12 +29,14 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
 - **key** ( -> :i )
 
   Wait for and return the next character from the input buffer (blocking except when unsupported; defaults to 0 in that case)
+  - *agon:* Blocking read of next native key event: (vkeycode << 8) | keyascii.
 
 - **setcharset** ( mode :i )
 
   Select text character set (`charset_native` or `charset_text`; no-op where fixed)
   - *c64:* Switch between `charset_native` (`0`, `142 emit`) and `charset_text` (`1`, `14 emit`).
   - *x16:* Switch between `charset_native` (`0`, `143 emit 142 emit`) and `charset_text` (`1`, `15 emit` ISO-8859-15).
+  - *x16gs:* Switch between `charset_native` (`0`, `143 emit 142 emit`) and `charset_text` (`1`, `15 emit` ISO-8859-15).
 
 - **type** ( s :a len :i ) — Print *len* bytes starting at *s*
 - **type0** ( s :a ) — Print NUL-terminated string at *s*
@@ -53,19 +55,24 @@ Platform overrides implement raw `emit` (and optionally the `default fn` entries
   Emit character *c* with platform text mapping (defaults to raw emit; PETSCII on C64)
   - *c64:* Maps ASCII to PETSCII (`charset_text`: mixed case; `charset_native`: folds `a..z` to uppercase) and clears quote mode (`$D4`) after `"`.
   - *x16:* Maps ASCII to ISO (`charset_text`) or uppercase PETSCII (`charset_native`); uses `$80` verbatim mode for `"` so quote mode never triggers.
+  - *x16gs:* Maps ASCII to ISO (`charset_text`) or uppercase PETSCII (`charset_native`); uses `$80` verbatim mode for `"` so quote mode never triggers.
 
 - **xinkey** ( -> :i )
 
   Non-blocking read of next key mapped to normalized ASCII (defaults to raw inkey)
+  - *agon:* Non-blocking read of next key mapped to normalized ASCII (sysvar_keyascii; 0 for non-ASCII).
   - *c64:* Maps PETSCII input (in Lowercase/Uppercase mode) to normalized ASCII (unshifted a-z, shifted A-Z).
   - *x16:* Maps key input to normalized ASCII (direct pass-through in ISO `charset_text`; PETSCII case swap in `charset_native`).
+  - *x16gs:* Maps key input to normalized ASCII (direct pass-through in ISO `charset_text`; PETSCII case swap in `charset_native`).
   - *zx81:* Decodes LAST_K (`$4025`) via ROM `$07BD` to normalized ASCII, or 0 if no key is pressed.
 
 - **xkey** ( -> :i )
 
   Blocking read of next key mapped to normalized ASCII (defaults to raw key)
+  - *agon:* Blocking read using xinkey.
   - *c64:* Blocking read using xinkey.
   - *x16:* Blocking read using xinkey.
+  - *x16gs:* Blocking read using xinkey.
   - *zx81:* Blocking read using xinkey.
 
 ## Platforms
@@ -87,9 +94,21 @@ Commodore 64 KERNAL console I/O (`$FFD2` / `$FFE4`)
 
 CP/M BDOS console I/O (BDOS 2 / 6 / 11)
 
+### sim65816
+
+sim65816 paravirtual console output ($00FFF0)
+
+### web
+
+Web runtime stdio
+
 ### x16
 
 Commander X16 KERNAL console I/O (`$FFD2` / `$FFE4` / `$FFF0`)
+
+### x16gs
+
+Commander X16GS KERNAL console I/O ($FFD2 / $FFE4)
 
 ### zx81
 

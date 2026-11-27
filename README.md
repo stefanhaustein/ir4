@@ -105,7 +105,8 @@ If your favourite obscure platform is missing, please file an issue or send a PR
 - **[PASTA/80 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
 - **[LCC (C89)](docs/frontend/lcc/README.md)** — Example integration of an IR4(th) backend into [LCC 4.2](https://github.com/stefanhaustein/lcc), supporting 16-, 32-, and 64-bit IR4(th) targets.
 
-If you have added on, please file an issue and I'll link it here.
+If you have added IR4(th) as a backend somewhere, please file an issue and I'll link it here.
+
 
 ## Companion Library
 
@@ -126,7 +127,6 @@ See [docs/lib/README.md](docs/lib/README.md) for the full reference.
 - [tests/](tests/) — Cross-target test suite and negative compiler tests in [tests/errors/](tests/errors/)
 - [tools/](tools/) — Relocatable runtime generators and developer tools
 - [docs/](docs/) — Platform documentation and screenshots
-
 
 
 ## Demos, Videos and Screenshots 

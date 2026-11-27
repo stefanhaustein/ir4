@@ -27,6 +27,14 @@ Agon VDP sound effects (VDU 23, 0, &85)
 
 Commodore 64 SID sound effects (3 voices at $D400)
 
+### web
+
+WebAudio sound driver
+
 ### x16
 
 Commander X16 VERA PSG sound effects (16 channels at VRAM $1F9C0)
+
+### x16gs
+
+Commander X16GS VERA PSG sound effects (16 channels at VRAM $1F9C0)

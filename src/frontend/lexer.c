@@ -113,6 +113,7 @@ void lex_init(FILE *in, const char *path) {
     sf->line_num = 1;
     sf->req_group = 0;
     sf->req_rank = 0;
+    sf->can_reopen = 0;
     sf->buf_pos = 0;
     sf->buf_len = 0;
     sf->pushback = -1;
@@ -146,8 +147,21 @@ int src_getc(SrcFile *sf) {
         return c;
     }
     if (sf->buf_pos >= sf->buf_len) {
+        if (!sf->fp) {
+            if (!sf->can_reopen)
+                return EOF;
+            sf->fp = fopen(sf->path, "r");
+            if (!sf->fp)
+                ir4_die("cannot open required file");
+            sf->can_reopen = 0;
+        }
         sf->buf_len = fread(sf->buf, 1, sizeof(sf->buf), sf->fp);
         sf->buf_pos = 0;
+        if (sf->buf_len < sizeof(sf->buf)) {
+            if (sf->fp != stdin)
+                fclose(sf->fp);
+            sf->fp = NULL;
+        }
         if (sf->buf_len == 0)
             return EOF;
     }
@@ -168,7 +182,8 @@ int skip_ws_and_comments(void) {
         c = src_getc(cur);
         if (c == EOF) {
             if (src_stack.len > 1) {
-                fclose(cur->fp);
+                if (cur->fp && cur->fp != stdin)
+                    fclose(cur->fp);
                 src_stack.len--;
                 cur = &src_stack.data[src_stack.len - 1];
                 ir4_status_file("Parsing", cur->path, cur->line_num);
@@ -290,6 +305,7 @@ static void push_src_file(FILE *fp, const char *path, u16 req_group, u8 req_rank
     sf->line_num = 1;
     sf->req_group = req_group;
     sf->req_rank = req_rank;
+    sf->can_reopen = (fp == NULL) ? 1 : 0;
     sf->buf_pos = 0;
     sf->buf_len = 0;
     sf->pushback = -1;
@@ -299,7 +315,7 @@ void push_require_ex(const char *name, int lib_only) {
     const char *cands[3];
     int n_cands = 0;
     int c;
-    FILE *found_fps[3];
+    FILE *found_fp0 = NULL;
     const char *found_paths[3];
     u8 found_ranks[3];
     int found_cnt = 0;
@@ -321,7 +337,10 @@ void push_require_ex(const char *name, int lib_only) {
             if (seen)
                 seen_cnt++;
             else if (fp) {
-                found_fps[found_cnt] = fp;
+                if (found_cnt == 0)
+                    found_fp0 = fp;
+                else
+                    fclose(fp);
                 found_paths[found_cnt] = path;
                 found_ranks[found_cnt] = (u8)c;
                 found_cnt++;
@@ -352,7 +371,10 @@ void push_require_ex(const char *name, int lib_only) {
                 if (seen)
                     seen_cnt++;
                 else if (fp) {
-                    found_fps[found_cnt] = fp;
+                    if (found_cnt == 0)
+                        found_fp0 = fp;
+                    else
+                        fclose(fp);
                     found_paths[found_cnt] = path;
                     found_ranks[found_cnt] = (u8)c;
                     found_cnt++;
@@ -371,7 +393,10 @@ void push_require_ex(const char *name, int lib_only) {
             if (seen)
                 seen_cnt++;
             else if (fp) {
-                found_fps[found_cnt] = fp;
+                if (found_cnt == 0)
+                    found_fp0 = fp;
+                else
+                    fclose(fp);
                 found_paths[found_cnt] = path;
                 found_ranks[found_cnt] = (u8)c;
                 found_cnt++;
@@ -384,7 +409,7 @@ void push_require_ex(const char *name, int lib_only) {
         int i;
         /* Push least-specific first so most-specific is parsed first on LIFO stack. */
         for (i = found_cnt - 1; i >= 0; i--) {
-            push_src_file(found_fps[i], found_paths[i], grp, found_ranks[i]);
+            push_src_file((i == 0) ? found_fp0 : NULL, found_paths[i], grp, found_ranks[i]);
         }
         ir4_status_file("Parsing", src_stack.data[src_stack.len - 1].path, 0);
         return;

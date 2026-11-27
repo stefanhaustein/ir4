@@ -26,6 +26,10 @@ System, CLI arguments, environment, CWD, and clock API
 
   Look up NUL-terminated environment variable name0; copy up to max bytes into buf; return length or < 0
 
+- **sysexit** ( code :i )
+
+  Terminate program immediately with exit status code (default: no-op)
+
 - **sysmillis** ( -> :i32 )
 
   Return monotonic millisecond counter as 32-bit signed integer (:i32)
@@ -50,6 +54,14 @@ Commodore 64 KERNAL system clock and sleep
 
 CP/M BDOS CLI arguments and current drive letter
 
+### web
+
+Web runtime system functions
+
 ### x16
 
 Commander X16 KERNAL system clock, sleep, and CMDR-DOS CWD
+
+### x16gs
+
+Commander X16GS KERNAL system clock and sleep

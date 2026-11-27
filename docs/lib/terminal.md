@@ -23,6 +23,7 @@ Text screen & cursor control (ANSI defaults)
   Show (*visible* <> 0) or hide (*visible* = 0) the text cursor (ANSI default)
   - *c64:* Set cursor flash flag via BLNSW ($00CC: 0 = enabled, 1 = disabled).
   - *x16:* No-op on X16 (no single KERNAL cursor visibility toggle)
+  - *x16gs:* No-op on X16GS (no single KERNAL cursor visibility toggle)
 
 - **termfg** ( c :i )
 
@@ -56,9 +57,17 @@ Commodore 64 KERNAL text screen & cursor control
 
 CP/M VT52 terminal screen & cursor control
 
+### web
+
+Web runtime terminal
+
 ### x16
 
 Commander X16 KERNAL text screen & cursor control
+
+### x16gs
+
+Commander X16GS KERNAL text screen & cursor control
 
 ### zx81
 

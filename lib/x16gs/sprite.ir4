@@ -1,0 +1,103 @@
+\ lib/x16gs/sprite.ir4 - Commander X16GS VERA 8-bpp hardware sprites
+
+require "graphics.ir4"
+
+var __x16gs_spr_u :i
+var __x16gs_img_lo :bytes 64
+var __x16gs_img_hi :bytes 64
+var __x16gs_img_sz :bytes 64
+
+const sprcount 128 :i
+const sprdepth 8 :i
+const sprmaxw  64 :i
+const sprmaxh  64 :i
+
+fn __x16gs_spr_size_code ( n :i -> :i )
+  n 8 <= if 0 return then
+  n 16 <= if 1 return then
+  n 32 <= if 2 return then
+  3
+end
+
+fn __x16gs_spr_attr_addr ( id :i off :i )
+  0 __VERA_CTRL i8!
+  id 31 and 3 << off + __VERA_ADDR_L i8!
+  0xFC id 5 u>> + __VERA_ADDR_M i8!
+  0x11 __VERA_ADDR_H i8!
+end
+
+hot fn sprimg ( img :i w :i h :i data :a pal :a ncolors :i -> :i )
+  img 0 < img 63 > or w 0 <= or h 0 <= or w 64 > or h 64 > or ncolors 0 <= or ncolors 255 > or if 0 return then
+  __x16gs_spr_u -> var spr_u :i
+  spr_u 0 = if 2400 -> spr_u then
+  0 __VERA_CTRL i8!
+  __VERA_VIDEO u8@ 0x40 or __VERA_VIDEO i8!
+
+  w __x16gs_spr_size_code -> var wc :i
+  h __x16gs_spr_size_code -> var hc :i
+  8 wc << -> var sw :i
+  8 hc << -> var sh :i
+  sw sh * 5 u>> -> var units :i
+  spr_u units + 3456 > spr_u 3760 < and if 3760 -> spr_u then
+  spr_u units + 3968 > if 0 return then
+
+  0 __VERA_CTRL i8!
+  spr_u 7 and 5 << __VERA_ADDR_L i8!
+  spr_u 3 u>> 255 and __VERA_ADDR_M i8!
+  spr_u 11 u>> 0x10 or __VERA_ADDR_H i8!
+
+  0 -> var y :i
+  begin y sh < while
+    y h < if
+      0 -> var x :i
+      begin x sw < while
+        x w < if
+          data u8@ -> var c :i
+          c 0 = c ncolors > or if 0 else pal c 1 - a+ u8@ then __VERA_DATA0 i8!
+          1 +-> data
+        else
+          0 __VERA_DATA0 i8!
+        then
+        1 +-> x
+      repeat
+    else
+      0 -> var pad :i
+      begin pad sw < while
+        0 __VERA_DATA0 i8!
+        1 +-> pad
+      repeat
+    then
+    1 +-> y
+  repeat
+
+  spr_u 255 and __x16gs_img_lo img a+ i8!
+  spr_u 8 u>> 0x80 or __x16gs_img_hi img a+ i8!
+  hc 6 << wc 4 << or __x16gs_img_sz img a+ i8!
+
+  spr_u units + -> __x16gs_spr_u
+  -1
+end
+
+fn sprset ( id :i img :i )
+  id 0 < id 127 > or img 0 < or img 63 > or if return then
+  id 0 __x16gs_spr_attr_addr
+  __x16gs_img_lo img a+ u8@ __VERA_DATA0 i8!
+  __x16gs_img_hi img a+ u8@ __VERA_DATA0 i8!
+  id 7 __x16gs_spr_attr_addr
+  __x16gs_img_sz img a+ u8@ __VERA_DATA0 i8!
+end
+
+fn sprpos ( id :i x :i y :i )
+  id 0 < id 127 > or if return then
+  id 2 __x16gs_spr_attr_addr
+  x 255 and __VERA_DATA0 i8!
+  x 8 u>> 255 and __VERA_DATA0 i8!
+  y 255 and __VERA_DATA0 i8!
+  y 8 u>> 255 and __VERA_DATA0 i8!
+end
+
+fn sprshow ( id :i on :i )
+  id 0 < id 127 > or if return then
+  id 6 __x16gs_spr_attr_addr
+  on 0 <> if 0x0C else 0 then __VERA_DATA0 i8!
+end

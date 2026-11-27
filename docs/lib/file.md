@@ -49,6 +49,7 @@ Sequential file I/O (fallback stubs + convenience wrappers)
   - *c64:* CBM 1541 DOS reports directory sizes in 254-byte blocks
   - *cpm:* CP/M BDOS stores file lengths in 128-byte records
   - *x16:* CMDR-DOS $=L provides exact 1-byte file sizes
+  - *x16gs:* CMDR-DOS $=L provides exact 1-byte file sizes
 
 - **fsmkdir** ( path :a len :i -> :i )
 
@@ -129,3 +130,7 @@ CP/M BDOS random/sequential file I/O (4 static FCB + 128-byte slots)
 ### x16
 
 Commander X16 KERNAL / CMDR-DOS file & directory I/O
+
+### x16gs
+
+Commander X16GS KERNAL / CMDR-DOS file & directory I/O
