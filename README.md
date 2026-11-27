@@ -95,6 +95,8 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
   - [cpm](docs/target/cpm/README.md) (-t cpm) — CP/M COM executables
   - [zx81](docs/target/zx81/README.md) (-t zx81) — Sinclair ZX81 `.p` snapshots
 
+If your favourite obscure platform is missing, please file an issue or send a PR! 
+
 `ir4c` enables `-O1` optimizations by default (toggleable with `-O0`), including reachability dead-code elimination, constant folding, power-of-2 strength reduction, immediate/compare-branch lowering, and on-demand runtime embedding. These reflect the current 2-pass stack-oriented compiler rather than a limit of IR4(th) itself — the typed, monomorphic IR leaves plenty of headroom for future backends (such as register-allocating emitters).
 
 
@@ -103,6 +105,7 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 - **[PASTA/80 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
 - **[LCC (C89)](docs/frontend/lcc/README.md)** — Example integration of an IR4(th) backend into [LCC 4.2](https://github.com/stefanhaustein/lcc), supporting 16-, 32-, and 64-bit IR4(th) targets.
 
+If you have added on, please file an issue and I'll link it here.
 
 ## Companion Library
 
