@@ -94,3 +94,16 @@ fn syssleep ( ms :i )
   ms i>i32 -> var dur :i32
   begin sysmillis t0 i32- dur i32< while repeat
 end
+
+\ Terminate Agon MOS program immediately with exit status code in HL/BC
+code agon sysexit ( code :i )
+  0xD1 :i8
+  0xC1 :i8
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8
+  0x39 :i8
+  0x11 :i8 0x00 :i8 0x00 :i8 0x0B :i8
+  0xB7 :i8
+  0xED :i8 0x52 :i8
+  0xDA :i8 0x30 :i8 0x00 :i8 0x04 :i8
+  0xC3 :i8 0x30 :i8 0x00 :i8 0x0B :i8
+end

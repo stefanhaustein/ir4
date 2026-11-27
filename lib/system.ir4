@@ -36,6 +36,11 @@ default fn syssleep ( ms :i )
   ms drop
 end
 
+\ Terminate program immediately with exit status code (default: no-op)
+default fn sysexit ( code :i )
+  code drop
+end
+
 \ Look up NUL-terminated environment variable name0; copy up to max bytes into buf; return length or < 0
 fn sysenv0 ( name0 :a buf :a max :i -> :i )
   name0 str0>str buf max sysenv

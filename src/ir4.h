@@ -283,6 +283,10 @@ typedef struct {
 
 /* Error reporting (implemented in frontend/lexer.c) */
 void ir4_die(const char *msg);
+void ir4_status(const char *msg);
+void ir4_status_file(const char *prefix, const char *path, u32 line_num);
+void ir4_status_prog(const char *prefix, size_t done, size_t total);
+void ir4_status_clear(void);
 
 /* Optimization control (implemented in frontend/frontend.c) */
 void ir4_set_opt_level(int level);

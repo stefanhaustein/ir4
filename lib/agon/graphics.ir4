@@ -57,11 +57,13 @@ fn gfxmode ( mode :i )
   22 emit mode emit
   23 emit 0 emit 192 emit 0 emit
   23 emit 1 emit 0 emit
+  0 -> __agon_spr_active
 end
 
 fn gfxdone ( )
   22 emit 0 emit
   23 emit 1 emit 1 emit
+  0 -> __agon_spr_active
 end
 
 code agon gfxticks ( -> :i )

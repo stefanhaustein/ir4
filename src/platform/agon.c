@@ -103,6 +103,14 @@ static void agon_end(int main_idx) {
 
     if (sig->out_types.len == 1) {
         cb_emit8(EZ80_POP_BC); /* preserve main() return value in BC for test harness */
+    } else {
+        cb_emit8(EZ80_LD_BC_N24);
+        cb_emit24(0);
+    }
+    {
+        u32 exit_addr = (u32)cb_cur_addr();
+        cb_patch8(0x30, EZ80_JP);
+        cb_patch24(0x31, exit_addr);
     }
     cb_emit8(EZ80_LD_HL_NN);
     cb_emit24((u32)(agon_base + 0x34));
@@ -111,8 +119,8 @@ static void agon_end(int main_idx) {
     cb_emit8(0xE1);
     cb_emit8(0xDD);
     cb_emit8(0xE1);
-    cb_emit8(EZ80_LD_HL_N24);
-    cb_emit24(0); /* MOS exit code */
+    cb_emit8(0xC5); /* PUSH BC */
+    cb_emit8(0xE1); /* POP HL: MOS exit code */
     cb_emit8(EZ80_RET);
 }
 

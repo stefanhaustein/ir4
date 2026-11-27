@@ -32,27 +32,27 @@ typedef enum {
 } IrKind;
 
 typedef struct {
-    IrKind kind;
+    u8 kind; /* IrKind */
     union {
         i32 w;
         u32 a;
         double f;
         size_t offset;
         struct {
-            LocalOp op;
+            u8 op;   /* LocalOp */
+            u8 type; /* StackType */
+            u16 stack_bytes;
             size_t slot;
-            StackType type;
-            size_t stack_bytes;
         } loc;
         struct {
-            StackOp op;
-            StackType t1;
-            StackType t2;
+            u8 op; /* StackOp */
+            u8 t1; /* StackType */
+            u8 t2; /* StackType */
         } stk;
-        IrOp op;
+        u8 op; /* IrOp */
         size_t func_idx;
         struct {
-            BranchCond cond;
+            u8 cond; /* BranchCond */
             size_t target;
         } br;
         struct {
@@ -68,7 +68,7 @@ enum { CODE_REL_SELF = 1, CODE_REL_STACK = 2, CODE_REL_DATA = 3 };
 typedef struct {
     size_t ir_off;
     size_t addend;
-    u8 kind;
+    u8 kind; /* CODE_REL_* */
 } CodeReloc;
 
 typedef struct {
@@ -78,9 +78,12 @@ typedef struct {
     size_t reloc_cnt;
 } InlineBlock;
 
+VEC_OF(IrVec, IrInstr);
+
 typedef struct {
-    size_t ir_start;
-    size_t ir_len;
+    IrVec ir;
+    size_t raw_start;
+    size_t raw_len;
     size_t reloc_start;
     size_t reloc_cnt;
     size_t param_cnt;
@@ -91,7 +94,6 @@ typedef struct {
 } WordIR;
 
 VEC_OF(InlineVec, InlineBlock);
-VEC_OF(IrVec, IrInstr);
 VEC_OF(WordVec, WordIR *);
 VEC_OF(CodeRelocVec, CodeReloc);
 
@@ -112,7 +114,6 @@ extern const Backend *be;
 extern const char *platform_name;
 extern FuncVec funcs;
 extern WordVec words;
-extern IrVec ir_buf;
 extern SizeVec jtab_targets;
 extern ByteVec raw_code_buf;
 extern CodeRelocVec code_relocs;

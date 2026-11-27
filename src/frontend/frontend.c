@@ -30,7 +30,6 @@ const Backend *be;
 const char *platform_name = NULL;
 FuncVec funcs;
 WordVec words;
-IrVec ir_buf;
 SizeVec jtab_targets;
 ByteVec raw_code_buf;
 CodeRelocVec code_relocs;
@@ -129,6 +128,7 @@ static void tpop_expect(StackType expected) {
     StackType got = tpop();
     if (got != expected) {
         const SrcFile *cur = lex_cur();
+        ir4_status_clear();
         fprintf(stderr, "%s:%lu: error: ir4c: expected %s, got %s\n", cur->path,
                 (unsigned long)cur->line_num, type_name(expected), type_name(got));
         exit(1);
@@ -239,12 +239,15 @@ static int const_matches_fn(StackType ty, const FuncSig *fn) {
            fn->out_types.len == 1 && fn->out_types.data[0] == ty;
 }
 
+static void reset_word_ir(WordIR *w) {
+    free(w->ir.data);
+    free(w->locals.data);
+    memset(w, 0, sizeof(WordIR));
+}
+
 static void emit_const_fn_body(WordIR *w, const ConstSym *cs) {
     IrInstr *ins;
-    w->ir_start = ir_buf.len;
-    w->ir_len = 0;
-    w->param_cnt = 0;
-    w->locals.len = 0;
+    reset_word_ir(w);
     ins = emit_ir(
         (cs->type == TY_A) ? IR_PUSH_A
         : (cs->type == TY_I32) ? IR_PUSH_I32
@@ -381,10 +384,9 @@ static const BuiltinDef builtins[] = {/* Native word (:i) arithmetic & bitwise *
                                       {"i32>i", OP_I322W, TY_I32, TY_NONE, TY_W}};
 
 IrInstr *emit_ir(IrKind kind, WordIR *w) {
-    IrInstr *ins = VEC_ADD(ir_buf);
+    IrInstr *ins = VEC_ADD(w->ir);
     memset(ins, 0, sizeof(IrInstr));
-    ins->kind = kind;
-    w->ir_len++;
+    ins->kind = (u8)kind;
     return ins;
 }
 
@@ -695,8 +697,8 @@ static int handle_builtin(const char *tok, WordIR *w) {
             if (builtins[i].out != TY_NONE)
                 tpush(builtins[i].out);
             if (ir4_opt_level > 0) {
-                if (builtins[i].op == OP_INVERT && w->ir_len >= fold_fence + 1) {
-                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                if (builtins[i].op == OP_INVERT && w->ir.len >= fold_fence + 1) {
+                    IrInstr *p1 = &w->ir.data[w->ir.len - 1];
                     if (p1->kind == IR_PUSH_W) {
                         p1->u.w = ~p1->u.w;
                         return 1;
@@ -704,8 +706,8 @@ static int handle_builtin(const char *tok, WordIR *w) {
                 }
                 if ((builtins[i].op == OP_W2A || builtins[i].op == OP_W2I32 ||
                      builtins[i].op == OP_U2I32) &&
-                    w->ir_len >= fold_fence + 1) {
-                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                    w->ir.len >= fold_fence + 1) {
+                    IrInstr *p1 = &w->ir.data[w->ir.len - 1];
                     if (p1->kind == IR_PUSH_W) {
                         if (builtins[i].op == OP_W2A) {
                             p1->kind = IR_PUSH_A;
@@ -716,26 +718,25 @@ static int handle_builtin(const char *tok, WordIR *w) {
                         return 1;
                     }
                 }
-                if (w->ir_len >= fold_fence + 1) {
+                if (w->ir.len >= fold_fence + 1) {
                     IrOp sop = swapped_store_op(builtins[i].op);
                     if (sop != builtins[i].op) {
-                        IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                        IrInstr *p1 = &w->ir.data[w->ir.len - 1];
                         if (p1->kind == IR_STACK_OP && p1->u.stk.op == OP_SWAP) {
                             p1->kind = IR_ALU_OP;
-                            p1->u.op = sop;
+                            p1->u.op = (u8)sop;
                             return 1;
                         }
                     }
                 }
-                if (w->ir_len >= fold_fence + 2) {
-                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 2];
-                    IrInstr *p2 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                if (w->ir.len >= fold_fence + 2) {
+                    IrInstr *p1 = &w->ir.data[w->ir.len - 2];
+                    IrInstr *p2 = &w->ir.data[w->ir.len - 1];
                     i32 folded;
                     if (p1->kind == IR_PUSH_W && p2->kind == IR_PUSH_W &&
                         try_fold_const_w(builtins[i].op, p1->u.w, p2->u.w, &folded)) {
                         p1->u.w = folded;
-                        w->ir_len--;
-                        ir_buf.len--;
+                        w->ir.len--;
                         return 1;
                     }
                     if (p1->kind == IR_PUSH_DATA && p2->kind == IR_PUSH_W &&
@@ -745,32 +746,29 @@ static int handle_builtin(const char *tok, WordIR *w) {
                         if (delta >= 0) {
                             if ((u32)delta <= 0xFFFFUL) {
                                 p1->u.offset += (size_t)delta;
-                                w->ir_len--;
-                                ir_buf.len--;
+                                w->ir.len--;
                                 return 1;
                             }
                         } else {
                             size_t mag = (size_t)(0UL - (u32)delta);
                             if (mag <= p1->u.offset) {
                                 p1->u.offset -= mag;
-                                w->ir_len--;
-                                ir_buf.len--;
+                                w->ir.len--;
                                 return 1;
                             }
                         }
                     }
                 }
-                if (w->ir_len >= fold_fence + 1) {
+                if (w->ir.len >= fold_fence + 1) {
                     IrOp rop = builtins[i].op;
-                    IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                    IrInstr *p1 = &w->ir.data[w->ir.len - 1];
                     if (p1->kind == IR_PUSH_W) {
                         if ((p1->u.w == 0 &&
                              (rop == OP_ADD || rop == OP_SUB || rop == OP_AADD || rop == OP_ASUB ||
                               rop == OP_OR || rop == OP_XOR || rop == OP_LSHIFT ||
                               rop == OP_RSHIFT || rop == OP_ARSHIFT)) ||
                             (p1->u.w == -1 && rop == OP_AND)) {
-                            w->ir_len--;
-                            ir_buf.len--;
+                            w->ir.len--;
                             return 1;
                         }
                         if (p1->u.w == 0 && (rop == OP_MUL || rop == OP_AND)) {
@@ -785,7 +783,7 @@ static int handle_builtin(const char *tok, WordIR *w) {
                     }
                     if (rop == OP_MUL || rop == OP_UDIV || rop == OP_UMOD || rop == OP_MUL32 ||
                         rop == OP_UDIV32 || rop == OP_UMOD32) {
-                        IrInstr *p1 = &ir_buf.data[w->ir_start + w->ir_len - 1];
+                        IrInstr *p1 = &w->ir.data[w->ir.len - 1];
                         u8 is32 = (rop == OP_MUL32 || rop == OP_UDIV32 || rop == OP_UMOD32);
                         if ((!is32 && p1->kind == IR_PUSH_W) ||
                             (is32 && p1->kind == IR_PUSH_I32)) {
@@ -796,8 +794,7 @@ static int handle_builtin(const char *tok, WordIR *w) {
                                                                   : (u32)p1->u.w;
                             if (v == 1 && (rop == OP_MUL || rop == OP_UDIV || rop == OP_MUL32 ||
                                            rop == OP_UDIV32)) {
-                                w->ir_len--;
-                                ir_buf.len--;
+                                w->ir.len--;
                                 return 1;
                             }
                             if (v >= 2 && (v & (v - 1)) == 0 &&
@@ -1018,7 +1015,7 @@ static void emit_bytes_param_copies(WordIR *w) {
 
         ins = emit_ir(IR_ALU_OP, w);
         ins->u.op = OP_BCOPY;
-        fold_fence = w->ir_len;
+        fold_fence = w->ir.len;
     }
 }
 
@@ -1059,7 +1056,6 @@ static void compile_word(int is_default, int is_hot) {
     WordIR *w;
     WordIR discard_w;
     int discard_body = 0;
-    size_t saved_ir_count = ir_buf.len;
     size_t fidx;
     int existing;
     size_t param_cnt = 0;
@@ -1121,7 +1117,7 @@ static void compile_word(int is_default, int is_hot) {
             ex->req_rank = cur_rank;
             sig = ex;
             w = words.data[fidx];
-            memset(w, 0, sizeof(WordIR));
+            reset_word_ir(w);
         }
     } else {
         int ex_const = find_const(name);
@@ -1178,7 +1174,7 @@ static void compile_word(int is_default, int is_hot) {
     emit_bytes_param_copies(w);
     compile_body(w);
     if (discard_body) {
-        ir_buf.len = saved_ir_count;
+        reset_word_ir(&discard_w);
     }
 }
 
@@ -1326,7 +1322,7 @@ static void compile_code(int is_hot) {
         ex->req_rank = cur_rank;
         sig = ex;
         w = words.data[fidx];
-        memset(w, 0, sizeof(WordIR));
+        reset_word_ir(w);
     } else {
         tok = next_tok();
         if (!tok || strcmp(tok, "(") != 0)
@@ -1341,7 +1337,7 @@ static void compile_code(int is_hot) {
     }
 
     w->is_code = 1;
-    parse_raw_code_body(&w->ir_start, &w->ir_len, &w->reloc_start, &w->reloc_cnt);
+    parse_raw_code_body(&w->raw_start, &w->raw_len, &w->reloc_start, &w->reloc_cnt);
 }
 
 static void compile_init(void) {
@@ -1427,16 +1423,16 @@ static void emit_label_br(WordIR *w, LabelVec *labels, LabelRefVec *refs, size_t
     IrInstr *ins;
     if (labels->data[lidx].defined) {
         ins = emit_ir(IR_BR_BACK, w);
-        ins->u.br.cond = cond;
+        ins->u.br.cond = (u8)cond;
         ins->u.br.target = labels->data[lidx].target_ir;
     } else {
         LabelRef *ref = VEC_ADD(*refs);
-        ref->ir_idx = w->ir_len;
+        ref->ir_idx = w->ir.len;
         ref->label_idx = lidx;
         ins = emit_ir(IR_BR_FWD, w);
-        ins->u.br.cond = cond;
+        ins->u.br.cond = (u8)cond;
     }
-    fold_fence = w->ir_len;
+    fold_fence = w->ir.len;
 }
 
 /* Parse a local 'var <name> :<type>' declaration and return its local slot. */
@@ -1609,10 +1605,10 @@ static int handle_var_op(const char *tok, WordIR *w) {
                 ir4_die("cannot assign to ':bytes' local");
             tpop_expect(lv->type);
             if (ir4_opt_level > 0 && (lv->type == TY_W || lv->type == TY_A) &&
-                w->ir_len >= fold_fence + 3) {
-                IrInstr *p0 = &ir_buf.data[w->ir_start + w->ir_len - 3];
-                IrInstr *p1 = p0 + 1;
-                IrInstr *p2 = p0 + 2;
+                w->ir.len >= fold_fence + 3) {
+                IrInstr *p0 = &w->ir.data[w->ir.len - 3];
+                IrInstr *p1 = &w->ir.data[w->ir.len - 2];
+                IrInstr *p2 = &w->ir.data[w->ir.len - 1];
                 if (p0->kind == IR_LOCAL_OP && p0->u.loc.op == LOCAL_GET &&
                     p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
                     p2->kind == IR_ALU_OP &&
@@ -1626,10 +1622,9 @@ static int handle_var_op(const char *tok, WordIR *w) {
                     p1->kind = IR_LOCAL_OP;
                     p1->u.loc.op = LOCAL_ADD;
                     p1->u.loc.slot = lv->slot;
-                    p1->u.loc.type = lv->type;
-                    p1->u.loc.stack_bytes = tstack_bytes();
-                    w->ir_len--;
-                    ir_buf.len--;
+                    p1->u.loc.type = (u8)lv->type;
+                    p1->u.loc.stack_bytes = (u16)tstack_bytes();
+                    w->ir.len--;
                     return 1;
                 }
             }
@@ -1681,7 +1676,7 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
         b->saved_unreach = *unreachable;
         b->if_unreach = 0;
         stack_copy(&b->saved_stack, &tstack);
-        b->patch_else = w->ir_len;
+        b->patch_else = w->ir.len;
         ins = emit_ir(IR_BR_FWD, w);
         ins->u.br.cond = BR_JZ;
         return 1;
@@ -1696,11 +1691,11 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
         stack_copy(&b->else_stack, &tstack);
         stack_copy(&tstack, &b->saved_stack);
         *unreachable = b->saved_unreach;
-        b->patch_end = w->ir_len;
+        b->patch_end = w->ir.len;
         ins = emit_ir(IR_BR_FWD, w);
         ins->u.br.cond = BR_JMP;
-        ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
-        fold_fence = w->ir_len;
+        w->ir.data[b->patch_else].u.br.target = w->ir.len;
+        fold_fence = w->ir.len;
         return 1;
     }
     if (strcmp(tok, "then") == 0) {
@@ -1713,7 +1708,7 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
                 ir4_die("unbalanced stack in 'if ... then'");
             stack_copy(&tstack, &b->saved_stack);
             *unreachable = b->saved_unreach;
-            ir_buf.data[w->ir_start + b->patch_else].u.br.target = w->ir_len;
+            w->ir.data[b->patch_else].u.br.target = w->ir.len;
         } else {
             if (!b->if_unreach && !*unreachable) {
                 if (!stack_eq(&tstack, &b->else_stack))
@@ -1722,18 +1717,18 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
                 stack_copy(&tstack, &b->else_stack);
                 *unreachable = 0;
             }
-            ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
+            w->ir.data[b->patch_end].u.br.target = w->ir.len;
         }
         free_block(b);
-        fold_fence = w->ir_len;
+        fold_fence = w->ir.len;
         return 1;
     }
     if (strcmp(tok, "begin") == 0) {
         BlockInfo *b = NEW(BlockInfo);
         VEC_PUSH(blocks, b);
         b->kind = BLOCK_BEGIN;
-        b->loop_addr = w->ir_len;
-        fold_fence = w->ir_len;
+        b->loop_addr = w->ir.len;
+        fold_fence = w->ir.len;
         stack_copy(&b->saved_stack, &tstack);
         return 1;
     }
@@ -1743,7 +1738,7 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
             ir4_die("'while' without 'begin'");
         b = blocks.data[blocks.len - 1];
         tpop_expect(TY_W);
-        b->patch_end = w->ir_len;
+        b->patch_end = w->ir.len;
         ins = emit_ir(IR_BR_FWD, w);
         ins->u.br.cond = BR_JZ;
         return 1;
@@ -1758,9 +1753,9 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
         ins = emit_ir(IR_BR_BACK, w);
         ins->u.br.cond = BR_JMP;
         ins->u.br.target = b->loop_addr;
-        ir_buf.data[w->ir_start + b->patch_end].u.br.target = w->ir_len;
+        w->ir.data[b->patch_end].u.br.target = w->ir.len;
         free_block(b);
-        fold_fence = w->ir_len;
+        fold_fence = w->ir.len;
         return 1;
     }
     if (strcmp(tok, "::") == 0) {
@@ -1778,8 +1773,8 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
         if (labels->data[lidx].defined)
             ir4_die("duplicate label");
         labels->data[lidx].defined = 1;
-        labels->data[lidx].target_ir = w->ir_len;
-        fold_fence = w->ir_len;
+        labels->data[lidx].target_ir = w->ir.len;
+        fold_fence = w->ir.len;
         return 1;
     }
     if (strcmp(tok, "jmp") == 0) {
@@ -1850,7 +1845,7 @@ static void resolve_word_labels(WordIR *w, LabelVec *labels, LabelRefVec *label_
         size_t lidx = label_refs->data[r].label_idx;
         if (!labels->data[lidx].defined)
             ir4_die("undefined label");
-        ir_buf.data[w->ir_start + label_refs->data[r].ir_idx].u.br.target =
+        w->ir.data[label_refs->data[r].ir_idx].u.br.target =
             labels->data[lidx].target_ir;
     }
     for (r = jtab_start; r < jtab_targets.len; r++) {
@@ -1879,9 +1874,7 @@ static void compile_body(WordIR *w) {
     label_refs.len = 0;
     label_refs.cap = 0;
 
-    w->ir_start = ir_buf.len;
-    w->ir_len = 0;
-    fold_fence = 0;
+    fold_fence = w->ir.len;
 
     while ((tok = next_tok()) != NULL) {
         int idx;
@@ -1956,7 +1949,7 @@ static void compile_body(WordIR *w) {
                 IrInstr *ins = emit_ir(IR_INLINE, w);
                 ins->u.inl_idx = inline_blocks.len;
                 VEC_PUSH(inline_blocks, ib);
-                fold_fence = w->ir_len;
+                fold_fence = w->ir.len;
             }
             continue;
         }
@@ -2042,6 +2035,7 @@ static void compile_body(WordIR *w) {
 
         {
             const SrcFile *cur = lex_cur();
+            ir4_status_clear();
             fprintf(stderr, "%s:%lu: error: ir4c: unknown word '%s'\n", cur->path,
                     (unsigned long)cur->line_num, tok);
         }
@@ -2359,7 +2353,6 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
             add_builtin_const(cname, active ? -1 : 0);
         }
     }
-    ir_buf.len = 0;
     raw_code_buf.len = 0;
     inline_blocks.len = 0;
     code_relocs.len = 0;

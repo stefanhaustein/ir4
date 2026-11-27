@@ -55,7 +55,7 @@ const char *intern_str_n(const char *s, size_t len) {
     size_t mask, slot;
     char *copy;
     if (ht_len * 10 >= ht_cap * 7)
-        ht_grow(ht_cap ? ht_cap * 2 : 1024);
+        ht_grow(ht_cap ? ht_cap * 2 : 512);
     mask = ht_cap - 1;
     slot = (size_t)fnv1a_n(s, len) & mask;
     while (ht_slots[slot]) {

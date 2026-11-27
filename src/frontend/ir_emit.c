@@ -41,8 +41,8 @@ static Bool can_reach_func(size_t cur, size_t target, Bool *visited, const Bool 
     size_t i;
     if (funcs.data[cur]->is_extern || w->is_code)
         return false;
-    for (i = 0; i < w->ir_len; i++) {
-        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+    for (i = 0; i < w->ir.len; i++) {
+        const IrInstr *ins = &w->ir.data[i];
         if (ins->kind == IR_CALL) {
             size_t callee = ins->u.func_idx;
             if (callee == target)
@@ -73,13 +73,13 @@ static Bool can_reach_func(size_t cur, size_t target, Bool *visited, const Bool 
 static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     FuncSig *sig = funcs.data[fidx];
     WordIR *cw = words.data[fidx];
-    if (!ir4_get_opt_level() || !cw->is_code || !sig->is_hot || cw->ir_len == 0 ||
-        cw->ir_len > HOT_CODE_INLINE_MAX)
+    if (!ir4_get_opt_level() || !cw->is_code || !sig->is_hot || cw->raw_len == 0 ||
+        cw->raw_len > HOT_CODE_INLINE_MAX)
         return 0;
     if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "65816") != 0 &&
         strcmp(be->name, "z80") != 0 && strcmp(be->name, "ez80") != 0)
         return 0;
-    *out_len = cw->ir_len;
+    *out_len = cw->raw_len;
     return 1;
 }
 
@@ -95,8 +95,8 @@ static void mark_reachable(size_t fidx) {
     w->reachable = 1;
     if (w->is_code)
         return;
-    for (i = 0; i < w->ir_len; i++) {
-        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+    for (i = 0; i < w->ir.len; i++) {
+        const IrInstr *ins = &w->ir.data[i];
         if (ins->kind == IR_CALL) {
             size_t inl_len = 0;
             if (!can_inline_hot_code(ins->u.func_idx, &inl_len))
@@ -142,8 +142,8 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
 
 static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
     size_t j;
-    for (j = 0; j < w->ir_len; j++) {
-        const IrInstr *bi = &ir_buf.data[w->ir_start + j];
+    for (j = 0; j < w->ir.len; j++) {
+        const IrInstr *bi = &w->ir.data[j];
         if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
             return 1;
         if (bi->kind == IR_JTAB) {
@@ -161,7 +161,7 @@ static int ir_can_fuse(const WordIR *w, size_t i, size_t extra) {
     size_t k;
     if (!ir4_get_opt_level())
         return 0;
-    if (i + extra >= w->ir_len)
+    if (i + extra >= w->ir.len)
         return 0;
     for (k = 1; k <= extra; k++) {
         if (ir_is_br_target(w, i + k))
@@ -188,7 +188,7 @@ static void emit_word(size_t fidx) {
     if (w->is_code) {
         sig->addr = be->cur_addr();
         sig->has_addr = 1;
-        emit_raw_code_block(w->ir_start, w->ir_len, w->reloc_start, w->reloc_cnt);
+        emit_raw_code_block(w->raw_start, w->raw_len, w->reloc_start, w->reloc_cnt);
         if (strcmp(be->name, "6502") == 0)
             cb_emit8(0x60); /* RTS */
         else if (strcmp(be->name, "65816") == 0)
@@ -202,12 +202,12 @@ static void emit_word(size_t fidx) {
         return;
     }
 
-    VEC_ENSURE(ir_addr, w->ir_len + 1);
+    VEC_ENSURE(ir_addr, w->ir.len + 1);
     sig->addr = be->cur_addr();
     sig->has_addr = 1;
     be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
 
-    for (i = 0; i <= w->ir_len; i++) {
+    for (i = 0; i <= w->ir.len; i++) {
         if (be->peep_fence && ir_is_br_target(w, i))
             be->peep_fence();
         for (p = 0; p < pending.len; p++) {
@@ -221,19 +221,19 @@ static void emit_word(size_t fidx) {
                                pending_jtab.data[p].count, be->cur_addr());
             }
         }
-        if (i == w->ir_len)
+        if (i == w->ir.len)
             break;
         ir_addr.data[i] = be->cur_addr();
         {
-            const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+            const IrInstr *ins = &w->ir.data[i];
             switch (ins->kind) {
             case IR_FN_END:
                 be->fn_end(sig, w->locals.data, w->locals.len);
                 break;
             case IR_PUSH_W:
                 if (ir_can_fuse(w, i, 1) &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_LOCAL_OP) {
-                    const IrInstr *nins = &ir_buf.data[w->ir_start + i + 1];
+                    w->ir.data[i + 1].kind == IR_LOCAL_OP) {
+                    const IrInstr *nins = &w->ir.data[i + 1];
                     if (nins->u.loc.op == LOCAL_ADD && be->local_add_imm &&
                         be->local_add_imm(nins->u.loc.slot, nins->u.loc.type,
                                           nins->u.loc.stack_bytes, ins->u.w)) {
@@ -242,10 +242,10 @@ static void emit_word(size_t fidx) {
                     }
                 }
                 if (ir_can_fuse(w, i, 2) &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
-                    ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP) {
-                    IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
-                    IrOp mop = ir_buf.data[w->ir_start + i + 2].u.op;
+                    w->ir.data[i + 1].kind == IR_ALU_OP &&
+                    w->ir.data[i + 2].kind == IR_ALU_OP) {
+                    IrOp aop = w->ir.data[i + 1].u.op;
+                    IrOp mop = w->ir.data[i + 2].u.op;
                     if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
                         mop <= OP_FSTORE && be->mem_imm) {
                         i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)ins->u.w) : ins->u.w;
@@ -256,8 +256,8 @@ static void emit_word(size_t fidx) {
                     }
                 }
                 if (ir_can_fuse(w, i, 1) &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
-                    IrOp aop = ir_buf.data[w->ir_start + i + 1].u.op;
+                    w->ir.data[i + 1].kind == IR_ALU_OP) {
+                    IrOp aop = w->ir.data[i + 1].u.op;
                     i32 imm = ins->u.w;
                     if (aop == OP_ADD || aop == OP_SUB || aop == OP_AADD || aop == OP_ASUB) {
                         i32 delta = (aop == OP_SUB || aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
@@ -267,7 +267,7 @@ static void emit_word(size_t fidx) {
                         }
                     } else if (aop >= OP_EQ && aop <= OP_AGT) {
                         if (ir_can_fuse(w, i, 2)) {
-                            const IrInstr *bins = &ir_buf.data[w->ir_start + i + 2];
+                            const IrInstr *bins = &w->ir.data[i + 2];
                             if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ &&
                                 be->cmp_br_fwd) {
                                 size_t patch_off = 0;
@@ -321,9 +321,9 @@ static void emit_word(size_t fidx) {
                 break;
             case IR_PUSH_DATA:
                 if (ir_can_fuse(w, i, 1) &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP &&
+                    w->ir.data[i + 1].kind == IR_ALU_OP &&
                     be->data_mem &&
-                    be->data_mem(ir_buf.data[w->ir_start + i + 1].u.op, ins->u.offset)) {
+                    be->data_mem(w->ir.data[i + 1].u.op, ins->u.offset)) {
                     i++;
                     break;
                 }
@@ -343,14 +343,14 @@ static void emit_word(size_t fidx) {
             case IR_LOCAL_OP:
                 if (ins->u.loc.op == LOCAL_ADDR && be->local_mem) {
                     if (ir_can_fuse(w, i, 3) &&
-                        ir_buf.data[w->ir_start + i + 1].kind == IR_PUSH_W &&
-                        ir_buf.data[w->ir_start + i + 2].kind == IR_ALU_OP &&
-                        ir_buf.data[w->ir_start + i + 3].kind == IR_ALU_OP) {
-                        IrOp aop = ir_buf.data[w->ir_start + i + 2].u.op;
-                        IrOp mop = ir_buf.data[w->ir_start + i + 3].u.op;
+                        w->ir.data[i + 1].kind == IR_PUSH_W &&
+                        w->ir.data[i + 2].kind == IR_ALU_OP &&
+                        w->ir.data[i + 3].kind == IR_ALU_OP) {
+                        IrOp aop = w->ir.data[i + 2].u.op;
+                        IrOp mop = w->ir.data[i + 3].u.op;
                         if ((aop == OP_AADD || aop == OP_ASUB) && mop >= OP_I8FETCH &&
                             mop <= OP_FSTORE) {
-                            i32 imm = ir_buf.data[w->ir_start + i + 1].u.w;
+                            i32 imm = w->ir.data[i + 1].u.w;
                             i32 off = (aop == OP_ASUB) ? (i32)(0UL - (u32)imm) : imm;
                             if (be->local_mem(ins->u.loc.slot, off, mop, ins->u.loc.stack_bytes)) {
                                 i += 3;
@@ -358,8 +358,8 @@ static void emit_word(size_t fidx) {
                             }
                         }
                     } else if (ir_can_fuse(w, i, 1) &&
-                               ir_buf.data[w->ir_start + i + 1].kind == IR_ALU_OP) {
-                        IrOp mop = ir_buf.data[w->ir_start + i + 1].u.op;
+                               w->ir.data[i + 1].kind == IR_ALU_OP) {
+                        IrOp mop = w->ir.data[i + 1].u.op;
                         if (mop >= OP_I8FETCH && mop <= OP_FSTORE &&
                             be->local_mem(ins->u.loc.slot, 0, mop, ins->u.loc.stack_bytes)) {
                             i += 1;
@@ -375,7 +375,7 @@ static void emit_word(size_t fidx) {
                 break;
             case IR_ALU_OP:
                 if (ins->u.op >= OP_EQ && ins->u.op <= OP_AGT && ir_can_fuse(w, i, 1)) {
-                    const IrInstr *bins = &ir_buf.data[w->ir_start + i + 1];
+                    const IrInstr *bins = &w->ir.data[i + 1];
                     if (bins->kind == IR_BR_FWD && bins->u.br.cond == BR_JZ && be->cmp_br_fwd) {
                         size_t patch_off = 0;
                         if (be->cmp_br_fwd(ins->u.op, 0, 0, &patch_off)) {
@@ -403,13 +403,13 @@ static void emit_word(size_t fidx) {
                     break;
                 }
                 if (can_inline_hot_code(target, &inl_len)) {
-                    emit_raw_code_block(words.data[target]->ir_start, inl_len,
+                    emit_raw_code_block(words.data[target]->raw_start, inl_len,
                                         words.data[target]->reloc_start,
                                         words.data[target]->reloc_cnt);
                     break;
                 }
                 if (funcs.data[target]->has_addr && be->tail_call && ir_can_fuse(w, i, 1) &&
-                    ir_buf.data[w->ir_start + i + 1].kind == IR_FN_END) {
+                    w->ir.data[i + 1].kind == IR_FN_END) {
 #if IR4_ENABLE_6502
                     if (be == &be_6502) {
                         be_6502_set_call_bank(funcs.data[target]->bank);
@@ -521,7 +521,6 @@ void run_reachability_dce(void) {
         for (k = 0; k < funcs.data[main_idx]->out_types.len; k++) {
             VEC_PUSH(wsig->out_types, funcs.data[main_idx]->out_types.data[k]);
         }
-        ww->ir_start = ir_buf.len;
         for (k = 0; k < init_funcs.len; k++) {
             ins = emit_ir(IR_CALL, ww);
             ins->u.func_idx = init_funcs.data[k];
@@ -533,6 +532,7 @@ void run_reachability_dce(void) {
     }
     if (main_idx >= 0) {
         size_t di;
+        ir4_status("Analyzing reachability...");
         mark_reachable((size_t)main_idx);
         for (di = 0; di < cb_data_init_reloc_count(); di++) {
             size_t po, tv;
@@ -546,6 +546,21 @@ void run_reachability_dce(void) {
         for (f = 0; f < funcs.len; f++) {
             if (!funcs.data[f]->is_extern && funcs.data[f]->is_defined)
                 words.data[f]->reachable = true;
+        }
+    }
+
+    /* Free IR and local metadata of unreachable functions before Pass 2 lowering */
+    for (f = 0; f < funcs.len; f++) {
+        WordIR *w = words.data[f];
+        if (!w->reachable && !w->is_code) {
+            free(w->ir.data);
+            w->ir.data = NULL;
+            w->ir.len = 0;
+            w->ir.cap = 0;
+            free(w->locals.data);
+            w->locals.data = NULL;
+            w->locals.len = 0;
+            w->locals.cap = 0;
         }
     }
 
@@ -565,8 +580,8 @@ void run_reachability_dce(void) {
             size_t i;
             if (!w->reachable || funcs.data[f]->is_extern || w->is_code)
                 continue;
-            for (i = 0; i < w->ir_len; i++) {
-                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+            for (i = 0; i < w->ir.len; i++) {
+                const IrInstr *ins = &w->ir.data[i];
                 if (ins->kind == IR_PUSH_FN && ins->u.func_idx < funcs.len)
                     addr_taken[ins->u.func_idx] = true;
             }
@@ -601,7 +616,7 @@ static u16 assign_code_banks(void) {
             strcmp(sig->name, "init") == 0) {
             sig->bank = 0;
         } else {
-            u32 est_sz = (u32)(w->ir_len * 64);
+            u32 est_sz = (u32)(w->ir.len * 64);
             if (est_sz == 0)
                 est_sz = 16;
             if (cur_sz > 0 && cur_sz + est_sz > soft_cap) {
@@ -661,10 +676,10 @@ static Bool *select_compact_funcs(void) {
 
     for (f = 0; f < funcs.len; f++) {
         if (!funcs.data[f]->is_extern && words.data[f]->reachable && !words.data[f]->is_code) {
-            est[f] = (u32)(words.data[f]->ir_len * 10);
+            est[f] = (u32)(words.data[f]->ir.len * 10);
             total_est += est[f];
-            if (words.data[f]->ir_len > max_ir)
-                max_ir = words.data[f]->ir_len;
+            if (words.data[f]->ir.len > max_ir)
+                max_ir = words.data[f]->ir.len;
         }
     }
     if (total_est > compact_thresh) {
@@ -681,9 +696,9 @@ static Bool *select_compact_funcs(void) {
                 heat[f] += 10000;
             if (funcs.data[f]->is_recursive)
                 heat[f] += 100;
-            memset(depth, 0, w->ir_len);
-            for (i = 0; i < w->ir_len; i++) {
-                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+            memset(depth, 0, w->ir.len);
+            for (i = 0; i < w->ir.len; i++) {
+                const IrInstr *ins = &w->ir.data[i];
                 if (ins->kind == IR_BR_BACK) {
                     size_t k;
                     for (k = ins->u.br.target; k <= i; k++) {
@@ -692,8 +707,8 @@ static Bool *select_compact_funcs(void) {
                     }
                 }
             }
-            for (i = 0; i < w->ir_len; i++) {
-                const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+            for (i = 0; i < w->ir.len; i++) {
+                const IrInstr *ins = &w->ir.data[i];
                 u32 wgt = (depth[i] == 0) ? 0 : (depth[i] == 1 ? 10 : 100);
                 heat[f] += wgt;
                 if (ins->kind == IR_CALL && wgt > 0) {
@@ -708,8 +723,8 @@ static Bool *select_compact_funcs(void) {
                 size_t i;
                 if (funcs.data[f]->is_extern || !w->reachable || w->is_code || heat[f] == 0)
                     continue;
-                for (i = 0; i < w->ir_len; i++) {
-                    const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+                for (i = 0; i < w->ir.len; i++) {
+                    const IrInstr *ins = &w->ir.data[i];
                     if (ins->kind == IR_CALL && heat[ins->u.func_idx] < heat[f]) {
                         heat[ins->u.func_idx] += heat[f] / 2;
                     }
@@ -789,8 +804,8 @@ void emit_program(void) {
                     size_t i;
                     if (funcs.data[f]->is_extern || !w->reachable || funcs.data[f]->bank == 0)
                         continue;
-                    for (i = 0; i < w->ir_len; i++) {
-                        const IrInstr *ins = &ir_buf.data[w->ir_start + i];
+                    for (i = 0; i < w->ir.len; i++) {
+                        const IrInstr *ins = &w->ir.data[i];
                         if (ins->kind == IR_ICALL) {
                             need_icall = 1;
                         } else if (ins->kind == IR_ALU_OP) {
@@ -812,6 +827,13 @@ void emit_program(void) {
         }
         cb_end_banks();
     } else {
+        size_t reach_total = 0;
+        size_t reach_done = 0;
+        for (f = 0; f < funcs.len; f++) {
+            if (!funcs.data[f]->is_extern && words.data[f]->reachable)
+                reach_total++;
+        }
+        ir4_status_prog("Generating code", 0, reach_total);
         for (f = 0; f < funcs.len; f++) {
             if (!funcs.data[f]->is_extern && words.data[f]->reachable) {
 #if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
@@ -823,6 +845,9 @@ void emit_program(void) {
                     set_be_compact(0);
 #endif
                 emit_word(f);
+                reach_done++;
+                if ((reach_done & 15) == 0 || reach_done == reach_total)
+                    ir4_status_prog("Generating code", reach_done, reach_total);
             }
         }
     }
@@ -831,6 +856,7 @@ void emit_program(void) {
 #endif
     free(fn_compact);
 
+    ir4_status("Patching relocations...");
     for (c = 0; c < fwd_calls.len; c++) {
         if (fwd_calls.data[c].is_fn_ptr) {
             be->patch_fn(fwd_calls.data[c].call_pc, fwd_calls.data[c].call_addr,

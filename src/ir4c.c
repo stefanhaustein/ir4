@@ -280,6 +280,7 @@ int main(int argc, char **argv) {
     if (plat && plat->end) {
         int main_idx = ir4_find_func("main");
         if (plat->needs_main && main_idx < 0) {
+            ir4_status_clear();
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
             return 1;
         }
@@ -300,14 +301,17 @@ int main(int argc, char **argv) {
         cb_patch_data_relocs(data_addr);
     }
 
+    ir4_status_file("Writing", out_path, 0);
     out_fp = fopen(out_path, "wb");
     if (!out_fp) {
+        ir4_status_clear();
         fprintf(stderr, "ir4c: cannot open output %s\n", out_path);
         return 1;
     }
 
     if (plat && plat->write) {
         if (!plat->write(out_fp, base)) {
+            ir4_status_clear();
             fprintf(stderr, "ir4c: write failed: %s\n", out_path);
             fclose(out_fp);
             return 1;
@@ -318,12 +322,14 @@ int main(int argc, char **argv) {
         pad_align = (be != &be_arm64);
 #endif
         if (!cb_write_raw(out_fp, pad_align)) {
+            ir4_status_clear();
             fprintf(stderr, "ir4c: write failed: %s\n", out_path);
             fclose(out_fp);
             return 1;
         }
     }
     fclose(out_fp);
+    ir4_status_clear();
 
     printf("Compiled %s -> %s (target: %s, base: 0x%04lX, size: %lu bytes)\n", in_path, out_path,
            be->name, (unsigned long)base, (unsigned long)cb_pc());

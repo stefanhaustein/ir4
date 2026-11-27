@@ -17,7 +17,82 @@ void ir4_add_lib_root(const char *path) {
     VEC_PUSH(extra_lib_roots, path);
 }
 
+#if defined(__ez80__) || defined(__EZ80__) || defined(IR4_MINIMAL) || defined(IR4_STATUS)
+static size_t status_len = 0;
+
+static const char *short_path(const char *path) {
+    const char *p = path;
+    const char *last = path;
+    if (!path)
+        return "";
+    while (*p) {
+        if (*p == '/' || *p == '\\')
+            last = p + 1;
+        p++;
+    }
+    return last;
+}
+
+void ir4_status(const char *msg) {
+    size_t n = strlen(msg) + 2;
+    size_t i;
+    fprintf(stdout, "\r  %s", msg);
+    for (i = n; i < status_len; i++)
+        fputc(' ', stdout);
+    fflush(stdout);
+    status_len = n;
+}
+
+void ir4_status_file(const char *prefix, const char *path, u32 line_num) {
+    char buf[72];
+    const char *sp = short_path(path);
+    if (line_num > 0)
+        sprintf(buf, "%s %.40s:%lu", prefix, sp, (unsigned long)line_num);
+    else
+        sprintf(buf, "%s %.48s...", prefix, sp);
+    ir4_status(buf);
+}
+
+void ir4_status_prog(const char *prefix, size_t done, size_t total) {
+    char buf[72];
+    sprintf(buf, "%s (%lu/%lu)...", prefix, (unsigned long)done, (unsigned long)total);
+    ir4_status(buf);
+}
+
+void ir4_status_clear(void) {
+    size_t i;
+    if (status_len > 0) {
+        fputc('\r', stdout);
+        for (i = 0; i < status_len; i++)
+            fputc(' ', stdout);
+        fputc('\r', stdout);
+        fflush(stdout);
+        status_len = 0;
+    }
+}
+#else
+void ir4_status(const char *msg) { (void)msg; }
+void ir4_status_file(const char *prefix, const char *path, u32 line_num) {
+    (void)prefix;
+    (void)path;
+    (void)line_num;
+}
+void ir4_status_prog(const char *prefix, size_t done, size_t total) {
+    (void)prefix;
+    (void)done;
+    (void)total;
+}
+void ir4_status_clear(void) {}
+#endif
+
+static void bump_line(SrcFile *cur) {
+    cur->line_num++;
+    if ((cur->line_num & 63) == 0)
+        ir4_status_file("Parsing", cur->path, cur->line_num);
+}
+
 void ir4_die(const char *msg) {
+    ir4_status_clear();
     if (src_stack.len > 0) {
         const SrcFile *cur = &src_stack.data[src_stack.len - 1];
         fprintf(stderr, "%s:%lu: error: ir4c: %s\n", cur->path, (unsigned long)cur->line_num, msg);
@@ -45,6 +120,7 @@ void lex_init(FILE *in, const char *path) {
 
     seen_files.len = 0;
     VEC_PUSH(seen_files, root_path);
+    ir4_status_file("Parsing", root_path, 0);
 }
 
 SrcFile *lex_cur(void) {
@@ -94,12 +170,14 @@ int skip_ws_and_comments(void) {
             if (src_stack.len > 1) {
                 fclose(cur->fp);
                 src_stack.len--;
+                cur = &src_stack.data[src_stack.len - 1];
+                ir4_status_file("Parsing", cur->path, cur->line_num);
                 continue;
             }
             return EOF;
         }
         if (c == '\n') {
-            cur->line_num++;
+            bump_line(cur);
             continue;
         }
         if (isspace((unsigned char)c))
@@ -108,12 +186,12 @@ int skip_ws_and_comments(void) {
             int c2 = src_getc(cur);
             if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
                 if (c2 == '\n') {
-                    cur->line_num++;
+                    bump_line(cur);
                 } else if (c2 != EOF) {
                     while ((c = src_getc(cur)) != EOF && c != '\n')
                         ;
                     if (c == '\n')
-                        cur->line_num++;
+                        bump_line(cur);
                 }
                 continue;
             }
@@ -180,7 +258,7 @@ const char *next_tok(void) {
                 continue;
             }
             if (c == '\n')
-                cur->line_num++;
+                bump_line(cur);
         }
         return tok_sb.data;
     }
@@ -308,6 +386,7 @@ void push_require_ex(const char *name, int lib_only) {
         for (i = found_cnt - 1; i >= 0; i--) {
             push_src_file(found_fps[i], found_paths[i], grp, found_ranks[i]);
         }
+        ir4_status_file("Parsing", src_stack.data[src_stack.len - 1].path, 0);
         return;
     }
     if (seen_cnt > 0)
@@ -315,8 +394,9 @@ void push_require_ex(const char *name, int lib_only) {
 
     {
         const SrcFile *cur = &src_stack.data[src_stack.len - 1];
-        fprintf(stderr, "%s:%u: error: ir4c: cannot open required file '%s'\n", cur->path,
-                cur->line_num, name);
+        ir4_status_clear();
+        fprintf(stderr, "%s:%lu: error: ir4c: cannot open required file '%s'\n", cur->path,
+                (unsigned long)cur->line_num, name);
         exit(1);
     }
 }
