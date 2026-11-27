@@ -2350,7 +2350,10 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
                          (platform_name && strcmp(platform_name, t) == 0);
             strcpy(cname, "target_");
             strcat(cname, t);
-            add_builtin_const(cname, active ? -1 : 0);
+            {
+                i32 cval = active ? -1 : 0;
+                add_builtin_const(cname, cval);
+            }
         }
     }
     raw_code_buf.len = 0;
@@ -2408,19 +2411,32 @@ static void parse_toplevel(void) {
             compile_init();
         } else if (strcmp(tok, "fwd") == 0) {
             FuncSig *sig;
+            int existing;
             const char *name = next_tok_intern();
             if (!name)
                 ir4_die("expected word name after 'fwd'");
             if (find_const(name) >= 0)
                 ir4_die("forward declaration conflicts with existing constant");
-            if (ir4_find_func(name) >= 0)
-                ir4_die("duplicate 'fwd' declaration");
-            alloc_func(&sig, NULL);
-            sig->name = name;
-            tok = next_tok();
-            if (!tok || strcmp(tok, "(") != 0)
-                ir4_die("expected '(' after 'fwd' name");
-            parse_sig_body(sig, NULL, 0);
+            existing = ir4_find_func(name);
+            if (existing >= 0) {
+                FuncSig tmp_sig;
+                memset(&tmp_sig, 0, sizeof(FuncSig));
+                tok = next_tok();
+                if (!tok || strcmp(tok, "(") != 0)
+                    ir4_die("expected '(' after 'fwd' name");
+                parse_sig_body(&tmp_sig, NULL, 0);
+                if (!sigs_match(funcs.data[existing], &tmp_sig))
+                    ir4_die("duplicate 'fwd' declaration");
+                free(tmp_sig.in_types.data);
+                free(tmp_sig.out_types.data);
+            } else {
+                alloc_func(&sig, NULL);
+                sig->name = name;
+                tok = next_tok();
+                if (!tok || strcmp(tok, "(") != 0)
+                    ir4_die("expected '(' after 'fwd' name");
+                parse_sig_body(sig, NULL, 0);
+            }
         } else if (strcmp(tok, "extern") == 0) {
             FuncSig ex_sig;
             const char *name;

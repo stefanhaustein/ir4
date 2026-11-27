@@ -55,6 +55,9 @@ int main(int argc, char **argv) {
 #elif IR4_ENABLE_6502
     const Backend *be = &be_6502;
     size_t base = 0x0801;
+#elif IR4_ENABLE_65816
+    const Backend *be = &be_65816;
+    size_t base = 0x010000UL;
 #elif IR4_ENABLE_ARM64
     const Backend *be = &be_arm64;
     size_t base = 0x0000;

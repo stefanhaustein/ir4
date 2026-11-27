@@ -240,8 +240,10 @@ static void x16gs_build_bin_paths(const char *prg_path, char *full_buf, size_t f
     size_t i;
 
     if (!prg_path || !*prg_path) {
-        snprintf(full_buf, full_cap, "X16GS.BIN");
-        snprintf(base_buf, base_cap, "X16GS.BIN");
+        if (full_cap >= 10)
+            strcpy(full_buf, "X16GS.BIN");
+        if (base_cap >= 10)
+            strcpy(base_buf, "X16GS.BIN");
         return;
     }
     for (p = prg_path; *p; p++) {
