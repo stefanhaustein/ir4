@@ -158,4 +158,3 @@ Thanks to [Jörg Pleumann](https://github.com/pleumann) and [David Given](https:
 ## License
 
 Licensed under the **GNU General Public License v3.0 or later (GPLv3+)** with a compiled-output exception and separate notices for third-party float runtimes (`math48` and `wozfp`). See [LICENSE](LICENSE) (and [GPLv3](GPLv3) for the full GPLv3 text).
-could
