@@ -62,7 +62,7 @@ fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
   narrow if s_chdr_n else s_chdr then type0
   0 -> var row_i :i
   0x20 -> var base :i
-  begin row_i 3 < while
+  begin row_i 6 < while
     0 r0 1 + row_i + termgoto
     7 termfg sb termbg
     narrow 0 = if base 2 typehw 58 emit then
@@ -71,12 +71,13 @@ fn draw_charset ( r0 :i use_x :i fg :i cb :i sb :i bd :i )
     begin col 32 < while
       narrow 0 = col 16 = and if 32 emit then
       base col + -> var ch :i
-      ch 127 < if
+      ch 127 <> if
         use_x if ch xemit else ch emit then
       then
       1 +-> col
     repeat
     32 +-> base
+    base 0x80 = if 0xA0 -> base then
     1 +-> row_i
     13 emit
     7 termfg sb termbg
@@ -93,21 +94,21 @@ fn draw_static ( use_x :i fg :i cb :i sb :i bd :i -> :i )
 
   4 use_x fg cb sb bd draw_charset
 
-  0 10 termgoto
+  0 13 termgoto
   s_sfx type0 sfxcount typei
   s_joy type0 joycount typei
 
-  0 11 termgoto
+  0 14 termgoto
   s_spr type0 sprcount typei s_slots type0
   sprmaxw typei 120 xemit sprmaxh typei 32 emit
   sprdepth typei s_bpp type0
 
   gfxmodes -> var nmodes :i -> var mptr :a
-  0 13 termgoto
+  0 16 termgoto
   s_modes type0 nmodes typei s_rpar type0
-  14 -> var row :i
+  17 -> var row :i
   0 -> var i :i
-  begin i nmodes < i 4 < and while
+  begin i nmodes < while
     0 row termgoto
     s_hash type0 i typei s_colon type0
     mptr i 3 << a+ -> var ent :a
@@ -153,7 +154,7 @@ fn main ( )
 
   begin 1 while
     gfxticks -> var t :i
-    16 10 termgoto
+    16 13 termgoto
     7 termfg s_tick type0 6 termfg t typei 7 termfg
 
     use_x if xinkey else inkey then -> var k :i
@@ -191,7 +192,7 @@ fn main ( )
       1 +-> key_cnt
     then
     k -> prev_k
-    0 9 termgoto
+    0 12 termgoto
     use_x if s_xinkey else s_inkey then type0
     6 termfg last_k 2 typehw 32 emit 40 emit
     last_k 32 >= last_k 126 <= and if last_k xemit else 46 emit then

@@ -106,3 +106,7 @@ Example host test run:
 - `--version` — prints the compiler version
 
 For `ir4c`, `-O1` (constant folding, immediate lowering, static locals on 8-bit/eZ80, and `PUSH`/`POP` peepholes) is enabled by default; pass `-O0` to disable optimizations if debugging generated code.
+
+## 6. Self-Hosted IDE on Agon
+
+For building and running the self-hosted Pascal IDE directly on Agon, see [Self-Hosted PASTA/80 IDE on Agon](agon.md).
