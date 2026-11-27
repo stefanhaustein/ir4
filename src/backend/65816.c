@@ -34,11 +34,33 @@ static size_t m816_inx_pc = 0;
 static u8 m816_inx_cnt = 0;
 static size_t m816_sta_tos_pc = 0;
 
+typedef struct {
+    size_t patch_pc;
+    size_t br_idx;
+} M816FwdPatch;
+
+VEC_OF(M816ByteVec, u8);
+VEC_OF(M816FwdPatchVec, M816FwdPatch);
+
+static M816ByteVec m816_br_long;
+static M816FwdPatchVec m816_fwd_list;
+static size_t m816_br_idx = 0;
+static int m816_br_need_relax = 0;
+
 static void m816_peep_fence(void) {
     m816_inx_pc = 0;
     m816_inx_cnt = 0;
     m816_sta_tos_pc = 0;
 }
+
+void be_65816_relax_reset(void) {
+    m816_br_long.len = 0;
+    m816_fwd_list.len = 0;
+    m816_br_idx = 0;
+    m816_br_need_relax = 0;
+}
+
+int be_65816_need_relax(void) { return m816_br_need_relax; }
 
 #define M816_RSTACK_BYTES 16384U
 
@@ -66,6 +88,7 @@ void be_65816_reset(void) {
     m816_fp_w2f_addr = 0;
     m816_fp_f2w_addr = 0;
     m816_fp_fcmp_addr = 0;
+    be_65816_relax_reset();
     m816_peep_fence();
 }
 
@@ -174,32 +197,47 @@ static void emit_dp_data_addr(u8 dp, size_t data_off) {
 }
 
 void be_65816_emit_zero_bss(void) {
-    /* Zero [__bss_start .. __bss_end) in Bank 0/1.. via DP_PTR0 & DP_TMP0 */
-    size_t loop_pc, done_br;
-    emit_dp_data_addr(M816_DP_PTR0, cb_init_data_size());
-    emit_dp_data_addr(M816_DP_TMP0, CB_HEAP_START_OFF);
-    loop_pc = cb_cur_addr();
-    /* Compare DP_PTR0 (24-bit) == DP_TMP0 (24-bit) */
-    cb_emit8_8(M816_LDA_DP, M816_DP_PTR0);
-    cb_emit8_8(M816_CMP_DP, M816_DP_TMP0);
-    cb_emit8_8(M816_BNE, 8);
-    emit_sep_m();
-    cb_emit8_8(M816_LDA_DP, M816_DP_PTR0 + 2);
-    cb_emit8_8(M816_CMP_DP, M816_DP_TMP0 + 2);
-    emit_rep_m();
-    done_br = cb_pc();
-    cb_emit8_8(M816_BEQ, 0);
-    emit_sep_m();
-    cb_emit8_8(M816_LDA_IMM, 0);
-    cb_emit8_8(M816_STA_IDL, M816_DP_PTR0);
-    emit_rep_m();
-    cb_emit8_8(M816_INC_DP, M816_DP_PTR0);
-    cb_emit8_8(M816_BNE, 6);
-    emit_sep_m();
-    cb_emit8_8(M816_INC_DP, M816_DP_PTR0 + 2);
-    emit_rep_m();
-    cb_emit8_8(M816_BRA, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    /* Zero [__bss_start .. __bss_end) in 16-bit words via [DP_PTR0],Y */
+    size_t init_sz = cb_init_data_size();
+    size_t total_sz = cb_data_size();
+    size_t bss_sz = (total_sz > init_sz) ? (total_sz - init_sz) : 0;
+    u16 full_banks = (u16)(bss_sz >> 16);
+    u16 even_rem = (u16)(bss_sz & 0xFFFEU);
+
+    if (bss_sz == 0)
+        return;
+
+    emit_dp_data_addr(M816_DP_PTR0, init_sz);
+    emit8_16(M816_LDA_IMM, 0);
+    emit8_16(M816_LDY_IMM, 0);
+
+    if (full_banks > 0) {
+        size_t bank_loop;
+        emit8_16(M816_LDX_IMM, full_banks);
+        bank_loop = cb_cur_addr();
+        cb_emit8_8(M816_STA_IDLY, M816_DP_PTR0);
+        cb_emit8(M816_INY);
+        cb_emit8(M816_INY);
+        cb_emit8_8(M816_BNE, (u8)((i8)-6));
+        cb_emit8_8(M816_INC_DP, M816_DP_PTR0 + 2);
+        cb_emit8(M816_DEX);
+        cb_emit8_8(M816_BNE, (u8)((i8)((i32)bank_loop - (i32)(cb_cur_addr() + 2))));
+    }
+
+    if (even_rem > 0) {
+        size_t rem_loop = cb_cur_addr();
+        cb_emit8_8(M816_STA_IDLY, M816_DP_PTR0);
+        cb_emit8(M816_INY);
+        cb_emit8(M816_INY);
+        emit8_16(M816_CPY_IMM, even_rem);
+        cb_emit8_8(M816_BNE, (u8)((i8)((i32)rem_loop - (i32)(cb_cur_addr() + 2))));
+    }
+
+    if (bss_sz & 1U) {
+        emit_sep_m();
+        cb_emit8_8(M816_STA_IDLY, M816_DP_PTR0);
+        emit_rep_m();
+    }
 }
 
 static void emit_sta_tos_w(void) {
@@ -1120,6 +1158,9 @@ static void m816_fn_begin(const char *name, size_t param_cnt, const LocalVar *lo
     (void)name;
     ensure_rt_data();
     m816_peep_fence();
+    m816_fwd_list.len = 0;
+    m816_br_idx = 0;
+    m816_br_need_relax = 0;
     m816_stack_bytes = 0;
     m816_cur_is_recursive = is_recursive ? 1 : 0;
     m816_frame_bytes = 0;
@@ -2743,10 +2784,45 @@ static int m816_local_deref(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
     return m816_emit_dp_mem_off(M816_DP_PTR0, op, (u16)off);
 }
 
+static int m816_take_short_fwd(size_t *out_bidx) {
+    size_t idx = m816_br_idx++;
+    if (idx >= m816_br_long.len)
+        VEC_PUSH(m816_br_long, 0);
+    *out_bidx = idx;
+    return ir4_get_opt_level() && !m816_br_long.data[idx];
+}
+
+static size_t m816_emit_fwd_short(u8 op, size_t bidx) {
+    size_t pc = cb_pc();
+    M816FwdPatch *fp = VEC_ADD(m816_fwd_list);
+    fp->patch_pc = pc;
+    fp->br_idx = bidx;
+    cb_emit8_8(op, 0);
+    return pc;
+}
+
+static int m816_emit_back_short(u8 op, size_t target_addr) {
+    if (ir4_get_opt_level()) {
+        i32 rel8 = (i32)target_addr - (i32)(cb_cur_addr() + 2);
+        if (rel8 >= -128 && rel8 <= 127) {
+            cb_emit8_8(op, (u8)(i8)rel8);
+            return 1;
+        }
+    }
+    return 0;
+}
+
 static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t target_addr,
                             size_t *patch_offset) {
     size_t skip1 = 0, skip2 = 0;
+    size_t bidx = 0;
     int has_skip2 = 0;
+    int is_short = 0;
+
+    if (!((!has_imm && (op == OP_AEQ || op == OP_ANE)) || (op >= OP_EQ && op <= OP_UGE)))
+        return 0;
+    if (is_fwd)
+        is_short = m816_take_short_fwd(&bidx);
 
     if (!has_imm && (op == OP_AEQ || op == OP_ANE)) {
         size_t neq_br;
@@ -2771,23 +2847,27 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
             cb_emit8_8(M816_BRA, 0);
             cb_patch8(eq_br + 1, (u8)(cb_pc() - (eq_br + 2)));
         }
-        if (is_fwd) {
-            *patch_offset = cb_pc();
-            cb_emit8_16(M816_BRL, 0);
-        } else {
-            i32 rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
-            cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
-        }
-        cb_patch8(skip1 + 1, (u8)(cb_pc() - (skip1 + 2)));
-        return 1;
+        goto emit_target_brl;
     }
-
-    if (op < OP_EQ || op > OP_UGE)
-        return 0;
 
     if (has_imm) {
         u16 rhs = (u16)(imm & 0xFFFF);
+        if ((op == OP_LE || op == OP_GT) && (i16)rhs < 32767) {
+            rhs = (u16)(rhs + 1U);
+            op = (op == OP_LE) ? OP_LT : OP_GE;
+        } else if ((op == OP_ULE || op == OP_UGT) && rhs < 0xFFFFU) {
+            rhs = (u16)(rhs + 1U);
+            op = (op == OP_ULE) ? OP_ULT : OP_UGE;
+        }
         if (rhs == 0 && (op == OP_EQ || op == OP_NE || op == OP_LT || op == OP_GE)) {
+            u8 false_op = (op == OP_EQ)   ? M816_BNE
+                          : (op == OP_NE) ? M816_BEQ
+                          : (op == OP_LT) ? M816_BPL
+                                          : M816_BMI;
+            u8 true_op = (op == OP_EQ)   ? M816_BEQ
+                         : (op == OP_NE) ? M816_BNE
+                         : (op == OP_LT) ? M816_BMI
+                                         : M816_BPL;
             if (ir4_get_opt_level() && m816_sta_tos_pc != 0 && cb_pc() == m816_sta_tos_pc) {
                 cb_rewind(3);
                 m816_sta_tos_pc = 0;
@@ -2797,12 +2877,14 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
                 emit_inx_n(2);
                 emit8_16(M816_LDA_ABSX, M816_STACK_BASE - 2);
             }
+            if (is_fwd && is_short) {
+                *patch_offset = m816_emit_fwd_short(false_op, bidx);
+                return 1;
+            }
+            if (!is_fwd && m816_emit_back_short(false_op, target_addr))
+                return 1;
             skip1 = cb_pc();
-            cb_emit8_8(op == OP_EQ   ? M816_BEQ
-                       : op == OP_NE ? M816_BNE
-                       : op == OP_LT ? M816_BMI
-                                     : M816_BPL,
-                       0);
+            cb_emit8_8(true_op, 0);
             goto emit_target_brl;
         }
         emit_pop_w_a();
@@ -2823,41 +2905,67 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         }
     }
 
-    if (op == OP_EQ) {
+    if (op == OP_EQ || op == OP_NE || op == OP_ULT || op == OP_UGE || op == OP_LT || op == OP_GE) {
+        u8 false_op = (op == OP_EQ)    ? M816_BNE
+                      : (op == OP_NE)  ? M816_BEQ
+                      : (op == OP_ULT) ? M816_BCS
+                      : (op == OP_UGE) ? M816_BCC
+                      : (op == OP_LT)  ? M816_BPL
+                                       : M816_BMI;
+        u8 true_op = (op == OP_EQ)    ? M816_BEQ
+                     : (op == OP_NE)  ? M816_BNE
+                     : (op == OP_ULT) ? M816_BCC
+                     : (op == OP_UGE) ? M816_BCS
+                     : (op == OP_LT)  ? M816_BMI
+                                      : M816_BPL;
+        if (op == OP_LT || op == OP_GE) {
+            cb_emit8_8(M816_BVC, 3);
+            emit8_16(M816_EOR_IMM, 0x8000);
+        }
+        if (is_fwd && is_short) {
+            *patch_offset = m816_emit_fwd_short(false_op, bidx);
+            return 1;
+        }
+        if (!is_fwd && m816_emit_back_short(false_op, target_addr))
+            return 1;
         skip1 = cb_pc();
-        cb_emit8_8(M816_BEQ, 0);
-    } else if (op == OP_NE) {
-        skip1 = cb_pc();
-        cb_emit8_8(M816_BNE, 0);
-    } else if (op == OP_ULT) {
-        skip1 = cb_pc();
-        cb_emit8_8(M816_BCC, 0);
-    } else if (op == OP_UGE) {
-        skip1 = cb_pc();
-        cb_emit8_8(M816_BCS, 0);
+        cb_emit8_8(true_op, 0);
     } else if (op == OP_ULE) {
         skip2 = cb_pc();
-        has_skip2 = 1;
-        cb_emit8_8(M816_BCC, 0);
-        skip1 = cb_pc();
         cb_emit8_8(M816_BEQ, 0);
+        if (is_fwd && is_short) {
+            *patch_offset = m816_emit_fwd_short(M816_BCS, bidx);
+            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            return 1;
+        }
+        if (!is_fwd && m816_emit_back_short(M816_BCS, target_addr)) {
+            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            return 1;
+        }
+        has_skip2 = 1;
+        skip1 = cb_pc();
+        cb_emit8_8(M816_BCC, 0);
     } else if (op == OP_UGT) {
         size_t to_brl = cb_pc();
         cb_emit8_8(M816_BCC, 0);
         skip1 = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         cb_patch8(to_brl + 1, (u8)(cb_pc() - (to_brl + 2)));
-    } else if (op == OP_LT || op == OP_GE) {
-        cb_emit8_8(M816_BVC, 3);
-        emit8_16(M816_EOR_IMM, 0x8000);
-        skip1 = cb_pc();
-        cb_emit8_8((op == OP_LT) ? M816_BMI : M816_BPL, 0);
     } else if (op == OP_LE) {
         skip2 = cb_pc();
-        has_skip2 = 1;
         cb_emit8_8(M816_BEQ, 0);
         cb_emit8_8(M816_BVC, 3);
         emit8_16(M816_EOR_IMM, 0x8000);
+        if (is_fwd && is_short) {
+            *patch_offset = m816_emit_fwd_short(M816_BPL, bidx);
+            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            return 1;
+        }
+        if (!is_fwd && m816_emit_back_short(M816_BPL, target_addr)) {
+            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            return 1;
+        }
+        has_skip2 = 1;
         skip1 = cb_pc();
         cb_emit8_8(M816_BMI, 0);
     } else { /* OP_GT */
@@ -2872,9 +2980,13 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
 
 emit_target_brl:
     if (is_fwd) {
-        *patch_offset = cb_pc();
-        cb_emit8_16(M816_BRL, 0);
-    } else {
+        if (is_short) {
+            *patch_offset = m816_emit_fwd_short(M816_BRA, bidx);
+        } else {
+            *patch_offset = cb_pc();
+            cb_emit8_16(M816_BRL, 0);
+        }
+    } else if (!m816_emit_back_short(M816_BRA, target_addr)) {
         i32 rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
         cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
     }
@@ -2893,7 +3005,8 @@ static int m816_cmp_br_back(IrOp op, int has_imm, i32 imm, size_t target_addr) {
 }
 
 static size_t m816_emit_br_fwd(BranchCond cond) {
-    size_t patch_off;
+    size_t patch_off, bidx;
+    int is_short = m816_take_short_fwd(&bidx);
     if (cond == BR_JZ) {
         size_t nz_br;
         if (ir4_get_opt_level() && m816_sta_tos_pc != 0 && cb_pc() == m816_sta_tos_pc) {
@@ -2905,12 +3018,16 @@ static size_t m816_emit_br_fwd(BranchCond cond) {
             emit_inx_n(2);
             emit8_16(M816_LDA_ABSX, M816_STACK_BASE - 2);
         }
+        if (is_short)
+            return m816_emit_fwd_short(M816_BEQ, bidx);
         nz_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         patch_off = cb_pc();
         cb_emit8_16(M816_BRL, 0);
         cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
     } else {
+        if (is_short)
+            return m816_emit_fwd_short(M816_BRA, bidx);
         patch_off = cb_pc();
         cb_emit8_16(M816_BRL, 0);
     }
@@ -2930,21 +3047,44 @@ static void m816_emit_br_back(BranchCond cond, size_t target_addr) {
             emit_inx_n(2);
             emit8_16(M816_LDA_ABSX, M816_STACK_BASE - 2);
         }
+        if (m816_emit_back_short(M816_BEQ, target_addr))
+            return;
         nz_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
         cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
         cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
     } else {
-        i32 rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
+        i32 rel;
+        if (m816_emit_back_short(M816_BRA, target_addr))
+            return;
+        rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
         cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
     }
 }
 
 static void m816_patch_fwd(size_t patch_offset) {
-    i32 rel = (i32)cb_pc() - (i32)(patch_offset + 3);
     m816_peep_fence();
-    cb_patch16(patch_offset + 1, (u16)(rel & 0xFFFF));
+    if (cb_data()[patch_offset] != M816_BRL) {
+        i32 rel = (i32)cb_pc() - (i32)(patch_offset + 2);
+        if (rel >= -128 && rel <= 127) {
+            cb_patch8(patch_offset + 1, (u8)(i8)rel);
+        } else {
+            size_t k;
+            for (k = 0; k < m816_fwd_list.len; k++) {
+                if (m816_fwd_list.data[k].patch_pc == patch_offset) {
+                    m816_br_long.data[m816_fwd_list.data[k].br_idx] = 1;
+                    break;
+                }
+            }
+            m816_br_need_relax = 1;
+        }
+        return;
+    }
+    {
+        i32 rel = (i32)cb_pc() - (i32)(patch_offset + 3);
+        cb_patch16(patch_offset + 1, (u16)(rel & 0xFFFF));
+    }
 }
 
 static size_t m816_emit_jtab(size_t count) {

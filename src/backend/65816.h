@@ -141,6 +141,8 @@ enum {
 
 void be_65816_reset(void);
 void be_65816_invalidate_from(size_t addr);
+void be_65816_relax_reset(void);
+int be_65816_need_relax(void);
 size_t be_65816_rstack_off(void);
 void be_65816_emit_zero_bss(void);
 

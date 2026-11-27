@@ -177,6 +177,113 @@ fn rec_deref_ops ( p :a depth :i -> :i )
   p i16@ q i16@ + p 4 a+ i8@ + q 3 a+ u8@ + q 2 a- i16@ + p 8 a+ @ +
 end
 
+\ 10. Short & long forward/backward relative branches (cmp_br_fwd/back, emit_br_fwd/back)
+fn test_short_branches ( -> :i )
+  var i :i
+  var lim :i
+  var acc :i
+  var p :a
+  var q :a
+
+  \ Short backward jz loops (cmp_br_back: imm & reg, signed/unsigned/zero/addr/bare)
+  0 -> i  0 -> acc
+  :: L_lt_imm
+  i +-> acc  1 +-> i
+  i 5 >= jz L_lt_imm
+  acc 10 <> if 60 return then
+
+  5 -> lim  0 -> i  0 -> acc
+  :: L_lt_reg
+  i +-> acc  1 +-> i
+  i lim >= jz L_lt_reg
+  acc 10 <> if 61 return then
+
+  5 -> lim  0 -> i  0 -> acc
+  :: L_ule_reg
+  i +-> acc  1 +-> i
+  lim i u<= jz L_ule_reg
+  acc 10 <> if 62 return then
+
+  5 -> lim  0 -> i  0 -> acc
+  :: L_le_reg
+  i +-> acc  1 +-> i
+  lim i <= jz L_le_reg
+  acc 10 <> if 63 return then
+
+  5 -> i  0 -> acc
+  :: L_z_eq
+  i +-> acc  -1 +-> i
+  i 0 = jz L_z_eq
+  acc 15 <> if 64 return then
+
+  -4 -> i  0 -> acc
+  :: L_z_ge
+  i +-> acc  1 +-> i
+  i 0 >= jz L_z_ge
+  acc -10 <> if 65 return then
+
+  \ Bare backward BR_JZ (non-comparison boolean expression)
+  4 -> i  0 -> acc
+  :: L_bare_jz
+  i +-> acc  -1 +-> i
+  i 0 = invert invert jz L_bare_jz
+  acc 10 <> if 66 return then
+
+  \ Address equality backward jz
+  gbuf -> p  gbuf 4 a+ -> q  0 -> acc
+  :: L_aeq
+  1 +-> acc  1 +-> p
+  p q a= jz L_aeq
+  acc 4 <> if 67 return then
+
+  \ Signed boundary constants (32767 <= / >, -32768 <= / >, -1 <= / >)
+  32767 -> i
+  i 32767 <= 0 = if 68 return then
+  i 32767 > if 69 return then
+  -1 -> i
+  i -1 <= 0 = if 70 return then
+  i -1 > if 71 return then
+  0 -> i
+  i -1 > 0 = if 72 return then
+  i -1 <= if 73 return then
+
+  0
+end
+
+fn test_long_branches ( sel :i -> :i )
+  var i :i
+  var acc :i
+  0 -> acc
+  \ Outer forward branch > 128 bytes containing inner short branches (tests multi-pass relaxation)
+  sel 0 > if
+    1 +-> acc  acc 0 > if 2 +-> acc then
+    3 +-> acc  acc 0 > if 4 +-> acc then
+    5 +-> acc  acc 0 > if 6 +-> acc then
+    7 +-> acc  acc 0 > if 8 +-> acc then
+    9 +-> acc  acc 0 > if 10 +-> acc then
+    11 +-> acc acc 0 > if 12 +-> acc then
+    13 +-> acc acc 0 > if 14 +-> acc then
+    15 +-> acc acc 0 > if 16 +-> acc then
+    17 +-> acc acc 0 > if 18 +-> acc then
+    19 +-> acc acc 0 > if 20 +-> acc then
+    acc return
+  then
+  \ Long backward jz loop > 128 bytes (tests backward BRL fallback)
+  0 -> i
+  :: L_big_back
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> acc  acc 0 > if 1 +-> acc then
+  1 +-> i
+  i 3 >= jz L_big_back
+  acc
+end
+
 fn main ( -> :i )
   10 1 hot_ladd 323 <> if 1 return then
   10 0 hot_ladd 11 <> if 2 return then
@@ -222,6 +329,11 @@ fn main ( -> :i )
   var dbuf :bytes 16
   dbuf static_deref_ops -2304 <> if 52 return then
   dbuf 2 rec_deref_ops 4028 <> if 53 return then
+
+  test_short_branches -> var sb_err :i
+  sb_err 0 <> if sb_err return then
+  1 test_long_branches 210 <> if 74 return then
+  0 test_long_branches 48 <> if 75 return then
 
   0
 end

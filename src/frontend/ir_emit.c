@@ -369,8 +369,10 @@ static void emit_word(size_t fidx) {
         int retried = 0;
         int is_816 = (strcmp(be->name, "65816") == 0);
 #if IR4_ENABLE_65816
-        if (is_816)
+        if (is_816) {
             (void)be_65816_rstack_off();
+            be_65816_relax_reset();
+        }
 #endif
     retry_emit:
         {
@@ -527,6 +529,16 @@ static void emit_word(size_t fidx) {
             }
         }
     }
+#if IR4_ENABLE_65816
+            if (is_816 && be_65816_need_relax()) {
+                cb_restore(cp);
+                be_65816_invalidate_from(start_addr);
+                fwd_calls.len = fc_len;
+                pending.len = 0;
+                pending_jtab.len = 0;
+                goto retry_emit;
+            }
+#endif
             if (is_816 && !retried && be->cur_addr() > start_addr &&
                 ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
                 size_t pad = 0x10000UL - (start_addr & 0xFFFFUL);
