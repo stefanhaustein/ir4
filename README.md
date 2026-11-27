@@ -101,6 +101,7 @@ Pass `-I dir` (repeatable) to add library search directories ahead of the built-
 ## Frontends
 
 - **[PASTA/80 (Pascal)](docs/frontend/pasta80/README.md)** — Classic Pascal compiler frontend targeting IR4(th) (forked from [PASTA/80](https://github.com/pleumann/pasta80)), supporting Commodore 64, Commander X16, Agon Light, CP/M, ZX81, and ARM64 JIT.
+- **[LCC (C89)](docs/frontend/lcc/README.md)** — Example integration of an IR4(th) backend into [LCC 4.2](https://github.com/stefanhaustein/lcc), supporting 16-, 32-, and 64-bit IR4(th) targets.
 
 
 ## Companion Library
