@@ -7,15 +7,15 @@ Automated results from running the PASTA/80 v1.00 test suites across IR4(th) tar
 | ⁉️ | Target | core | heap | files | more | prm | snd | ovl | Total | Time |
 | :---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | ℹ️ | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
-| 🅾️ | [Agon](#agon) | 1553 | 17 | 192 | 45 | 6 | 4 | 32 | 1849 | 16.10s |
-| 🅾️ | [ARM64](#arm64) | 1549 | 17 | 194 | 45 | 5 | 4 | 32 | 1846 | 4.71s |
-| 🅾️ | [C64](#c64) | n/a | 17 | ??? | 49 | n/a | 4 | 32 | \*102 | 99.14s |
-| 🅾️ | [CP/M](#cpm) | n/a | ??? | \*180 | 49 | 6 | 4 | 32 | \*271 | 30.97s |
-| 🅾️ | [RV32](#rv32) | 1538 | 17 | n/a | 45 | n/a | 4 | 32 | \*1636 | 0.54s |
-| 🅾️ | [Web](#web) | 1550 | 17 | n/a | 45 | n/a | 4 | 32 | \*1648 | 1.00s |
-| 🅾️ | [X16](#x16) | n/a | 17 | n/a | 49 | n/a | 4 | 32 | \*102 | 5.84s |
-| 🅾️ | [X16GS](#x16gs) | 1572 | 17 | 194 | 49 | 6 | 4 | 32 | 1874 | 11.09s |
-| 🅾️ | [ZX81](#zx81) | n/a | ??? | n/a | ??? | n/a | 4 | ??? | \*4 | 44.47s |
+| 🅾️ | [Agon](#agon) | 1553 | 26 | 192 | 45 | 6 | 4 | 32 | 1858 | 16.12s |
+| 🅾️ | [ARM64](#arm64) | 1549 | 26 | 194 | 45 | 5 | 4 | 32 | 1855 | 4.70s |
+| 🅾️ | [C64](#c64) | n/a | 26 | ??? | 49 | n/a | 4 | 32 | \*111 | 99.73s |
+| 🅾️ | [CP/M](#cpm) | n/a | 17 | \*180 | 49 | 6 | 4 | 32 | \*288 | 0.95s |
+| 🅾️ | [RV32](#rv32) | 1538 | 26 | n/a | 45 | n/a | 4 | 32 | \*1645 | 0.51s |
+| 🅾️ | [Web](#web) | 1550 | 26 | n/a | 45 | n/a | 4 | 32 | \*1657 | 0.99s |
+| ✅ | [X16](#x16) | n/a | 26 | n/a | 49 | n/a | 4 | 32 | \*111 | 5.74s |
+| ✅ | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 10.98s |
+| 🅾️ | [ZX81](#zx81) | n/a | ??? | n/a | ??? | n/a | 4 | ??? | \*4 | 44.53s |
 
 ## Notes
 
@@ -48,18 +48,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core      1553        19      1572
-    heap        17         9        26
+    heap        26         0        26
    files       192         2       194
     more        45         4        49
   params         6         0         6
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1849        34      1883
+   Total      1858        25      1883
 
               [  FAIL  ]
 
-Tests finished (16.103s).
+Tests finished (16.118s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -81,15 +81,6 @@ Failed assertions:
   core.pas:2321 (TestSizeOf)
   core.pas:2323 (TestSizeOf)
   core.pas:2329 (TestSizeOf)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
   files.pas:492 (TestTextReadIOResult)
   files.pas:585 (TestTextWithReals)
   more.pas:112 (TestSizeOfSubranges)
@@ -112,18 +103,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core      1549        23      1572
-    heap        17         9        26
+    heap        26         0        26
    files       194         0       194
     more        45         4        49
   params         5         1         6
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1846        37      1883
+   Total      1855        28      1883
 
               [  FAIL  ]
 
-Tests finished (4.708s).
+Tests finished (4.700s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -149,15 +140,6 @@ Failed assertions:
   core.pas:2321 (TestSizeOf)
   core.pas:2323 (TestSizeOf)
   core.pas:2329 (TestSizeOf)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
   more.pas:112 (TestSizeOfSubranges)
   more.pas:114 (TestSizeOfSubranges)
   more.pas:150 (TestNegativeLiteralBounds)
@@ -179,29 +161,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core       n/a       n/a       n/a
-    heap        17         9        26
+    heap        26         0        26
    files       ???       ???       ???
     more        49         0        49
   params       n/a       n/a       n/a
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total       102         9       111
+   Total       111         0       111
 
               [  FAIL  ]
 
-Tests finished (99.138s).
-
-Failed assertions:
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
+Tests finished (99.728s).
 ```
 
 ### CP/M
@@ -218,20 +189,31 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core       n/a       n/a       n/a
-    heap       ???       ???       ???
+    heap        17         9        26
    files       180        15       195
     more        49         0        49
   params         6         0         6
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total       271        15       286
+   Total       288        24       312
+
+Wrong number of tests (311 expected)!
 
               [  FAIL  ]
 
-Tests finished (30.970s).
+Tests finished (0.946s).
 
 Failed assertions:
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
+  heap.pas:118 (TestStress)
   files.pas:386 (TestTextWithStrings)
   files.pas:402 (TestTextWithStrings)
   files.pas:919 (TestTypedFileIO)
@@ -263,18 +245,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core      1538        34      1572
-    heap        17         9        26
+    heap        26         0        26
    files       n/a       n/a       n/a
     more        45         4        49
   params       n/a       n/a       n/a
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1636        47      1683
+   Total      1645        38      1683
 
               [  FAIL  ]
 
-Tests finished (0.537s).
+Tests finished (0.512s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -311,15 +293,6 @@ Failed assertions:
   core.pas:3226 (TestStr)
   core.pas:3229 (TestStr)
   core.pas:3230 (TestStr)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
   more.pas:112 (TestSizeOfSubranges)
   more.pas:114 (TestSizeOfSubranges)
   more.pas:150 (TestNegativeLiteralBounds)
@@ -340,18 +313,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core      1550        22      1572
-    heap        17         9        26
+    heap        26         0        26
    files       n/a       n/a       n/a
     more        45         4        49
   params       n/a       n/a       n/a
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1648        35      1683
+   Total      1657        26      1683
 
               [  FAIL  ]
 
-Tests finished (0.996s).
+Tests finished (0.993s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -376,15 +349,6 @@ Failed assertions:
   core.pas:2321 (TestSizeOf)
   core.pas:2323 (TestSizeOf)
   core.pas:2329 (TestSizeOf)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
   more.pas:112 (TestSizeOfSubranges)
   more.pas:114 (TestSizeOfSubranges)
   more.pas:150 (TestNegativeLiteralBounds)
@@ -405,29 +369,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core       n/a       n/a       n/a
-    heap        17         9        26
+    heap        26         0        26
    files       n/a       n/a       n/a
     more        49         0        49
   params       n/a       n/a       n/a
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total       102         9       111
+   Total       111         0       111
 
-              [  FAIL  ]
+              [  PASS  ]
 
-Tests finished (5.843s).
-
-Failed assertions:
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
+Tests finished (5.736s).
 ```
 
 ### X16GS
@@ -444,29 +397,18 @@ Results of PASTA/80 version 1.00 tests
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
     core      1572         0      1572
-    heap        17         9        26
+    heap        26         0        26
    files       194         0       194
     more        49         0        49
   params         6         0         6
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1874         9      1883
+   Total      1883         0      1883
 
-              [  FAIL  ]
+              [  PASS  ]
 
-Tests finished (11.094s).
-
-Failed assertions:
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
-  heap.pas:118 (TestStress)
+Tests finished (10.978s).
 ```
 
 ### ZX81
@@ -494,5 +436,5 @@ overlays       ???       ???       ???
 
               [  FAIL  ]
 
-Tests finished (44.473s).
+Tests finished (44.535s).
 ```

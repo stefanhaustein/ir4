@@ -164,11 +164,15 @@ fn main ( -> :i )
   av1 av0 < -1 21 assert_eq
   dup 0 <> if return then drop
   p1 heapfree
-  heapavail av1 > -1 22 assert_eq
+  heapavail av0 = -1 22 assert_eq
   dup 0 <> if return then drop
-  heapreset
+  16 heapalloc -> p1
+  16 heapalloc -> p2
+  p1 heapfree
+  p2 heapfree
   heapavail av0 = -1 23 assert_eq
   dup 0 <> if return then drop
+  heapreset
 
   cr
 

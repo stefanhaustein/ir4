@@ -48,11 +48,13 @@ end
 default fn heapfree ( p :a )
   p 0 i>a a= if return then
   p 8 a- -> var blk :a
+  0 i>a -> var pprev :a
   0 i>a -> var prev :a
   __heap_free -> var cur :a
   begin
     cur 0 i>a a<> if cur blk a< else 0 then
   while
+    prev -> pprev
     cur -> prev
     cur 8 a+ a@ -> cur
   repeat
@@ -68,7 +70,14 @@ default fn heapfree ( p :a )
     prev prev @ a+ blk a= if
       prev @ blk @ + prev !
       blk 8 a+ a@ prev 8 a+ a!
+      prev -> blk
+      pprev -> prev
     then
+  then
+  blk blk @ a+ __heap_ptr a= if
+    blk 8 a+ a@ -> var nxt :a
+    prev 0 i>a a= if nxt -> __heap_free else nxt prev 8 a+ a! then
+    blk -> __heap_ptr
   then
 end
 
