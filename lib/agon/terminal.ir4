@@ -4,10 +4,14 @@ require "stdio.ir4"
 
 \ __agon_term_sysvars ( -> :a )  MOS $08: returns IX -> HLU
 code agon __agon_term_sysvars ( -> :a )
-  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
-  0xDD :i8 0xE5 :i8 0xE1 :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0x3E :i8 0x08 :i8             \\   LD A, 0x08
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xDD :i8 0xE5 :i8             \\   PUSH IX
+  0xE1 :i8                      \\   POP HL
+  0xD1 :i8                      \\   POP DE
+  0xE5 :i8                      \\   PUSH HL
+  0xD5 :i8                      \\   PUSH DE
+end \\ 6c85
 
 fn __agon_term_query ( flag :i vdu :i -> :a )
   __agon_term_sysvars -> var sv :a

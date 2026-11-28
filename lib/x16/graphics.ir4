@@ -16,12 +16,16 @@ init
 end
 
 code x16 __x16_mode_gfx ( )
-  0xA9 :i8 0x80 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
-end
+  0xA9 :i8 0x80 :i8             \\   LDA #$80
+  0x18 :i8                      \\   CLC
+  0x4C :i8 0x5F :i8 0xFF :i8    \\   JMP $FF5F           ; SCREEN_MODE (tail call)
+end \\ 27bf
 
 code x16 __x16_mode_txt ( )
-  0xA9 :i8 0x00 :i8 0x18 :i8 0x4C :i8 0x5F :i8 0xFF :i8
-end
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x18 :i8                      \\   CLC
+  0x4C :i8 0x5F :i8 0xFF :i8    \\   JMP $FF5F           ; SCREEN_MODE (tail call)
+end \\ ca18
 
 extern __x16_set_charset 0xFF62 ( A :i )
 

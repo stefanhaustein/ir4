@@ -1,0 +1,4 @@
+\ Error test: stale '\\' assembly hash in 'code' block
+code arm64 bad_asm ( )
+  0xC0 :i8 0x03 :i8 0x5F :i8 0xD6 :i8   \\ ret
+end \\ 0000

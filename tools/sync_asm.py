@@ -30,6 +30,7 @@ CPU_FAMILY = {
 CODE_HDR_RE = re.compile(r"^(\s*(?:(?:default|hot)\s+)*code\s+(\S+)\s+\S+\s*\([^)]*\))(.*)$")
 VAR_DATA_RE = re.compile(r"^\s*(?:var|data)\s+(\S+)(?:\s|$)")
 END_RE = re.compile(r"^(\s*end)(?:\s+\\\\\s*([0-9a-fA-F]{4})\s*|\s*(\\(?!\\).*)?|\s*)$")
+LABEL_RE = re.compile(r"^[A-Za-z_.@][A-Za-z0-9_.$@]*:")
 
 
 def fnv1a_byte(h: int, b: int) -> int:
@@ -215,11 +216,16 @@ def find_agondev_bin(name: str):
 
 
 def assemble_ez80(header_lines: list[str], body_lines: list[str], syms: list[str], pass_idx: int):
-    mc = find_agondev_bin("ez80-clang")
-    ld = find_agondev_bin("ez80-ld") or find_agondev_bin("ld.lld")
-    objcopy = find_agondev_bin("ez80-objcopy") or find_agondev_bin("llvm-objcopy")
-    nm = find_agondev_bin("ez80-nm") or find_agondev_bin("llvm-nm")
-    if not (mc and ld and objcopy and nm):
+    as_bin = find_agondev_bin("ez80-none-elf-as")
+    ld = find_agondev_bin("ez80-none-elf-ld") or find_agondev_bin("ez80-ld") or find_agondev_bin("ld.lld")
+    objcopy = (
+        find_agondev_bin("ez80-none-elf-objcopy")
+        or find_agondev_bin("ez80-objcopy")
+        or find_agondev_bin("llvm-objcopy")
+    )
+    nm = find_agondev_bin("ez80-none-elf-nm") or find_agondev_bin("ez80-nm") or find_agondev_bin("llvm-nm")
+    mc = None if as_bin else find_agondev_bin("ez80-clang")
+    if not ((as_bin or mc) and ld and objcopy and nm):
         return None
 
     org = 0x044000 if pass_idx == 0 else 0x044400
@@ -250,7 +256,10 @@ def assemble_ez80(header_lines: list[str], body_lines: list[str], syms: list[str
                 f"SECTIONS {{ . = 0x{org:06X}; .text : {{ *(.text*) }} /DISCARD/ : {{ *(*) }} }}\n"
             )
 
-        subprocess.run([mc, "-c", src_path, "-o", obj_path], check=True)
+        if as_bin:
+            subprocess.run([as_bin, "-march=ez80+adl", src_path, "-o", obj_path], check=True)
+        else:
+            subprocess.run([mc, "-c", src_path, "-o", obj_path], check=True)
         subprocess.run([ld, "-T", lds_path, obj_path, "-o", elf_path], check=True)
         subprocess.run([objcopy, "-O", "binary", elf_path, bin_path], check=True)
         nm_out = subprocess.check_output([nm, elf_path], text=True)
@@ -459,9 +468,10 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
         for bi, bl in enumerate(block_lines):
             if bi in asm_map:
                 ts, raw_asm = asm_map[bi]
-                asm_clean = raw_asm.rstrip("\r\n")
-                if asm_clean and not asm_clean.startswith(" "):
-                    asm_clean = " " + asm_clean
+                asm_clean = raw_asm.strip(" \t\r\n")
+                if asm_clean:
+                    pad = " " if LABEL_RE.match(asm_clean) else "   "
+                    asm_clean = pad + asm_clean
                 new_block_lines.append(f"{ts:<{col}}\\\\{asm_clean}".rstrip())
             else:
                 if not extract_code_tokens(bl):

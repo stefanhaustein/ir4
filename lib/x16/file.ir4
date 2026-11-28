@@ -13,64 +13,109 @@ extern __x16_chrout 0xFFD2 ( A :i )
 
 \ __x16_setlfs ( lfn :i dev :i sa :i ) -> SETLFS $FFBA (A=lfn, X=dev, Y=sa)
 code x16 __x16_setlfs ( lfn :i dev :i sa :i )
-  0xBD :i8 0 :as 0xA8 :i8
-  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
-  0xBD :i8 4 :as 0x85 :i8 0x02 :i8
-  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
-  0x8A :i8 0x48 :i8
-  0xA6 :i8 0x03 :i8
-  0xA5 :i8 0x02 :i8
-  0x20 :i8 0xBA :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-end
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0xA8 :i8                      \\   TAY
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x03 :i8             \\   STA $03
+  0xBD :i8 4 :as                \\   LDA STACK+4,X
+  0x85 :i8 0x02 :i8             \\   STA $02
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0xA6 :i8 0x03 :i8             \\   LDX $03
+  0xA5 :i8 0x02 :i8             \\   LDA $02
+  0x20 :i8 0xBA :i8 0xFF :i8    \\   JSR $FFBA
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+end \\ 823c
 
 \ __x16_setnam ( addr :a len :i ) -> SETNAM $FFBD (A=len, X=lo, Y=hi)
 code x16 __x16_setnam ( addr :a len :i )
-  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
-  0xBD :i8 2 :as 0x85 :i8 0x03 :i8
-  0xBD :i8 3 :as 0xA8 :i8
-  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
-  0x8A :i8 0x48 :i8
-  0xA6 :i8 0x03 :i8
-  0xA5 :i8 0x02 :i8
-  0x20 :i8 0xBD :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-end
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA $02
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x03 :i8             \\   STA $03
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0xA8 :i8                      \\   TAY
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0xA6 :i8 0x03 :i8             \\   LDX $03
+  0xA5 :i8 0x02 :i8             \\   LDA $02
+  0x20 :i8 0xBD :i8 0xFF :i8    \\   JSR $FFBD
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+end \\ 7fec
 
 \ __x16_open ( -> :i ) -> OPEN $FFC0 (0 ok, -1 on C=1)
 code x16 __x16_open ( -> :i )
-  0xCA :i8 0xCA :i8
-  0x8A :i8 0x48 :i8
-  0x20 :i8 0xC0 :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-  0xB0 :i8 0x09 :i8
-  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
-  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
-end
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0x20 :i8 0xC0 :i8 0xFF :i8    \\   JSR $FFC0
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xB0 :i8 0x09 :i8             \\   BCS err
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x60 :i8                      \\   RTS
+                                \\ err:
+  0xA9 :i8 0xFF :i8             \\   LDA #$FF
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+end \\ fba5
 
 \ __x16_chkin ( lfn :i -> :i ) -> CHKIN $FFC6 (0 ok, -1 on C=1)
 code x16 __x16_chkin ( lfn :i -> :i )
-  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
-  0x8A :i8 0x48 :i8
-  0xA6 :i8 0x02 :i8
-  0x20 :i8 0xC6 :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-  0xB0 :i8 0x09 :i8
-  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
-  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
-end
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA $02
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0xA6 :i8 0x02 :i8             \\   LDX $02
+  0x20 :i8 0xC6 :i8 0xFF :i8    \\   JSR $FFC6
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xB0 :i8 0x09 :i8             \\   BCS err
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x60 :i8                      \\   RTS
+                                \\ err:
+  0xA9 :i8 0xFF :i8             \\   LDA #$FF
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+end \\ f17b
 
 \ __x16_ckout ( lfn :i -> :i ) -> CKOUT $FFC9 (0 ok, -1 on C=1)
 code x16 __x16_ckout ( lfn :i -> :i )
-  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
-  0x8A :i8 0x48 :i8
-  0xA6 :i8 0x02 :i8
-  0x20 :i8 0xC9 :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-  0xB0 :i8 0x09 :i8
-  0xA9 :i8 0x00 :i8 0x9D :i8 0 :as 0x9D :i8 1 :as 0x60 :i8
-  0xA9 :i8 0xFF :i8 0x9D :i8 0 :as 0x9D :i8 1 :as
-end
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA $02
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0xA6 :i8 0x02 :i8             \\   LDX $02
+  0x20 :i8 0xC9 :i8 0xFF :i8    \\   JSR $FFC9
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xB0 :i8 0x09 :i8             \\   BCS err
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x60 :i8                      \\   RTS
+                                \\ err:
+  0xA9 :i8 0xFF :i8             \\   LDA #$FF
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+end \\ 8810
 
 \ 4 open file slots (LFNs 2..5, SA 2..5) + 1 directory slot (LFN 6, SA 0)
 var __x16_fmode   :bytes 4

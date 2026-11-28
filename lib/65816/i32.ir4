@@ -1,49 +1,49 @@
 \ lib/65816/i32.ir4 - 32-bit multiply, divide, modulo, and shifts for 65816
 
 code 65816 i32<< ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0x00 :i8 0x02 :i8    \\ LDA $0200,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8 0x00 :i8    \\ AND #$001F
-  0xF0 :i8 0x0A :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0x00 :i8 0x02 :i8    \\   LDA $0200,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8 0x00 :i8    \\   AND #$001F
+  0xF0 :i8 0x0A :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0x1E :i8 0x00 :i8 0x02 :i8    \\ ASL $0200,X
-  0x3E :i8 0x02 :i8 0x02 :i8    \\ ROL $0202,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xF7 :i8             \\ BNE loop
+  0x1E :i8 0x00 :i8 0x02 :i8    \\   ASL $0200,X
+  0x3E :i8 0x02 :i8 0x02 :i8    \\   ROL $0202,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xF7 :i8             \\   BNE loop
                                 \\ done:
 end \\ d3c9
 
 code 65816 u32>> ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0x00 :i8 0x02 :i8    \\ LDA $0200,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8 0x00 :i8    \\ AND #$001F
-  0xF0 :i8 0x0A :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0x00 :i8 0x02 :i8    \\   LDA $0200,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8 0x00 :i8    \\   AND #$001F
+  0xF0 :i8 0x0A :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0x5E :i8 0x02 :i8 0x02 :i8    \\ LSR $0202,X
-  0x7E :i8 0x00 :i8 0x02 :i8    \\ ROR $0200,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xF7 :i8             \\ BNE loop
+  0x5E :i8 0x02 :i8 0x02 :i8    \\   LSR $0202,X
+  0x7E :i8 0x00 :i8 0x02 :i8    \\   ROR $0200,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xF7 :i8             \\   BNE loop
                                 \\ done:
 end \\ cea8
 
 code 65816 i32>> ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0x00 :i8 0x02 :i8    \\ LDA $0200,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8 0x00 :i8    \\ AND #$001F
-  0xF0 :i8 0x10 :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0x00 :i8 0x02 :i8    \\   LDA $0200,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8 0x00 :i8    \\   AND #$001F
+  0xF0 :i8 0x10 :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0xBD :i8 0x02 :i8 0x02 :i8    \\ LDA $0202,X
-  0xC9 :i8 0x00 :i8 0x80 :i8    \\ CMP #$8000
-  0x7E :i8 0x02 :i8 0x02 :i8    \\ ROR $0202,X
-  0x7E :i8 0x00 :i8 0x02 :i8    \\ ROR $0200,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xF1 :i8             \\ BNE loop
+  0xBD :i8 0x02 :i8 0x02 :i8    \\   LDA $0202,X
+  0xC9 :i8 0x00 :i8 0x80 :i8    \\   CMP #$8000
+  0x7E :i8 0x02 :i8 0x02 :i8    \\   ROR $0202,X
+  0x7E :i8 0x00 :i8 0x02 :i8    \\   ROR $0200,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xF1 :i8             \\   BNE loop
                                 \\ done:
 end \\ f066
 

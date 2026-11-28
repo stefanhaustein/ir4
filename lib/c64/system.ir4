@@ -4,17 +4,26 @@ require "i32.ir4"
 
 \ __c64_rdtim32 ( -> :i32 )  RDTIM $FFDE: A=LSB, X=mid, Y=MSB -> 4-byte :i32
 code c64 __c64_rdtim32 ( -> :i32 )
-  0x8A :i8 0x48 :i8
-  0x20 :i8 0xDE :i8 0xFF :i8
-  0x85 :i8 0xFB :i8
-  0x86 :i8 0xFC :i8
-  0x68 :i8 0xAA :i8
-  0xCA :i8 0xCA :i8 0xCA :i8 0xCA :i8
-  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
-  0xA5 :i8 0xFC :i8 0x9D :i8 1 :as
-  0x98 :i8 0x9D :i8 2 :as
-  0xA9 :i8 0x00 :i8 0x9D :i8 3 :as
-end
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0x20 :i8 0xDE :i8 0xFF :i8    \\   JSR $FFDE
+  0x85 :i8 0xFB :i8             \\   STA $FB
+  0x86 :i8 0xFC :i8             \\   STX $FC
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0xA5 :i8 0xFB :i8             \\   LDA $FB
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA5 :i8 0xFC :i8             \\   LDA $FC
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x98 :i8                      \\   TYA
+  0x9D :i8 2 :as                \\   STA STACK+2,X
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x9D :i8 3 :as                \\   STA STACK+3,X
+end \\ 405c
 
 fn sysmillis ( -> :i32 )
   __c64_rdtim32 50 i>i32 i32* 3 i>i32 i32/

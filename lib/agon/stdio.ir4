@@ -2,8 +2,12 @@
 \ ADL mode: POP DE (ret), POP HL (c), PUSH DE, LD A, L, RST $10, RET
 
 code agon emit ( c :i )
-  0xD1 :i8 0xE1 :i8 0xD5 :i8 0x7D :i8 0x5B :i8 0xD7 :i8
-end
+  0xD1 :i8                      \\   POP DE
+  0xE1 :i8                      \\   POP HL
+  0xD5 :i8                      \\   PUSH DE
+  0x7D :i8                      \\   LD A, L
+  0x5B :i8 0xD7 :i8             \\   RST.LIL 0x10
+end \\ 9143
 
 fn xemit ( c :i )
   c 10 = if 13 emit then
@@ -13,18 +17,24 @@ end
 \ Non-blocking read of next key event; returns (vkeycode << 8) | keyascii, or 0 if none.
 \ Clears sysvar_vkeydown so each keypress is consumed once.
 code agon inkey ( -> :i )
-  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
-  0xDD :i8 0x7E :i8 0x18 :i8
-  0xB7 :i8 0x20 :i8 0x06 :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8
-  0x18 :i8 0x0E :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8
-  0xDD :i8 0x66 :i8 0x17 :i8
-  0xDD :i8 0x6E :i8 0x05 :i8
-  0xAF :i8
-  0xDD :i8 0x77 :i8 0x18 :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0x3E :i8 0x08 :i8                    \\   LD A, 0x08
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0xDD :i8 0x7E :i8 0x18 :i8           \\   LD A, (IX + 0x18)
+  0xB7 :i8                             \\   OR A
+  0x20 :i8 0x06 :i8                    \\   JR NZ, have_key
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x18 :i8 0x0E :i8                    \\   JR push_ret
+                                       \\ have_key:
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0xDD :i8 0x66 :i8 0x17 :i8           \\   LD H, (IX + 0x17)
+  0xDD :i8 0x6E :i8 0x05 :i8           \\   LD L, (IX + 0x05)
+  0xAF :i8                             \\   XOR A
+  0xDD :i8 0x77 :i8 0x18 :i8           \\   LD (IX + 0x18), A
+                                       \\ push_ret:
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ c113
 
 \ Blocking read of next native key event: (vkeycode << 8) | keyascii.
 fn key ( -> :i )

@@ -18,263 +18,263 @@
 \\ T2 = $10
 
 code 6502 i32* ( a :i32 b :i32 -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA B0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA B1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x08 :i8             \\ STA B2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x09 :i8             \\ STA B3
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA A0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA A1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x04 :i8             \\ STA A2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x05 :i8             \\ STA A3
-  0xA9 :i8 0x00 :i8             \\ LDA #0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0x85 :i8 0x0D :i8             \\ STA R3
-  0xA0 :i8 0x20 :i8             \\ LDY #32
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA B0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA B1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x08 :i8             \\   STA B2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x09 :i8             \\   STA B3
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA A0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA A1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x04 :i8             \\   STA A2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x05 :i8             \\   STA A3
+  0xA9 :i8 0x00 :i8             \\   LDA #0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0x85 :i8 0x0D :i8             \\   STA R3
+  0xA0 :i8 0x20 :i8             \\   LDY #32
                                 \\ loop:
-  0x46 :i8 0x09 :i8             \\ LSR B3
-  0x66 :i8 0x08 :i8             \\ ROR B2
-  0x66 :i8 0x07 :i8             \\ ROR B1
-  0x66 :i8 0x06 :i8             \\ ROR B0
-  0x90 :i8 0x19 :i8             \\ BCC noadd
-  0x18 :i8                      \\ CLC
-  0xA5 :i8 0x0A :i8             \\ LDA R0
-  0x65 :i8 0x02 :i8             \\ ADC A0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0xA5 :i8 0x0B :i8             \\ LDA R1
-  0x65 :i8 0x03 :i8             \\ ADC A1
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0xA5 :i8 0x0C :i8             \\ LDA R2
-  0x65 :i8 0x04 :i8             \\ ADC A2
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0xA5 :i8 0x0D :i8             \\ LDA R3
-  0x65 :i8 0x05 :i8             \\ ADC A3
-  0x85 :i8 0x0D :i8             \\ STA R3
+  0x46 :i8 0x09 :i8             \\   LSR B3
+  0x66 :i8 0x08 :i8             \\   ROR B2
+  0x66 :i8 0x07 :i8             \\   ROR B1
+  0x66 :i8 0x06 :i8             \\   ROR B0
+  0x90 :i8 0x19 :i8             \\   BCC noadd
+  0x18 :i8                      \\   CLC
+  0xA5 :i8 0x0A :i8             \\   LDA R0
+  0x65 :i8 0x02 :i8             \\   ADC A0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0xA5 :i8 0x0B :i8             \\   LDA R1
+  0x65 :i8 0x03 :i8             \\   ADC A1
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0xA5 :i8 0x0C :i8             \\   LDA R2
+  0x65 :i8 0x04 :i8             \\   ADC A2
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0xA5 :i8 0x0D :i8             \\   LDA R3
+  0x65 :i8 0x05 :i8             \\   ADC A3
+  0x85 :i8 0x0D :i8             \\   STA R3
                                 \\ noadd:
-  0x06 :i8 0x02 :i8             \\ ASL A0
-  0x26 :i8 0x03 :i8             \\ ROL A1
-  0x26 :i8 0x04 :i8             \\ ROL A2
-  0x26 :i8 0x05 :i8             \\ ROL A3
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xD2 :i8             \\ BNE loop
-  0xA5 :i8 0x0A :i8             \\ LDA R0
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0xA5 :i8 0x0B :i8             \\ LDA R1
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0xA5 :i8 0x0C :i8             \\ LDA R2
-  0x9D :i8 2 :as                \\ STA STACK+2,X
-  0xA5 :i8 0x0D :i8             \\ LDA R3
-  0x9D :i8 3 :as                \\ STA STACK+3,X
+  0x06 :i8 0x02 :i8             \\   ASL A0
+  0x26 :i8 0x03 :i8             \\   ROL A1
+  0x26 :i8 0x04 :i8             \\   ROL A2
+  0x26 :i8 0x05 :i8             \\   ROL A3
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xD2 :i8             \\   BNE loop
+  0xA5 :i8 0x0A :i8             \\   LDA R0
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA5 :i8 0x0B :i8             \\   LDA R1
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0xA5 :i8 0x0C :i8             \\   LDA R2
+  0x9D :i8 2 :as                \\   STA STACK+2,X
+  0xA5 :i8 0x0D :i8             \\   LDA R3
+  0x9D :i8 3 :as                \\   STA STACK+3,X
 end \\ 4c22
 
 code 6502 u32/ ( a :i32 b :i32 -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA B0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA B1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x08 :i8             \\ STA B2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x09 :i8             \\ STA B3
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA A0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA A1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x04 :i8             \\ STA A2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x05 :i8             \\ STA A3
-  0xA9 :i8 0x00 :i8             \\ LDA #0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0x85 :i8 0x0D :i8             \\ STA R3
-  0xA0 :i8 0x20 :i8             \\ LDY #32
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA B0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA B1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x08 :i8             \\   STA B2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x09 :i8             \\   STA B3
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA A0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA A1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x04 :i8             \\   STA A2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x05 :i8             \\   STA A3
+  0xA9 :i8 0x00 :i8             \\   LDA #0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0x85 :i8 0x0D :i8             \\   STA R3
+  0xA0 :i8 0x20 :i8             \\   LDY #32
                                 \\ loop:
-  0x06 :i8 0x02 :i8             \\ ASL A0
-  0x26 :i8 0x03 :i8             \\ ROL A1
-  0x26 :i8 0x04 :i8             \\ ROL A2
-  0x26 :i8 0x05 :i8             \\ ROL A3
-  0x26 :i8 0x0A :i8             \\ ROL R0
-  0x26 :i8 0x0B :i8             \\ ROL R1
-  0x26 :i8 0x0C :i8             \\ ROL R2
-  0x26 :i8 0x0D :i8             \\ ROL R3
-  0x38 :i8                      \\ SEC
-  0xA5 :i8 0x0A :i8             \\ LDA R0
-  0xE5 :i8 0x06 :i8             \\ SBC B0
-  0x85 :i8 0x0E :i8             \\ STA T0
-  0xA5 :i8 0x0B :i8             \\ LDA R1
-  0xE5 :i8 0x07 :i8             \\ SBC B1
-  0x85 :i8 0x0F :i8             \\ STA T1
-  0xA5 :i8 0x0C :i8             \\ LDA R2
-  0xE5 :i8 0x08 :i8             \\ SBC B2
-  0x85 :i8 0x10 :i8             \\ STA T2
-  0xA5 :i8 0x0D :i8             \\ LDA R3
-  0xE5 :i8 0x09 :i8             \\ SBC B3
-  0x90 :i8 0x10 :i8             \\ BCC skip
-  0x85 :i8 0x0D :i8             \\ STA R3
-  0xA5 :i8 0x10 :i8             \\ LDA T2
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0xA5 :i8 0x0F :i8             \\ LDA T1
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0xA5 :i8 0x0E :i8             \\ LDA T0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0xE6 :i8 0x02 :i8             \\ INC A0
+  0x06 :i8 0x02 :i8             \\   ASL A0
+  0x26 :i8 0x03 :i8             \\   ROL A1
+  0x26 :i8 0x04 :i8             \\   ROL A2
+  0x26 :i8 0x05 :i8             \\   ROL A3
+  0x26 :i8 0x0A :i8             \\   ROL R0
+  0x26 :i8 0x0B :i8             \\   ROL R1
+  0x26 :i8 0x0C :i8             \\   ROL R2
+  0x26 :i8 0x0D :i8             \\   ROL R3
+  0x38 :i8                      \\   SEC
+  0xA5 :i8 0x0A :i8             \\   LDA R0
+  0xE5 :i8 0x06 :i8             \\   SBC B0
+  0x85 :i8 0x0E :i8             \\   STA T0
+  0xA5 :i8 0x0B :i8             \\   LDA R1
+  0xE5 :i8 0x07 :i8             \\   SBC B1
+  0x85 :i8 0x0F :i8             \\   STA T1
+  0xA5 :i8 0x0C :i8             \\   LDA R2
+  0xE5 :i8 0x08 :i8             \\   SBC B2
+  0x85 :i8 0x10 :i8             \\   STA T2
+  0xA5 :i8 0x0D :i8             \\   LDA R3
+  0xE5 :i8 0x09 :i8             \\   SBC B3
+  0x90 :i8 0x10 :i8             \\   BCC skip
+  0x85 :i8 0x0D :i8             \\   STA R3
+  0xA5 :i8 0x10 :i8             \\   LDA T2
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0xA5 :i8 0x0F :i8             \\   LDA T1
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0xA5 :i8 0x0E :i8             \\   LDA T0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0xE6 :i8 0x02 :i8             \\   INC A0
                                 \\ skip:
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xC4 :i8             \\ BNE loop
-  0xA5 :i8 0x02 :i8             \\ LDA A0
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0xA5 :i8 0x03 :i8             \\ LDA A1
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0xA5 :i8 0x04 :i8             \\ LDA A2
-  0x9D :i8 2 :as                \\ STA STACK+2,X
-  0xA5 :i8 0x05 :i8             \\ LDA A3
-  0x9D :i8 3 :as                \\ STA STACK+3,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xC4 :i8             \\   BNE loop
+  0xA5 :i8 0x02 :i8             \\   LDA A0
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA5 :i8 0x03 :i8             \\   LDA A1
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0xA5 :i8 0x04 :i8             \\   LDA A2
+  0x9D :i8 2 :as                \\   STA STACK+2,X
+  0xA5 :i8 0x05 :i8             \\   LDA A3
+  0x9D :i8 3 :as                \\   STA STACK+3,X
 end \\ 1718
 
 code 6502 u32mod ( a :i32 b :i32 -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA B0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA B1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x08 :i8             \\ STA B2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x09 :i8             \\ STA B3
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA A0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA A1
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x85 :i8 0x04 :i8             \\ STA A2
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x85 :i8 0x05 :i8             \\ STA A3
-  0xA9 :i8 0x00 :i8             \\ LDA #0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0x85 :i8 0x0D :i8             \\ STA R3
-  0xA0 :i8 0x20 :i8             \\ LDY #32
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA B0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA B1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x08 :i8             \\   STA B2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x09 :i8             \\   STA B3
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA A0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA A1
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x85 :i8 0x04 :i8             \\   STA A2
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x85 :i8 0x05 :i8             \\   STA A3
+  0xA9 :i8 0x00 :i8             \\   LDA #0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0x85 :i8 0x0D :i8             \\   STA R3
+  0xA0 :i8 0x20 :i8             \\   LDY #32
                                 \\ loop:
-  0x06 :i8 0x02 :i8             \\ ASL A0
-  0x26 :i8 0x03 :i8             \\ ROL A1
-  0x26 :i8 0x04 :i8             \\ ROL A2
-  0x26 :i8 0x05 :i8             \\ ROL A3
-  0x26 :i8 0x0A :i8             \\ ROL R0
-  0x26 :i8 0x0B :i8             \\ ROL R1
-  0x26 :i8 0x0C :i8             \\ ROL R2
-  0x26 :i8 0x0D :i8             \\ ROL R3
-  0x38 :i8                      \\ SEC
-  0xA5 :i8 0x0A :i8             \\ LDA R0
-  0xE5 :i8 0x06 :i8             \\ SBC B0
-  0x85 :i8 0x0E :i8             \\ STA T0
-  0xA5 :i8 0x0B :i8             \\ LDA R1
-  0xE5 :i8 0x07 :i8             \\ SBC B1
-  0x85 :i8 0x0F :i8             \\ STA T1
-  0xA5 :i8 0x0C :i8             \\ LDA R2
-  0xE5 :i8 0x08 :i8             \\ SBC B2
-  0x85 :i8 0x10 :i8             \\ STA T2
-  0xA5 :i8 0x0D :i8             \\ LDA R3
-  0xE5 :i8 0x09 :i8             \\ SBC B3
-  0x90 :i8 0x10 :i8             \\ BCC skip
-  0x85 :i8 0x0D :i8             \\ STA R3
-  0xA5 :i8 0x10 :i8             \\ LDA T2
-  0x85 :i8 0x0C :i8             \\ STA R2
-  0xA5 :i8 0x0F :i8             \\ LDA T1
-  0x85 :i8 0x0B :i8             \\ STA R1
-  0xA5 :i8 0x0E :i8             \\ LDA T0
-  0x85 :i8 0x0A :i8             \\ STA R0
-  0xE6 :i8 0x02 :i8             \\ INC A0
+  0x06 :i8 0x02 :i8             \\   ASL A0
+  0x26 :i8 0x03 :i8             \\   ROL A1
+  0x26 :i8 0x04 :i8             \\   ROL A2
+  0x26 :i8 0x05 :i8             \\   ROL A3
+  0x26 :i8 0x0A :i8             \\   ROL R0
+  0x26 :i8 0x0B :i8             \\   ROL R1
+  0x26 :i8 0x0C :i8             \\   ROL R2
+  0x26 :i8 0x0D :i8             \\   ROL R3
+  0x38 :i8                      \\   SEC
+  0xA5 :i8 0x0A :i8             \\   LDA R0
+  0xE5 :i8 0x06 :i8             \\   SBC B0
+  0x85 :i8 0x0E :i8             \\   STA T0
+  0xA5 :i8 0x0B :i8             \\   LDA R1
+  0xE5 :i8 0x07 :i8             \\   SBC B1
+  0x85 :i8 0x0F :i8             \\   STA T1
+  0xA5 :i8 0x0C :i8             \\   LDA R2
+  0xE5 :i8 0x08 :i8             \\   SBC B2
+  0x85 :i8 0x10 :i8             \\   STA T2
+  0xA5 :i8 0x0D :i8             \\   LDA R3
+  0xE5 :i8 0x09 :i8             \\   SBC B3
+  0x90 :i8 0x10 :i8             \\   BCC skip
+  0x85 :i8 0x0D :i8             \\   STA R3
+  0xA5 :i8 0x10 :i8             \\   LDA T2
+  0x85 :i8 0x0C :i8             \\   STA R2
+  0xA5 :i8 0x0F :i8             \\   LDA T1
+  0x85 :i8 0x0B :i8             \\   STA R1
+  0xA5 :i8 0x0E :i8             \\   LDA T0
+  0x85 :i8 0x0A :i8             \\   STA R0
+  0xE6 :i8 0x02 :i8             \\   INC A0
                                 \\ skip:
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xC4 :i8             \\ BNE loop
-  0xA5 :i8 0x0A :i8             \\ LDA R0
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0xA5 :i8 0x0B :i8             \\ LDA R1
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0xA5 :i8 0x0C :i8             \\ LDA R2
-  0x9D :i8 2 :as                \\ STA STACK+2,X
-  0xA5 :i8 0x0D :i8             \\ LDA R3
-  0x9D :i8 3 :as                \\ STA STACK+3,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xC4 :i8             \\   BNE loop
+  0xA5 :i8 0x0A :i8             \\   LDA R0
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA5 :i8 0x0B :i8             \\   LDA R1
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0xA5 :i8 0x0C :i8             \\   LDA R2
+  0x9D :i8 2 :as                \\   STA STACK+2,X
+  0xA5 :i8 0x0D :i8             \\   LDA R3
+  0x9D :i8 3 :as                \\   STA STACK+3,X
 end \\ 5218
 
 code 6502 i32<< ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8             \\ AND #31
-  0xF0 :i8 0x1C :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8             \\   AND #31
+  0xF0 :i8 0x1C :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0x1E :i8 0 :as                \\ ASL STACK+0,X
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x2A :i8                      \\ ROL A
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0xBD :i8 2 :as                \\ LDA STACK+2,X
-  0x2A :i8                      \\ ROL A
-  0x9D :i8 2 :as                \\ STA STACK+2,X
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x2A :i8                      \\ ROL A
-  0x9D :i8 3 :as                \\ STA STACK+3,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xE5 :i8             \\ BNE loop
+  0x1E :i8 0 :as                \\   ASL STACK+0,X
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x2A :i8                      \\   ROL A
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0x2A :i8                      \\   ROL A
+  0x9D :i8 2 :as                \\   STA STACK+2,X
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x2A :i8                      \\   ROL A
+  0x9D :i8 3 :as                \\   STA STACK+3,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xE5 :i8             \\   BNE loop
                                 \\ done:
 end \\ f4fb
 
 code 6502 u32>> ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8             \\ AND #31
-  0xF0 :i8 0x10 :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8             \\   AND #31
+  0xF0 :i8 0x10 :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0x5E :i8 3 :as                \\ LSR STACK+3,X
-  0x7E :i8 2 :as                \\ ROR STACK+2,X
-  0x7E :i8 1 :as                \\ ROR STACK+1,X
-  0x7E :i8 0 :as                \\ ROR STACK+0,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xF1 :i8             \\ BNE loop
+  0x5E :i8 3 :as                \\   LSR STACK+3,X
+  0x7E :i8 2 :as                \\   ROR STACK+2,X
+  0x7E :i8 1 :as                \\   ROR STACK+1,X
+  0x7E :i8 0 :as                \\   ROR STACK+0,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xF1 :i8             \\   BNE loop
                                 \\ done:
 end \\ b028
 
 code 6502 i32>> ( a :i32 cnt :i -> :i32 )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0x29 :i8 0x1F :i8             \\ AND #31
-  0xF0 :i8 0x14 :i8             \\ BEQ done
-  0xA8 :i8                      \\ TAY
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x29 :i8 0x1F :i8             \\   AND #31
+  0xF0 :i8 0x14 :i8             \\   BEQ done
+  0xA8 :i8                      \\   TAY
                                 \\ loop:
-  0xBD :i8 3 :as                \\ LDA STACK+3,X
-  0x0A :i8                      \\ ASL A
-  0x7E :i8 3 :as                \\ ROR STACK+3,X
-  0x7E :i8 2 :as                \\ ROR STACK+2,X
-  0x7E :i8 1 :as                \\ ROR STACK+1,X
-  0x7E :i8 0 :as                \\ ROR STACK+0,X
-  0x88 :i8                      \\ DEY
-  0xD0 :i8 0xED :i8             \\ BNE loop
+  0xBD :i8 3 :as                \\   LDA STACK+3,X
+  0x0A :i8                      \\   ASL A
+  0x7E :i8 3 :as                \\   ROR STACK+3,X
+  0x7E :i8 2 :as                \\   ROR STACK+2,X
+  0x7E :i8 1 :as                \\   ROR STACK+1,X
+  0x7E :i8 0 :as                \\   ROR STACK+0,X
+  0x88 :i8                      \\   DEY
+  0xD0 :i8 0xED :i8             \\   BNE loop
                                 \\ done:
 end \\ 0226

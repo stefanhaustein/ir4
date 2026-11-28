@@ -10,36 +10,57 @@ end
 
 \ Query KERNAL screen size via SCREEN ($FFED: X=cols, Y=rows)
 code c64 __c64_screen ( -> :i )
-  0x8A :i8 0x48 :i8
-  0x20 :i8 0xED :i8 0xFF :i8
-  0x8A :i8 0x85 :i8 0xFB :i8
-  0x68 :i8 0xAA :i8
-  0xCA :i8 0xCA :i8
-  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
-  0x98 :i8 0x9D :i8 1 :as
-end
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0x20 :i8 0xED :i8 0xFF :i8    \\   JSR $FFED
+  0x8A :i8                      \\   TXA
+  0x85 :i8 0xFB :i8             \\   STA $FB
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0xA5 :i8 0xFB :i8             \\   LDA $FB
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x98 :i8                      \\   TYA
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+end \\ a013
 
 \ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
 code c64 __c64_plot ( x :i y :i )
-  0xBD :i8 0 :as 0x85 :i8 0x02 :i8
-  0xBD :i8 2 :as 0xA8 :i8
-  0xE8 :i8 0xE8 :i8 0xE8 :i8 0xE8 :i8
-  0x8A :i8 0x48 :i8
-  0xA6 :i8 0x02 :i8
-  0x18 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
-  0x68 :i8 0xAA :i8
-end
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA $02
+  0xBD :i8 2 :as                \\   LDA STACK+2,X
+  0xA8 :i8                      \\   TAY
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0xA6 :i8 0x02 :i8             \\   LDX $02
+  0x18 :i8                      \\   CLC
+  0x20 :i8 0xF0 :i8 0xFF :i8    \\   JSR $FFF0
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+end \\ 88b6
 
 \ Read KERNAL cursor via PLOT ($FFF0, C=1 -> X=row, Y=col -> (col<<8)|row).
 code c64 __c64_plot_get ( -> :i )
-  0x8A :i8 0x48 :i8
-  0x38 :i8 0x20 :i8 0xF0 :i8 0xFF :i8
-  0x8A :i8 0x85 :i8 0xFB :i8
-  0x68 :i8 0xAA :i8
-  0xCA :i8 0xCA :i8
-  0xA5 :i8 0xFB :i8 0x9D :i8 0 :as
-  0x98 :i8 0x9D :i8 1 :as
-end
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0x38 :i8                      \\   SEC
+  0x20 :i8 0xF0 :i8 0xFF :i8    \\   JSR $FFF0
+  0x8A :i8                      \\   TXA
+  0x85 :i8 0xFB :i8             \\   STA $FB
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0xCA :i8                      \\   DEX
+  0xCA :i8                      \\   DEX
+  0xA5 :i8 0xFB :i8             \\   LDA $FB
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x98 :i8                      \\   TYA
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+end \\ 8ab9
 
 fn termwidth ( -> :i ) __c64_screen 255 and end
 fn termheight ( -> :i ) __c64_screen 8 u>> 255 and end

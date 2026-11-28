@@ -2,12 +2,16 @@
 
 \ MOS $1E (mos_getkbmap) -> IXU = pointer to 32-byte live virtual key bitmap
 code agon __agon_kbmap ( -> :a )
-  0xDD :i8 0xE5 :i8
-  0x3E :i8 0x1E :i8 0x5B :i8 0xCF :i8
-  0xDD :i8 0xE5 :i8 0xE1 :i8
-  0xDD :i8 0xE1 :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xDD :i8 0xE5 :i8             \\   PUSH IX
+  0x3E :i8 0x1E :i8             \\   LD A, 0x1E
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xDD :i8 0xE5 :i8             \\   PUSH IX
+  0xE1 :i8                      \\   POP HL
+  0xDD :i8 0xE1 :i8             \\   POP IX
+  0xD1 :i8                      \\   POP DE
+  0xE5 :i8                      \\   PUSH HL
+  0xD5 :i8                      \\   PUSH DE
+end \\ 0cc0
 
 fn __agon_key ( km :a vk :i -> :i )
   km vk 3 >> a+ u8@ 1 vk 7 and << and 0 <>

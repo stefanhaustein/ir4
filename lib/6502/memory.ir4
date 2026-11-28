@@ -10,194 +10,194 @@
 \\ T0 = $08
 
 code 6502 memfill ( dst :a len :i val :i )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x08 :i8             \\ STA T0
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA L0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA L1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA P0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA P1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0x30 :i8 0x24 :i8             \\ BMI fill_done
-  0x05 :i8 0x06 :i8             \\ ORA L0
-  0xF0 :i8 0x20 :i8             \\ BEQ fill_done
-  0xA5 :i8 0x08 :i8             \\ LDA T0
-  0xA4 :i8 0x07 :i8             \\ LDY L1
-  0xF0 :i8 0x0D :i8             \\ BEQ fill_tail
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x08 :i8             \\   STA T0
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA L0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA L1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA P0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA P1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0x30 :i8 0x24 :i8             \\   BMI fill_done
+  0x05 :i8 0x06 :i8             \\   ORA L0
+  0xF0 :i8 0x20 :i8             \\   BEQ fill_done
+  0xA5 :i8 0x08 :i8             \\   LDA T0
+  0xA4 :i8 0x07 :i8             \\   LDY L1
+  0xF0 :i8 0x0D :i8             \\   BEQ fill_tail
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ fill_page:
-  0x91 :i8 0x02 :i8             \\ STA (P0),Y
-  0xC8 :i8                      \\ INY
-  0xD0 :i8 0xFB :i8             \\ BNE fill_page
-  0xE6 :i8 0x03 :i8             \\ INC P1
-  0xC6 :i8 0x07 :i8             \\ DEC L1
-  0xD0 :i8 0xF5 :i8             \\ BNE fill_page
+  0x91 :i8 0x02 :i8             \\   STA (P0),Y
+  0xC8 :i8                      \\   INY
+  0xD0 :i8 0xFB :i8             \\   BNE fill_page
+  0xE6 :i8 0x03 :i8             \\   INC P1
+  0xC6 :i8 0x07 :i8             \\   DEC L1
+  0xD0 :i8 0xF5 :i8             \\   BNE fill_page
                                 \\ fill_tail:
-  0xA4 :i8 0x06 :i8             \\ LDY L0
-  0xF0 :i8 0x09 :i8             \\ BEQ fill_done
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xA4 :i8 0x06 :i8             \\   LDY L0
+  0xF0 :i8 0x09 :i8             \\   BEQ fill_done
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ fill_tloop:
-  0x91 :i8 0x02 :i8             \\ STA (P0),Y
-  0xC8 :i8                      \\ INY
-  0xC4 :i8 0x06 :i8             \\ CPY L0
-  0xD0 :i8 0xF9 :i8             \\ BNE fill_tloop
+  0x91 :i8 0x02 :i8             \\   STA (P0),Y
+  0xC8 :i8                      \\   INY
+  0xC4 :i8 0x06 :i8             \\   CPY L0
+  0xD0 :i8 0xF9 :i8             \\   BNE fill_tloop
                                 \\ fill_done:
 end \\ 0c8f
 
 code 6502 memcpy ( dst :a src :a len :i )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA L0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA L1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA P0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA P1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x04 :i8             \\ STA Q0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x05 :i8             \\ STA Q1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0x30 :i8 0x67 :i8             \\ BMI copy_done
-  0x05 :i8 0x06 :i8             \\ ORA L0
-  0xF0 :i8 0x63 :i8             \\ BEQ copy_done
-  0x38 :i8                      \\ SEC
-  0xA5 :i8 0x02 :i8             \\ LDA P0
-  0xE5 :i8 0x04 :i8             \\ SBC Q0
-  0xA5 :i8 0x03 :i8             \\ LDA P1
-  0xE5 :i8 0x05 :i8             \\ SBC Q1
-  0xB0 :i8 0x34 :i8             \\ BCS copy_fwd
-                                \\ ; Backward copy (dst > src)
-  0x18 :i8                      \\ CLC
-  0xA5 :i8 0x03 :i8             \\ LDA P1
-  0x65 :i8 0x07 :i8             \\ ADC L1
-  0x85 :i8 0x03 :i8             \\ STA P1
-  0x18 :i8                      \\ CLC
-  0xA5 :i8 0x05 :i8             \\ LDA Q1
-  0x65 :i8 0x07 :i8             \\ ADC L1
-  0x85 :i8 0x05 :i8             \\ STA Q1
-  0xA4 :i8 0x06 :i8             \\ LDY L0
-  0xF0 :i8 0x0A :i8             \\ BEQ bk_pages
-  0x88 :i8                      \\ DEY
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA L0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA L1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA P0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA P1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x04 :i8             \\   STA Q0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x05 :i8             \\   STA Q1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0x30 :i8 0x67 :i8             \\   BMI copy_done
+  0x05 :i8 0x06 :i8             \\   ORA L0
+  0xF0 :i8 0x63 :i8             \\   BEQ copy_done
+  0x38 :i8                      \\   SEC
+  0xA5 :i8 0x02 :i8             \\   LDA P0
+  0xE5 :i8 0x04 :i8             \\   SBC Q0
+  0xA5 :i8 0x03 :i8             \\   LDA P1
+  0xE5 :i8 0x05 :i8             \\   SBC Q1
+  0xB0 :i8 0x34 :i8             \\   BCS copy_fwd
+                                \\   ; Backward copy (dst > src)
+  0x18 :i8                      \\   CLC
+  0xA5 :i8 0x03 :i8             \\   LDA P1
+  0x65 :i8 0x07 :i8             \\   ADC L1
+  0x85 :i8 0x03 :i8             \\   STA P1
+  0x18 :i8                      \\   CLC
+  0xA5 :i8 0x05 :i8             \\   LDA Q1
+  0x65 :i8 0x07 :i8             \\   ADC L1
+  0x85 :i8 0x05 :i8             \\   STA Q1
+  0xA4 :i8 0x06 :i8             \\   LDY L0
+  0xF0 :i8 0x0A :i8             \\   BEQ bk_pages
+  0x88 :i8                      \\   DEY
                                 \\ bk_tloop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0x91 :i8 0x04 :i8             \\ STA (Q0),Y
-  0x88 :i8                      \\ DEY
-  0xC0 :i8 0xFF :i8             \\ CPY #$FF
-  0xD0 :i8 0xF7 :i8             \\ BNE bk_tloop
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0x91 :i8 0x04 :i8             \\   STA (Q0),Y
+  0x88 :i8                      \\   DEY
+  0xC0 :i8 0xFF :i8             \\   CPY #$FF
+  0xD0 :i8 0xF7 :i8             \\   BNE bk_tloop
                                 \\ bk_pages:
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0xF0 :i8 0x38 :i8             \\ BEQ copy_done
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0xF0 :i8 0x38 :i8             \\   BEQ copy_done
                                 \\ bk_ploop:
-  0xC6 :i8 0x03 :i8             \\ DEC P1
-  0xC6 :i8 0x05 :i8             \\ DEC Q1
-  0xA0 :i8 0xFF :i8             \\ LDY #$FF
+  0xC6 :i8 0x03 :i8             \\   DEC P1
+  0xC6 :i8 0x05 :i8             \\   DEC Q1
+  0xA0 :i8 0xFF :i8             \\   LDY #$FF
                                 \\ bk_iloop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0x91 :i8 0x04 :i8             \\ STA (Q0),Y
-  0x88 :i8                      \\ DEY
-  0xC0 :i8 0xFF :i8             \\ CPY #$FF
-  0xD0 :i8 0xF7 :i8             \\ BNE bk_iloop
-  0xC6 :i8 0x07 :i8             \\ DEC L1
-  0xD0 :i8 0xED :i8             \\ BNE bk_ploop
-  0x60 :i8                      \\ RTS
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0x91 :i8 0x04 :i8             \\   STA (Q0),Y
+  0x88 :i8                      \\   DEY
+  0xC0 :i8 0xFF :i8             \\   CPY #$FF
+  0xD0 :i8 0xF7 :i8             \\   BNE bk_iloop
+  0xC6 :i8 0x07 :i8             \\   DEC L1
+  0xD0 :i8 0xED :i8             \\   BNE bk_ploop
+  0x60 :i8                      \\   RTS
                                 \\ copy_fwd:
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0xF0 :i8 0x11 :i8             \\ BEQ fwd_tail
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0xF0 :i8 0x11 :i8             \\   BEQ fwd_tail
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ fwd_ploop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0x91 :i8 0x04 :i8             \\ STA (Q0),Y
-  0xC8 :i8                      \\ INY
-  0xD0 :i8 0xF9 :i8             \\ BNE fwd_ploop
-  0xE6 :i8 0x03 :i8             \\ INC P1
-  0xE6 :i8 0x05 :i8             \\ INC Q1
-  0xC6 :i8 0x07 :i8             \\ DEC L1
-  0xD0 :i8 0xF1 :i8             \\ BNE fwd_ploop
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0x91 :i8 0x04 :i8             \\   STA (Q0),Y
+  0xC8 :i8                      \\   INY
+  0xD0 :i8 0xF9 :i8             \\   BNE fwd_ploop
+  0xE6 :i8 0x03 :i8             \\   INC P1
+  0xE6 :i8 0x05 :i8             \\   INC Q1
+  0xC6 :i8 0x07 :i8             \\   DEC L1
+  0xD0 :i8 0xF1 :i8             \\   BNE fwd_ploop
                                 \\ fwd_tail:
-  0xA5 :i8 0x06 :i8             \\ LDA L0
-  0xF0 :i8 0x0B :i8             \\ BEQ copy_done
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xA5 :i8 0x06 :i8             \\   LDA L0
+  0xF0 :i8 0x0B :i8             \\   BEQ copy_done
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ fwd_tloop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0x91 :i8 0x04 :i8             \\ STA (Q0),Y
-  0xC8 :i8                      \\ INY
-  0xC4 :i8 0x06 :i8             \\ CPY L0
-  0xD0 :i8 0xF7 :i8             \\ BNE fwd_tloop
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0x91 :i8 0x04 :i8             \\   STA (Q0),Y
+  0xC8 :i8                      \\   INY
+  0xC4 :i8 0x06 :i8             \\   CPY L0
+  0xD0 :i8 0xF7 :i8             \\   BNE fwd_tloop
                                 \\ copy_done:
 end \\ 5c53
 
 code 6502 memcmp ( a :a b :a len :i -> :i )
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x06 :i8             \\ STA L0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x07 :i8             \\ STA L1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x04 :i8             \\ STA Q0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x05 :i8             \\ STA Q1
-  0xE8 :i8                      \\ INX
-  0xE8 :i8                      \\ INX
-  0xBD :i8 0 :as                \\ LDA STACK+0,X
-  0x85 :i8 0x02 :i8             \\ STA P0
-  0xBD :i8 1 :as                \\ LDA STACK+1,X
-  0x85 :i8 0x03 :i8             \\ STA P1
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0x30 :i8 0x2C :i8             \\ BMI cmp_zero
-  0x05 :i8 0x06 :i8             \\ ORA L0
-  0xF0 :i8 0x28 :i8             \\ BEQ cmp_zero
-  0xA5 :i8 0x07 :i8             \\ LDA L1
-  0xF0 :i8 0x13 :i8             \\ BEQ cmp_tail
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x06 :i8             \\   STA L0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x07 :i8             \\   STA L1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x04 :i8             \\   STA Q0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x05 :i8             \\   STA Q1
+  0xE8 :i8                      \\   INX
+  0xE8 :i8                      \\   INX
+  0xBD :i8 0 :as                \\   LDA STACK+0,X
+  0x85 :i8 0x02 :i8             \\   STA P0
+  0xBD :i8 1 :as                \\   LDA STACK+1,X
+  0x85 :i8 0x03 :i8             \\   STA P1
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0x30 :i8 0x2C :i8             \\   BMI cmp_zero
+  0x05 :i8 0x06 :i8             \\   ORA L0
+  0xF0 :i8 0x28 :i8             \\   BEQ cmp_zero
+  0xA5 :i8 0x07 :i8             \\   LDA L1
+  0xF0 :i8 0x13 :i8             \\   BEQ cmp_tail
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ cmp_ploop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0xD1 :i8 0x04 :i8             \\ CMP (Q0),Y
-  0xD0 :i8 0x25 :i8             \\ BNE cmp_diff
-  0xC8 :i8                      \\ INY
-  0xD0 :i8 0xF7 :i8             \\ BNE cmp_ploop
-  0xE6 :i8 0x03 :i8             \\ INC P1
-  0xE6 :i8 0x05 :i8             \\ INC Q1
-  0xC6 :i8 0x07 :i8             \\ DEC L1
-  0xD0 :i8 0xEF :i8             \\ BNE cmp_ploop
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0xD1 :i8 0x04 :i8             \\   CMP (Q0),Y
+  0xD0 :i8 0x25 :i8             \\   BNE cmp_diff
+  0xC8 :i8                      \\   INY
+  0xD0 :i8 0xF7 :i8             \\   BNE cmp_ploop
+  0xE6 :i8 0x03 :i8             \\   INC P1
+  0xE6 :i8 0x05 :i8             \\   INC Q1
+  0xC6 :i8 0x07 :i8             \\   DEC L1
+  0xD0 :i8 0xEF :i8             \\   BNE cmp_ploop
                                 \\ cmp_tail:
-  0xA5 :i8 0x06 :i8             \\ LDA L0
-  0xF0 :i8 0x0D :i8             \\ BEQ cmp_zero
-  0xA0 :i8 0x00 :i8             \\ LDY #0
+  0xA5 :i8 0x06 :i8             \\   LDA L0
+  0xF0 :i8 0x0D :i8             \\   BEQ cmp_zero
+  0xA0 :i8 0x00 :i8             \\   LDY #0
                                 \\ cmp_tloop:
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0xD1 :i8 0x04 :i8             \\ CMP (Q0),Y
-  0xD0 :i8 0x0E :i8             \\ BNE cmp_diff
-  0xC8 :i8                      \\ INY
-  0xC4 :i8 0x06 :i8             \\ CPY L0
-  0xD0 :i8 0xF5 :i8             \\ BNE cmp_tloop
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0xD1 :i8 0x04 :i8             \\   CMP (Q0),Y
+  0xD0 :i8 0x0E :i8             \\   BNE cmp_diff
+  0xC8 :i8                      \\   INY
+  0xC4 :i8 0x06 :i8             \\   CPY L0
+  0xD0 :i8 0xF5 :i8             \\   BNE cmp_tloop
                                 \\ cmp_zero:
-  0xA9 :i8 0x00 :i8             \\ LDA #0
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0x60 :i8                      \\ RTS
+  0xA9 :i8 0x00 :i8             \\   LDA #0
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x60 :i8                      \\   RTS
                                 \\ cmp_diff:
-  0x38 :i8                      \\ SEC
-  0xB1 :i8 0x02 :i8             \\ LDA (P0),Y
-  0xF1 :i8 0x04 :i8             \\ SBC (Q0),Y
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0xA9 :i8 0x00 :i8             \\ LDA #0
-  0xE9 :i8 0x00 :i8             \\ SBC #0
-  0x9D :i8 1 :as                \\ STA STACK+1,X
+  0x38 :i8                      \\   SEC
+  0xB1 :i8 0x02 :i8             \\   LDA (P0),Y
+  0xF1 :i8 0x04 :i8             \\   SBC (Q0),Y
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA9 :i8 0x00 :i8             \\   LDA #0
+  0xE9 :i8 0x00 :i8             \\   SBC #0
+  0x9D :i8 1 :as                \\   STA STACK+1,X
 end \\ 0050

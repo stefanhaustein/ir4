@@ -5,78 +5,78 @@ require "stdio.ir4"
 \ Call Bank-0 KERNAL routine at addr with Carry = (c_in != 0), 8-bit X = x_in, 8-bit Y = y_in;
 \ returns 16-bit (Y_out << 8) | X_out.
 code x16gs __x16gs_kernal_xy_out ( c_in :i x_in :i y_in :i addr :i -> :i )
-  0xBD :i8 0x00 :i8 0x02 :i8           \\ LDA $0200,X         ; addr
-  0x8F :i8 0x55 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000455       ; 16-bit addr at $0455..$0456
-  0xBD :i8 0x02 :i8 0x02 :i8           \\ LDA $0202,X         ; y_in
-  0x85 :i8 0x20 :i8                    \\ STA $20             ; $0420
-  0xBD :i8 0x04 :i8 0x02 :i8           \\ LDA $0204,X         ; x_in
-  0x85 :i8 0x22 :i8                    \\ STA $22             ; $0422
-  0xBD :i8 0x06 :i8 0x02 :i8           \\ LDA $0206,X         ; c_in
-  0x85 :i8 0x24 :i8                    \\ STA $24             ; $0424
-  0xE8 :i8                             \\ INX
-  0xE8 :i8                             \\ INX
-  0xE8 :i8                             \\ INX
-  0xE8 :i8                             \\ INX
-  0xE8 :i8                             \\ INX
-  0xE8 :i8                             \\ INX                 ; pop 4 words, leave 1 result slot
-  0x86 :i8 0x1E :i8                    \\ STX $1E             ; save data stack X
-  0x3B :i8                             \\ TSC
-  0x85 :i8 0x1C :i8                    \\ STA $1C             ; save native S
-  0xE2 :i8 0x20 :i8                    \\ SEP #$20
-  0xA9 :i8 0x38 :i8                    \\ LDA #$38            ; SEC
-  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000450
-  0xA9 :i8 0xFB :i8                    \\ LDA #$FB            ; XCE
-  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000451
-  0xA9 :i8 0x58 :i8                    \\ LDA #$58            ; CLI
-  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000452
-  0xA5 :i8 0x24 :i8                    \\ LDA $24             ; c_in low byte
-  0xF0 :i8 0x04 :i8                    \\ BEQ c_zero
-  0xA9 :i8 0x38 :i8                    \\ LDA #$38            ; SEC
-  0x80 :i8 0x02 :i8                    \\ BRA store_c
+  0xBD :i8 0x00 :i8 0x02 :i8           \\   LDA $0200,X         ; addr
+  0x8F :i8 0x55 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000455       ; 16-bit addr at $0455..$0456
+  0xBD :i8 0x02 :i8 0x02 :i8           \\   LDA $0202,X         ; y_in
+  0x85 :i8 0x20 :i8                    \\   STA $20             ; $0420
+  0xBD :i8 0x04 :i8 0x02 :i8           \\   LDA $0204,X         ; x_in
+  0x85 :i8 0x22 :i8                    \\   STA $22             ; $0422
+  0xBD :i8 0x06 :i8 0x02 :i8           \\   LDA $0206,X         ; c_in
+  0x85 :i8 0x24 :i8                    \\   STA $24             ; $0424
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX                 ; pop 4 words, leave 1 result slot
+  0x86 :i8 0x1E :i8                    \\   STX $1E             ; save data stack X
+  0x3B :i8                             \\   TSC
+  0x85 :i8 0x1C :i8                    \\   STA $1C             ; save native S
+  0xE2 :i8 0x20 :i8                    \\   SEP #$20
+  0xA9 :i8 0x38 :i8                    \\   LDA #$38            ; SEC
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000450
+  0xA9 :i8 0xFB :i8                    \\   LDA #$FB            ; XCE
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000451
+  0xA9 :i8 0x58 :i8                    \\   LDA #$58            ; CLI
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000452
+  0xA5 :i8 0x24 :i8                    \\   LDA $24             ; c_in low byte
+  0xF0 :i8 0x04 :i8                    \\   BEQ c_zero
+  0xA9 :i8 0x38 :i8                    \\   LDA #$38            ; SEC
+  0x80 :i8 0x02 :i8                    \\   BRA store_c
                                        \\ c_zero:
-  0xA9 :i8 0x18 :i8                    \\ LDA #$18            ; CLC
+  0xA9 :i8 0x18 :i8                    \\   LDA #$18            ; CLC
                                        \\ store_c:
-  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000453
-  0xA9 :i8 0x20 :i8                    \\ LDA #$20            ; JSR
-  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000454
-  0xA9 :i8 0x78 :i8                    \\ LDA #$78            ; SEI
-  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000457
-  0xA9 :i8 0x18 :i8                    \\ LDA #$18            ; CLC
-  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000458
-  0xA9 :i8 0xFB :i8                    \\ LDA #$FB            ; XCE
-  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000459
-  0xA9 :i8 0x6B :i8                    \\ LDA #$6B            ; RTL
-  0x8F :i8 0x5A :i8 0x04 :i8 0x00 :i8  \\ STA f:$00045A
-  0x8B :i8                             \\ PHB
-  0x68 :i8                             \\ PLA
-  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\ STA f:$00042A       ; save caller DBR
-  0xA9 :i8 0x00 :i8                    \\ LDA #$00
-  0x48 :i8                             \\ PHA
-  0xAB :i8                             \\ PLB                 ; DBR = $00
-  0xC2 :i8 0x20 :i8                    \\ REP #$20
-  0xA9 :i8 0x00 :i8 0x00 :i8           \\ LDA #$0000
-  0x5B :i8                             \\ TCD                 ; D = $0000
-  0xA2 :i8 0xDF :i8 0x01 :i8           \\ LDX #$01DF
-  0x9A :i8                             \\ TXS
-  0xE2 :i8 0x30 :i8                    \\ SEP #$30            ; 8-bit A, X, Y
-  0xAE :i8 0x22 :i8 0x04 :i8           \\ LDX $0422           ; x_in
-  0xAC :i8 0x20 :i8 0x04 :i8           \\ LDY $0420           ; y_in
-  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\ JSL $000450
-  0x8A :i8                             \\ TXA                 ; X_out
-  0x8F :i8 0x20 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000420
-  0x98 :i8                             \\ TYA                 ; Y_out
-  0x8F :i8 0x21 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000421
-  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\ LDA f:$00042A       ; restore caller DBR
-  0x48 :i8                             \\ PHA
-  0xAB :i8                             \\ PLB
-  0xC2 :i8 0x30 :i8                    \\ REP #$30
-  0xA9 :i8 0x00 :i8 0x04 :i8           \\ LDA #$0400
-  0x5B :i8                             \\ TCD                 ; D = $0400
-  0xA6 :i8 0x1E :i8                    \\ LDX $1E             ; restore data stack X
-  0xA5 :i8 0x1C :i8                    \\ LDA $1C
-  0x1B :i8                             \\ TCS                 ; restore native S
-  0xA5 :i8 0x20 :i8                    \\ LDA $20             ; (Y_out << 8) | X_out
-  0x9D :i8 0x00 :i8 0x02 :i8           \\ STA $0200,X
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000453
+  0xA9 :i8 0x20 :i8                    \\   LDA #$20            ; JSR
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000454
+  0xA9 :i8 0x78 :i8                    \\   LDA #$78            ; SEI
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000457
+  0xA9 :i8 0x18 :i8                    \\   LDA #$18            ; CLC
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000458
+  0xA9 :i8 0xFB :i8                    \\   LDA #$FB            ; XCE
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000459
+  0xA9 :i8 0x6B :i8                    \\   LDA #$6B            ; RTL
+  0x8F :i8 0x5A :i8 0x04 :i8 0x00 :i8  \\   STA f:$00045A
+  0x8B :i8                             \\   PHB
+  0x68 :i8                             \\   PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\   STA f:$00042A       ; save caller DBR
+  0xA9 :i8 0x00 :i8                    \\   LDA #$00
+  0x48 :i8                             \\   PHA
+  0xAB :i8                             \\   PLB                 ; DBR = $00
+  0xC2 :i8 0x20 :i8                    \\   REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8           \\   LDA #$0000
+  0x5B :i8                             \\   TCD                 ; D = $0000
+  0xA2 :i8 0xDF :i8 0x01 :i8           \\   LDX #$01DF
+  0x9A :i8                             \\   TXS
+  0xE2 :i8 0x30 :i8                    \\   SEP #$30            ; 8-bit A, X, Y
+  0xAE :i8 0x22 :i8 0x04 :i8           \\   LDX $0422           ; x_in
+  0xAC :i8 0x20 :i8 0x04 :i8           \\   LDY $0420           ; y_in
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\   JSL $000450
+  0x8A :i8                             \\   TXA                 ; X_out
+  0x8F :i8 0x20 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000420
+  0x98 :i8                             \\   TYA                 ; Y_out
+  0x8F :i8 0x21 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000421
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\   LDA f:$00042A       ; restore caller DBR
+  0x48 :i8                             \\   PHA
+  0xAB :i8                             \\   PLB
+  0xC2 :i8 0x30 :i8                    \\   REP #$30
+  0xA9 :i8 0x00 :i8 0x04 :i8           \\   LDA #$0400
+  0x5B :i8                             \\   TCD                 ; D = $0400
+  0xA6 :i8 0x1E :i8                    \\   LDX $1E             ; restore data stack X
+  0xA5 :i8 0x1C :i8                    \\   LDA $1C
+  0x1B :i8                             \\   TCS                 ; restore native S
+  0xA5 :i8 0x20 :i8                    \\   LDA $20             ; (Y_out << 8) | X_out
+  0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
 end \\ 1601
 
 \ Query KERNAL screen size via SCREEN ($FFED: X=cols, Y=rows)

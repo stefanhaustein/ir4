@@ -8,40 +8,40 @@ var __x16_keys :bytes 16
 
 \ Interrupt-safe KEYHDL ($032E) handler updating __x16_keys bitmap.
 code x16 __x16_keyhdl ( )
-  0x48 :i8                      \\ PHA                 ; orig A
-  0x8A :i8                      \\ TXA
-  0x48 :i8                      \\ PHA
-  0x98 :i8                      \\ TYA
-  0x48 :i8                      \\ PHA
-  0xBA :i8                      \\ TSX
-  0xBD :i8 0x03 :i8 0x01 :i8    \\ LDA $0103,X         ; orig A
-  0x29 :i8 0x7F :i8             \\ AND #$7F
-  0x4A :i8                      \\ LSR A
-  0x4A :i8                      \\ LSR A
-  0x4A :i8                      \\ LSR A               ; byte idx 0..15
-  0xA8 :i8                      \\ TAY
-  0xBD :i8 0x03 :i8 0x01 :i8    \\ LDA $0103,X         ; orig A
-  0x30 :i8 0x0E :i8             \\ BMI key_up
+  0x48 :i8                      \\   PHA                 ; orig A
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA
+  0x98 :i8                      \\   TYA
+  0x48 :i8                      \\   PHA
+  0xBA :i8                      \\   TSX
+  0xBD :i8 0x03 :i8 0x01 :i8    \\   LDA $0103,X         ; orig A
+  0x29 :i8 0x7F :i8             \\   AND #$7F
+  0x4A :i8                      \\   LSR A
+  0x4A :i8                      \\   LSR A
+  0x4A :i8                      \\   LSR A               ; byte idx 0..15
+  0xA8 :i8                      \\   TAY
+  0xBD :i8 0x03 :i8 0x01 :i8    \\   LDA $0103,X         ; orig A
+  0x30 :i8 0x0E :i8             \\   BMI key_up
                                 \\ key_down:
-  0x29 :i8 0x07 :i8             \\ AND #$07
-  0xAA :i8                      \\ TAX
-  0xBD :i8 & __x16_bit_tbl      \\ LDA __x16_bit_tbl,X
-  0x19 :i8 & __x16_keys         \\ ORA __x16_keys,Y
-  0x99 :i8 & __x16_keys         \\ STA __x16_keys,Y
-  0x80 :i8 0x0E :i8             \\ BRA done
+  0x29 :i8 0x07 :i8             \\   AND #$07
+  0xAA :i8                      \\   TAX
+  0xBD :i8 & __x16_bit_tbl      \\   LDA __x16_bit_tbl,X
+  0x19 :i8 & __x16_keys         \\   ORA __x16_keys,Y
+  0x99 :i8 & __x16_keys         \\   STA __x16_keys,Y
+  0x80 :i8 0x0E :i8             \\   BRA done
                                 \\ key_up:
-  0x29 :i8 0x07 :i8             \\ AND #$07
-  0xAA :i8                      \\ TAX
-  0xBD :i8 & __x16_bit_tbl      \\ LDA __x16_bit_tbl,X
-  0x49 :i8 0xFF :i8             \\ EOR #$FF
-  0x39 :i8 & __x16_keys         \\ AND __x16_keys,Y
-  0x99 :i8 & __x16_keys         \\ STA __x16_keys,Y
+  0x29 :i8 0x07 :i8             \\   AND #$07
+  0xAA :i8                      \\   TAX
+  0xBD :i8 & __x16_bit_tbl      \\   LDA __x16_bit_tbl,X
+  0x49 :i8 0xFF :i8             \\   EOR #$FF
+  0x39 :i8 & __x16_keys         \\   AND __x16_keys,Y
+  0x99 :i8 & __x16_keys         \\   STA __x16_keys,Y
                                 \\ done:
-  0x68 :i8                      \\ PLA
-  0xA8 :i8                      \\ TAY
-  0x68 :i8                      \\ PLA
-  0xAA :i8                      \\ TAX
-  0x68 :i8                      \\ PLA
+  0x68 :i8                      \\   PLA
+  0xA8 :i8                      \\   TAY
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX
+  0x68 :i8                      \\   PLA
 end \\ c078
 
 init
@@ -51,27 +51,27 @@ end
 \ Calls KERNAL JOYSTICK_GET ($FF56).
 \ Returns active-high (byte1 << 8) | byte0, or 0 if not present.
 code x16 __x16_joy_get ( port :i -> :i )
-  0x8A :i8                      \\ TXA
-  0x48 :i8                      \\ PHA                 ; save data stack pointer on HW stack
-  0xBD :i8 0 :as                \\ LDA STACK+0,X       ; port
-  0x20 :i8 0x56 :i8 0xFF :i8    \\ JSR $FF56           ; JOYSTICK_GET
-  0x85 :i8 0x02 :i8             \\ STA $02             ; save byte0
-  0x86 :i8 0x03 :i8             \\ STX $03             ; save byte1
-  0x68 :i8                      \\ PLA
-  0xAA :i8                      \\ TAX                 ; restore data stack pointer
-  0xC0 :i8 0xFF :i8             \\ CPY #$FF            ; absent?
-  0xD0 :i8 0x09 :i8             \\ BNE present
-  0xA9 :i8 0x00 :i8             \\ LDA #$00
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0x9D :i8 1 :as                \\ STA STACK+1,X
-  0x60 :i8                      \\ RTS
+  0x8A :i8                      \\   TXA
+  0x48 :i8                      \\   PHA                 ; save data stack pointer on HW stack
+  0xBD :i8 0 :as                \\   LDA STACK+0,X       ; port
+  0x20 :i8 0x56 :i8 0xFF :i8    \\   JSR $FF56           ; JOYSTICK_GET
+  0x85 :i8 0x02 :i8             \\   STA $02             ; save byte0
+  0x86 :i8 0x03 :i8             \\   STX $03             ; save byte1
+  0x68 :i8                      \\   PLA
+  0xAA :i8                      \\   TAX                 ; restore data stack pointer
+  0xC0 :i8 0xFF :i8             \\   CPY #$FF            ; absent?
+  0xD0 :i8 0x09 :i8             \\   BNE present
+  0xA9 :i8 0x00 :i8             \\   LDA #$00
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0x9D :i8 1 :as                \\   STA STACK+1,X
+  0x60 :i8                      \\   RTS
                                 \\ present:
-  0xA5 :i8 0x02 :i8             \\ LDA $02             ; byte0
-  0x49 :i8 0xFF :i8             \\ EOR #$FF            ; invert byte0
-  0x9D :i8 0 :as                \\ STA STACK+0,X
-  0xA5 :i8 0x03 :i8             \\ LDA $03             ; byte1
-  0x49 :i8 0xFF :i8             \\ EOR #$FF            ; invert byte1
-  0x9D :i8 1 :as                \\ STA STACK+1,X
+  0xA5 :i8 0x02 :i8             \\   LDA $02             ; byte0
+  0x49 :i8 0xFF :i8             \\   EOR #$FF            ; invert byte0
+  0x9D :i8 0 :as                \\   STA STACK+0,X
+  0xA5 :i8 0x03 :i8             \\   LDA $03             ; byte1
+  0x49 :i8 0xFF :i8             \\   EOR #$FF            ; invert byte1
+  0x9D :i8 1 :as                \\   STA STACK+1,X
 end \\ a8cc
 
 fn joycount ( -> :i ) 5 end

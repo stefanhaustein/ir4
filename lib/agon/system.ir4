@@ -4,21 +4,29 @@ require "i32.ir4"
 
 \ __agon_sysvars ( -> :a )  MOS $08: returns IX -> HLU
 code agon __agon_sysvars ( -> :a )
-  0x3E :i8 0x08 :i8 0x5B :i8 0xCF :i8
-  0xDD :i8 0xE5 :i8 0xE1 :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0x3E :i8 0x08 :i8             \\   LD A, 0x08
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xDD :i8 0xE5 :i8             \\   PUSH IX
+  0xE1 :i8                      \\   POP HL
+  0xD1 :i8                      \\   POP DE
+  0xE5 :i8                      \\   PUSH HL
+  0xD5 :i8                      \\   PUSH DE
+end \\ 6c85
 
 \ __agon_ffs_getcwd ( buf :a max :i -> :i )  MOS $9E: HL=buf, BC=max -> A=FRESULT
 code agon __agon_ffs_getcwd ( buf :a max :i -> :i )
-  0xFD :i8 0xE1 :i8
-  0xC1 :i8
-  0xE1 :i8
-  0xFD :i8 0xE5 :i8
-  0x3E :i8 0x9E :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xFD :i8 0xE1 :i8                    \\   POP IY
+  0xC1 :i8                             \\   POP BC
+  0xE1 :i8                             \\   POP HL
+  0xFD :i8 0xE5 :i8                    \\   PUSH IY
+  0x3E :i8 0x9E :i8                    \\   LD A, 0x9E
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 12c2
 
 var __agon_cwdbuf :bytes 256
 
@@ -97,13 +105,13 @@ end
 
 \ Terminate Agon MOS program immediately with exit status code in HL/BC
 code agon sysexit ( code :i )
-  0xD1 :i8
-  0xC1 :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8
-  0x39 :i8
-  0x11 :i8 0x00 :i8 0x00 :i8 0x0B :i8
-  0xB7 :i8
-  0xED :i8 0x52 :i8
-  0xDA :i8 0x30 :i8 0x00 :i8 0x04 :i8
-  0xC3 :i8 0x30 :i8 0x00 :i8 0x0B :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xC1 :i8                             \\   POP BC
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x39 :i8                             \\   ADD HL, SP
+  0x11 :i8 0x00 :i8 0x00 :i8 0x0B :i8  \\   LD DE, 0x0B0000
+  0xB7 :i8                             \\   OR A
+  0xED :i8 0x52 :i8                    \\   SBC HL, DE
+  0xDA :i8 0x30 :i8 0x00 :i8 0x04 :i8  \\   JP C, 0x040030
+  0xC3 :i8 0x30 :i8 0x00 :i8 0x0B :i8  \\   JP 0x0B0030
+end \\ 32e5

@@ -5,96 +5,175 @@ require "string.ir4"
 
 \ __mos_del ( path0 :a -> :i )  MOS $05: HL=path0 -> A=status (0=ok)
 code agon __mos_del ( path0 :a -> :i )
-  0xD1 :i8 0xE1 :i8 0xD5 :i8
-  0x3E :i8 0x05 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xD5 :i8                             \\   PUSH DE
+  0x3E :i8 0x05 :i8                    \\   LD A, 0x05
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 5c99
 
 \ __mos_ren ( old0 :a new0 :a -> :i )  MOS $06: HL=old0, DE=new0 -> A=status (0=ok)
 code agon __mos_ren ( old0 :a new0 :a -> :i )
-  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
-  0x3E :i8 0x06 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xC1 :i8                             \\   POP BC
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xC5 :i8                             \\   PUSH BC
+  0x3E :i8 0x06 :i8                    \\   LD A, 0x06
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 890f
 
 \ __mos_fopen ( path0 :a mode :i -> :i )  MOS $0A: HL=path0, C=mode -> A=handle (0=err)
 code agon __mos_fopen ( path0 :a mode :i -> :i )
-  0xD1 :i8 0xC1 :i8 0xE1 :i8 0xD5 :i8
-  0x3E :i8 0x0A :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xC1 :i8                             \\   POP BC
+  0xE1 :i8                             \\   POP HL
+  0xD5 :i8                             \\   PUSH DE
+  0x3E :i8 0x0A :i8                    \\   LD A, 0x0A
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 660d
 
 \ __mos_fclose ( handle :i -> :i )  MOS $0B: C=handle -> A=remaining open handles
 code agon __mos_fclose ( handle :i -> :i )
-  0xD1 :i8 0xC1 :i8 0xD5 :i8
-  0x3E :i8 0x0B :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xC1 :i8                             \\   POP BC
+  0xD5 :i8                             \\   PUSH DE
+  0x3E :i8 0x0B :i8                    \\   LD A, 0x0B
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ edf3
 
 \ __mos_getfil ( handle :i -> :a )  MOS $19: C=handle -> HLU=FIL*
 code agon __mos_getfil ( handle :i -> :a )
-  0xD1 :i8 0xC1 :i8 0xD5 :i8
-  0x3E :i8 0x19 :i8 0x5B :i8 0xCF :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                      \\   POP DE
+  0xC1 :i8                      \\   POP BC
+  0xD5 :i8                      \\   PUSH DE
+  0x3E :i8 0x19 :i8             \\   LD A, 0x19
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xD1 :i8                      \\   POP DE
+  0xE5 :i8                      \\   PUSH HL
+  0xD5 :i8                      \\   PUSH DE
+end \\ 17c3
 
 \ __mos_fread ( handle :i buf :a count :i -> :i )  MOS $1A: C=handle, HL=buf, DE=count -> DE=read
 code agon __mos_fread ( handle :i buf :a count :i -> :i )
-  0xFD :i8 0xE1 :i8 0xD1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
-  0x3E :i8 0x1A :i8 0x5B :i8 0xCF :i8
-  0xE1 :i8 0xD5 :i8 0xE5 :i8
-end
+  0xFD :i8 0xE1 :i8             \\   POP IY
+  0xD1 :i8                      \\   POP DE
+  0xE1 :i8                      \\   POP HL
+  0xC1 :i8                      \\   POP BC
+  0xFD :i8 0xE5 :i8             \\   PUSH IY
+  0x3E :i8 0x1A :i8             \\   LD A, 0x1A
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xE1 :i8                      \\   POP HL
+  0xD5 :i8                      \\   PUSH DE
+  0xE5 :i8                      \\   PUSH HL
+end \\ 3c4c
 
 \ __mos_fwrite ( handle :i buf :a count :i -> :i )  MOS $1B: C=handle, HL=buf, DE=count -> DE=written
 code agon __mos_fwrite ( handle :i buf :a count :i -> :i )
-  0xFD :i8 0xE1 :i8 0xD1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
-  0x3E :i8 0x1B :i8 0x5B :i8 0xCF :i8
-  0xE1 :i8 0xD5 :i8 0xE5 :i8
-end
+  0xFD :i8 0xE1 :i8             \\   POP IY
+  0xD1 :i8                      \\   POP DE
+  0xE1 :i8                      \\   POP HL
+  0xC1 :i8                      \\   POP BC
+  0xFD :i8 0xE5 :i8             \\   PUSH IY
+  0x3E :i8 0x1B :i8             \\   LD A, 0x1B
+  0x5B :i8 0xCF :i8             \\   RST.LIL 0x08
+  0xE1 :i8                      \\   POP HL
+  0xD5 :i8                      \\   PUSH DE
+  0xE5 :i8                      \\   PUSH HL
+end \\ 2d34
 
 \ __mos_flseek ( handle :i pos :i -> :i )  MOS $1C: C=handle, HLU=pos, E=0 -> A=status
 code agon __mos_flseek ( handle :i pos :i -> :i )
-  0xFD :i8 0xE1 :i8 0xE1 :i8 0xC1 :i8 0xFD :i8 0xE5 :i8
-  0x1E :i8 0x00 :i8 0x3E :i8 0x1C :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xFD :i8 0xE1 :i8                    \\   POP IY
+  0xE1 :i8                             \\   POP HL
+  0xC1 :i8                             \\   POP BC
+  0xFD :i8 0xE5 :i8                    \\   PUSH IY
+  0x1E :i8 0x00 :i8                    \\   LD E, 0
+  0x3E :i8 0x1C :i8                    \\   LD A, 0x1C
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ b86f
 
 \ __mos_mkdir ( path0 :a -> :i )  MOS $07: HL=path0 -> A=status (0=ok)
 code agon __mos_mkdir ( path0 :a -> :i )
-  0xD1 :i8 0xE1 :i8 0xD5 :i8
-  0x3E :i8 0x07 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xD5 :i8                             \\   PUSH DE
+  0x3E :i8 0x07 :i8                    \\   LD A, 0x07
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 3140
 
 \ __ffs_dopen ( dir :a path0 :a -> :i )  MOS $91: HL=dir, DE=path0 -> A=FRESULT
 code agon __ffs_dopen ( dir :a path0 :a -> :i )
-  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
-  0x3E :i8 0x91 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xC1 :i8                             \\   POP BC
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xC5 :i8                             \\   PUSH BC
+  0x3E :i8 0x91 :i8                    \\   LD A, 0x91
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 2206
 
 \ __ffs_dclose ( dir :a -> :i )  MOS $92: HL=dir -> A=FRESULT
 code agon __ffs_dclose ( dir :a -> :i )
-  0xD1 :i8 0xE1 :i8 0xD5 :i8
-  0x3E :i8 0x92 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xD5 :i8                             \\   PUSH DE
+  0x3E :i8 0x92 :i8                    \\   LD A, 0x92
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ f5ea
 
 \ __ffs_dread ( dir :a filinfo :a -> :i )  MOS $93: HL=dir, DE=filinfo -> A=FRESULT
 code agon __ffs_dread ( dir :a filinfo :a -> :i )
-  0xC1 :i8 0xD1 :i8 0xE1 :i8 0xC5 :i8
-  0x3E :i8 0x93 :i8 0x5B :i8 0xCF :i8
-  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8 0x6F :i8
-  0xD1 :i8 0xE5 :i8 0xD5 :i8
-end
+  0xC1 :i8                             \\   POP BC
+  0xD1 :i8                             \\   POP DE
+  0xE1 :i8                             \\   POP HL
+  0xC5 :i8                             \\   PUSH BC
+  0x3E :i8 0x93 :i8                    \\   LD A, 0x93
+  0x5B :i8 0xCF :i8                    \\   RST.LIL 0x08
+  0x21 :i8 0x00 :i8 0x00 :i8 0x00 :i8  \\   LD HL, 0
+  0x6F :i8                             \\   LD L, A
+  0xD1 :i8                             \\   POP DE
+  0xE5 :i8                             \\   PUSH HL
+  0xD5 :i8                             \\   PUSH DE
+end \\ 061a
 
 var __agon_handles :bytes 8
 var __agon_modes   :bytes 8
