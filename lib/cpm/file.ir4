@@ -2,22 +2,24 @@
 
 require "memory.ir4"
 require "stdio.ir4"
+require "i32.ir4"
 
 \ CP/M BDOS stores file lengths in 128-byte records
 const fsgranularity 128 :i
 
-\ Slot layout (176 bytes per slot):
+\ Slot layout (180 bytes per slot):
 \   +0..35:    FCB (36 bytes; +33..35 = random record r0, r1, r2)
 \   +36..163:  128-byte sector buffer
 \   +164:      mode (0=free, 1=read, 2=append, 3=readwrite)
 \   +165:      dirty (0/1)
-\   +166..167: pos (:i, current byte offset)
-\   +168..169: size (:i, file size in bytes)
-\   +170..171: buf_rec (:i, cached sector index or -1)
-var __cpm_fslots :bytes 704
+\   +166..169: pos (:i32, current byte offset)
+\   +170..173: size (:i32, file size in bytes)
+\   +174..175: buf_rec (:i, cached 16-bit sector index)
+\   +176:      buf_valid (0/1)
+var __cpm_fslots :bytes 720
 
 fn __cpm_slot ( fd :i -> :a )
-  __cpm_fslots fd 176 * a+
+  __cpm_fslots fd 180 * a+
 end
 
 fn __cpm_get_slot ( fd :i -> :a )
@@ -85,9 +87,8 @@ end
 
 fn __cpm_flush_buf ( s :a -> :i )
   s 165 a+ u8@ 0 = if 0 return then
-  s 170 a+ @ -> var rec :i
-  rec 0 < if 0 s 165 a+ i8! 0 return then
-  s rec __cpm_set_rec
+  s 176 a+ u8@ 0 = if 0 s 165 a+ i8! 0 return then
+  s s 174 a+ @ __cpm_set_rec
   26 s 36 a+ a>i bdos drop
   34 s a>i bdos 0 <> if -1 return then
   0 s 165 a+ i8!
@@ -95,23 +96,26 @@ fn __cpm_flush_buf ( s :a -> :i )
 end
 
 fn __cpm_load_buf ( s :a rec :i -> :i )
-  s 170 a+ @ rec = if 0 return then
+  s 176 a+ u8@ 0 <> s 174 a+ @ rec = and if 0 return then
   s __cpm_flush_buf 0 <> if -1 return then
   s rec __cpm_set_rec
   26 s 36 a+ a>i bdos drop
   33 s a>i bdos 0 <> if
     s 36 a+ 128 26 memfill
   then
-  rec s 170 a+ !
+  rec s 174 a+ !
+  1 s 176 a+ i8!
   0
 end
 
-fn __cpm_calc_size ( s :a -> :i )
+fn __cpm_fcb_recs_bytes ( fcb :a -> :i32 )
+  fcb 35 a+ u8@ 0 <> if 8388608 i>i32 return then
+  fcb 33 a+ u8@ i>i32 fcb 34 a+ u8@ i>i32 8 i32<< i32or 7 i32<<
+end
+
+fn __cpm_calc_size ( s :a -> :i32 )
   35 s a>i bdos drop
-  s 35 a+ u8@ 0 <> if 32640 return then
-  s 33 a+ @ -> var recs :i
-  recs 0 < recs 255 > or if 32640 return then
-  recs 7 <<
+  s __cpm_fcb_recs_bytes
 end
 
 fn fsopen ( path :a len :i mode :i -> :i )
@@ -126,8 +130,8 @@ fn fsopen ( path :a len :i mode :i -> :i )
   fd __cpm_slot -> var s :a
   s path len __cpm_parse_fcb 0 <> if -1 return then
   0 -> var smode :i
-  0 -> var sz :i
-  0 -> var pos :i
+  0 i>i32 -> var sz :i32
+  0 i>i32 -> var pos :i32
   mode 1 = if
     19 s a>i bdos drop
     22 s a>i bdos 255 = if -1 return then
@@ -135,7 +139,7 @@ fn fsopen ( path :a len :i mode :i -> :i )
   else mode 2 = if
     15 s a>i bdos 255 = if
       22 s a>i bdos 255 = if -1 return then
-      0 -> sz
+      0 i>i32 -> sz
     else
       s __cpm_calc_size -> sz
     then
@@ -148,9 +152,10 @@ fn fsopen ( path :a len :i mode :i -> :i )
   then then
   smode s 164 a+ i8!
   0 s 165 a+ i8!
-  pos s 166 a+ !
-  sz s 168 a+ !
-  -1 s 170 a+ !
+  pos s 166 a+ i32!
+  sz s 170 a+ i32!
+  0 s 174 a+ !
+  0 s 176 a+ i8!
   fd
 end
 
@@ -169,16 +174,16 @@ fn fsread ( fd :i buf :a len :i -> :i )
   fd __cpm_get_slot -> var s :a
   s 0 i>a a= if -1 return then
   s 164 a+ u8@ 2 = if -1 return then
-  s 166 a+ @ -> var pos :i
-  s 168 a+ @ -> var sz :i
-  pos sz >= if 0 return then
-  sz pos - -> var maxr :i
-  len -> var want :i
-  maxr want < if maxr -> want then
+  s 166 a+ i32@ -> var pos :i32
+  s 170 a+ i32@ -> var sz :i32
+  pos sz i32< 0 = if 0 return then
+  sz pos i32- -> var rem :i32
+  len i>i32 -> var want32 :i32
+  rem want32 i32< if rem i32>i else len then -> var want :i
   0 -> var total :i
   begin total want < while
-    pos 7 >> -> var rec :i
-    pos 127 and -> var off :i
+    pos 7 u32>> i32>i -> var rec :i
+    pos 127 i>i32 i32and i32>i -> var off :i
     s rec __cpm_load_buf 0 <> if
       total 0 > if total else -1 then return
     then
@@ -186,9 +191,9 @@ fn fsread ( fd :i buf :a len :i -> :i )
     want total - -> var chunk :i
     avail chunk < if avail -> chunk then
     buf total a+ s 36 a+ off a+ chunk memcpy
-    chunk +-> pos
+    pos chunk i>i32 i32+ -> pos
     chunk +-> total
-    pos s 166 a+ !
+    pos s 166 a+ i32!
   repeat
   total
 end
@@ -198,57 +203,58 @@ fn fswrite ( fd :i buf :a len :i -> :i )
   fd __cpm_get_slot -> var s :a
   s 0 i>a a= if -1 return then
   s 164 a+ u8@ 1 = if -1 return then
-  s 166 a+ @ -> var pos :i
-  s 168 a+ @ -> var sz :i
+  s 166 a+ i32@ -> var pos :i32
+  s 170 a+ i32@ -> var sz :i32
   0 -> var total :i
   begin total len < while
-    pos 7 >> -> var rec :i
-    pos 127 and -> var off :i
+    pos 7 u32>> i32>i -> var rec :i
+    pos 127 i>i32 i32and i32>i -> var off :i
     128 off - -> var space :i
     len total - -> var chunk :i
     space chunk < if space -> chunk then
-    s 170 a+ @ rec <> if
+    s 176 a+ u8@ 0 = s 174 a+ @ rec <> or if
       off 0 > chunk 128 < or if
         s rec __cpm_load_buf 0 <> if -1 return then
       else
         s __cpm_flush_buf 0 <> if -1 return then
-        rec s 170 a+ !
+        rec s 174 a+ !
+        1 s 176 a+ i8!
       then
     then
     s 36 a+ off a+ buf total a+ chunk memcpy
     1 s 165 a+ i8!
-    chunk +-> pos
+    pos chunk i>i32 i32+ -> pos
     chunk +-> total
-    pos s 166 a+ !
-    pos sz > if
+    pos s 166 a+ i32!
+    sz pos i32< if
       pos -> sz
-      sz s 168 a+ !
+      sz s 170 a+ i32!
     then
-    pos 127 and 0 = if
+    pos 127 i>i32 i32and 0 i>i32 i32= if
       s __cpm_flush_buf 0 <> if -1 return then
     then
   repeat
   total
 end
 
-fn fsseek ( fd :i pos :i -> :i )
-  pos 0 < if -1 return then
+fn fsseek ( fd :i pos :i32 -> :i )
+  pos 0 i>i32 i32< 8388608 i>i32 pos i32< or if -1 return then
   fd __cpm_get_slot -> var s :a
   s 0 i>a a= if -1 return then
-  pos s 166 a+ !
+  pos s 166 a+ i32!
   0
 end
 
-fn fspos ( fd :i -> :i )
+fn fspos ( fd :i -> :i32 )
   fd __cpm_get_slot -> var s :a
-  s 0 i>a a= if -1 return then
-  s 166 a+ @
+  s 0 i>a a= if -1 i>i32 return then
+  s 166 a+ i32@
 end
 
-fn fssize ( fd :i -> :i )
+fn fssize ( fd :i -> :i32 )
   fd __cpm_get_slot -> var s :a
-  s 0 i>a a= if -1 return then
-  s 168 a+ @
+  s 0 i>a a= if -1 i>i32 return then
+  s 170 a+ i32@
 end
 
 fn fsflush ( fd :i -> :i )
@@ -299,13 +305,13 @@ fn fsdiropen ( path :a len :i -> :i )
   0
 end
 
-fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
-  dd 0 <> __cpm_diropen u8@ 0 = or max 0 < or if -1 0 0 return then
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i32 )
+  dd 0 <> __cpm_diropen u8@ 0 = or max 0 < or if -1 0 0 i>i32 return then
   begin
     -1
   while
     __cpm_diropen u8@ -> var st :i
-    st 3 = if 0 0 0 return then
+    st 3 = if 0 0 0 i>i32 return then
     26 __cpm_dirbuf a>i bdos drop
     0 -> var rc :i
     st 1 = if
@@ -316,7 +322,7 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
     then
     rc 255 = if
       3 __cpm_diropen i8!
-      0 0 0 return
+      0 0 0 i>i32 return
     then
     __cpm_dirbuf rc 5 << a+ -> var e :a
     e u8@ 229 <> e 12 a+ u8@ 0 = and if
@@ -325,21 +331,21 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
       begin i 8 < while
         e 1 i + a+ u8@ 127 and -> var c :i
         c 32 <> if
-          n max >= if -1 0 0 return then
+          n max >= if -1 0 0 i>i32 return then
           c buf n a+ i8!
           1 +-> n
         then
         1 +-> i
       repeat
       e 9 a+ u8@ 127 and 32 <> if
-        n max >= if -1 0 0 return then
+        n max >= if -1 0 0 i>i32 return then
         46 buf n a+ i8!
         1 +-> n
         0 -> i
         begin i 3 < while
           e 9 i + a+ u8@ 127 and -> var c2 :i
           c2 32 <> if
-            n max >= if -1 0 0 return then
+            n max >= if -1 0 0 i>i32 return then
             c2 buf n a+ i8!
             1 +-> n
           then
@@ -349,9 +355,9 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
       0 -> var flags :i
       e 9 a+ u8@ 128 and 0 <> if 2 -> flags then
       e 15 a+ u8@ -> var recs :i
-      0 -> var sz :i
+      0 i>i32 -> var sz :i32
       recs 128 < if
-        recs 7 << -> sz
+        recs i>i32 7 i32<< -> sz
       else
         var tfcb :bytes 36
         tfcb 36 0 memfill
@@ -362,17 +368,12 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
           1 +-> i
         repeat
         35 tfcb a>i bdos drop
-        tfcb 35 a+ u8@ 0 <> if
-          32640 -> sz
-        else
-          tfcb 33 a+ @ -> recs
-          recs 0 < recs 255 > or if 32640 -> sz else recs 7 << -> sz then
-        then
+        tfcb __cpm_fcb_recs_bytes -> sz
       then
       n flags sz return
     then
   repeat
-  0 0 0
+  0 0 0 i>i32
 end
 
 fn fsdirclose ( dd :i -> :i )

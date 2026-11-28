@@ -1,5 +1,7 @@
 \ heap.ir4 - First-fit dynamic memory allocator starting at __heap_start
 
+require "system.ir4"
+
 var __heap_ptr :a
 var __heap_free :a
 
@@ -68,4 +70,45 @@ default fn heapfree ( p :a )
       blk 8 a+ a@ prev 8 a+ a!
     then
   then
+end
+
+fn __heap_tail ( -> :i )
+  __heap_ptr 0 i>a a= if __heap_start else __heap_ptr then -> var cur :a
+  sysramtop -> var ceil :a
+  ceil 0 i>a a= if __heap_start 32767 a+ -> ceil then
+  ceil cur a> 0 = if 0 return then
+  ceil cur adiff -> var d :i
+  d 0 < if 32767 else d then
+end
+
+\ Return total free heap bytes (unallocated tail + free-list blocks; clamped to 32767 on 16-bit)
+default fn heapavail ( -> :i )
+  __heap_tail -> var avail :i
+  __heap_free -> var cur :a
+  begin
+    cur 0 i>a a<>
+  while
+    cur @ 8 - -> var u :i
+    u 0 > if
+      avail u + -> var sum :i
+      sum 0 < sum avail < or if 32767 -> avail else sum -> avail then
+    then
+    cur 8 a+ a@ -> cur
+  repeat
+  avail
+end
+
+\ Return largest contiguous allocatable block in bytes (clamped to 32767 on 16-bit)
+default fn heapmax ( -> :i )
+  __heap_tail 8 - -> var best :i
+  best 0 < if 0 -> best then
+  __heap_free -> var cur :a
+  begin
+    cur 0 i>a a<>
+  while
+    cur @ 8 - -> var u :i
+    u best > if u -> best then
+    cur 8 a+ a@ -> cur
+  repeat
+  best
 end

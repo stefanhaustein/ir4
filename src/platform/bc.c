@@ -822,10 +822,10 @@ static Bool bc32_build(U8Vec *out, size_t base) {
         for (j = 0; j < len; j++)
             VEC_PUSH(*out, (u8)name[j]);
     }
-    for (i = 0; (u32)i < code_sz; i++)
-        VEC_PUSH(*out, code[i]);
     {
         u32 k;
+        for (k = 0; k < code_sz; k++)
+            VEC_PUSH(*out, code[k]);
         for (k = 0; k < init_sz; k++)
             VEC_PUSH(*out, init_d[k]);
     }

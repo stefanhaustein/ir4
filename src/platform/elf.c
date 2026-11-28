@@ -10,11 +10,11 @@
 #define ELF_R_RISCV_LO12_I 27U
 #define RV32_DSTACK_SIZE 4096U
 
-static u16 obj_main_off = 0;
-static u16 obj_main_size = 0;
+static u32 obj_main_off = 0;
+static u32 obj_main_size = 0;
 static int obj_has_main = 0;
-static u16 obj_s1_reloc = 0;
-static u16 obj_s2_reloc = 0;
+static u32 obj_s1_reloc = 0;
+static u32 obj_s2_reloc = 0;
 static int obj_has_s2_reloc = 0;
 
 static void init_elf32_hdr(u8 *hdr, u16 e_type) {
@@ -69,8 +69,8 @@ static int virt_write(FILE *fp, size_t base) {
 
 static void virt_end(int main_idx) {
     const FuncSig *sig = ir4_func_sig((size_t)main_idx);
-    u16 entry_off = cb_pc();
-    u16 db_patch_off;
+    size_t entry_off = cb_pc();
+    size_t db_patch_off;
     u32 data_addr;
     u32 hi;
     i32 lo;
@@ -82,9 +82,9 @@ static void virt_end(int main_idx) {
 
     cb_patch32(0, enc_j((i32)entry_off, 0));
 
-    /* sp = 0x80200000, s1 (data stack) = 0x80100000 */
-    cb_emit32(enc_u(0x80200000UL, 2, 0x37UL)); /* LUI sp, 0x80200 */
-    cb_emit32(enc_u(0x80100000UL, 9, 0x37UL)); /* LUI s1, 0x80100 */
+    /* sp = 0x80400000, s1 (data stack) = 0x80200000 */
+    cb_emit32(enc_u(0x80400000UL, 2, 0x37UL)); /* LUI sp, 0x80400 */
+    cb_emit32(enc_u(0x80200000UL, 9, 0x37UL)); /* LUI s1, 0x80200 */
 
     /* s2 (x18) = data base address; patched after stub */
     db_patch_off = cb_pc();
@@ -95,8 +95,8 @@ static void virt_end(int main_idx) {
     cb_emit32(enc_j((i32)sig->addr - (i32)cb_pc(), 1));
 
     if (sig->out_types.len == 1) {
-        u16 div_loop;
-        u16 print_loop;
+        size_t div_loop;
+        size_t print_loop;
         cb_emit32(enc_i(0, 9, 2, 10, 0x03UL));   /* LW a0, 0(s1) */
         cb_emit32(enc_i(4, 9, 0, 9, 0x13UL));    /* ADDI s1, s1, 4 */
         cb_emit32(enc_u(VIRT_UART0, 7, 0x37UL)); /* LUI t2, 0x10000 */
@@ -139,7 +139,7 @@ static void virt_end(int main_idx) {
     hi = (data_addr + 0x800UL) & 0xFFFFF000UL;
     lo = (i32)(data_addr - hi);
     cb_patch32(db_patch_off, enc_u(hi, 18, 0x37UL));
-    cb_patch32((u16)(db_patch_off + 4), enc_i(lo, 18, 0, 18, 0x13UL));
+    cb_patch32(db_patch_off + 4, enc_i(lo, 18, 0, 18, 0x13UL));
 }
 
 /* --- Relocatable Object (ET_REL, .o) --- */

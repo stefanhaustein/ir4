@@ -58,7 +58,7 @@ x64sc -autostartprgmode 1 pasta84/examples/mandelbrot.prg
 
 Running `pasta84/examples/fibo.pas` on C64 (`./pasta84/pasta84.sh -t c64 pasta84/examples/fibo.pas`):
 
-<img src="../../img/pasta_fibo_c64.png" alt="PASTA/84 fibo.pas on Commodore 64" width="320">
+<img src="../../img/pasta_fibo_c64.png" alt="PASTA/80 fibo.pas on Commodore 64" width="320">
 
 ### Commander X16 (`x16`)
 
@@ -97,6 +97,8 @@ Example host test run:
 ```sh
 ./pasta84/pasta84.sh -t arm64 --run pasta84/examples/fibo.pas
 ```
+
+To run the full PASTA/80 test suite and print per-target report cards (pass -t x16gs, -t agon, -t arm64, etc., or omit -t for all available targets), run `python3 pasta84/selftest.py`; see [Cross-Target Test Results](test-results.md) for the current matrix.
 
 ## 5. Compiler Options
 

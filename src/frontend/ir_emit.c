@@ -348,6 +348,14 @@ static void emit_word(size_t fidx) {
     pending_jtab.cap = 0;
 
     if (w->is_code) {
+        if (strcmp(be->name, "65816") == 0) {
+            size_t cstart = be->cur_addr();
+            if ((cstart >> 16) != ((cstart + w->raw_len + 1) >> 16)) {
+                size_t pad = 0x10000UL - (cstart & 0xFFFFUL);
+                while (pad-- > 0)
+                    cb_emit8(0);
+            }
+        }
         sig->addr = be->cur_addr();
         sig->has_addr = 1;
         emit_raw_code_block(w->raw_start, w->raw_len, w->reloc_start, w->reloc_cnt);
@@ -531,7 +539,7 @@ static void emit_word(size_t fidx) {
             }
 #endif
             if (is_816 && !retried && be->cur_addr() > start_addr &&
-                ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
+                ((start_addr >> 16) != (be->cur_addr() >> 16))) {
                 size_t pad = 0x10000UL - (start_addr & 0xFFFFUL);
                 cb_restore(cp);
 #if IR4_ENABLE_65816
@@ -546,7 +554,7 @@ static void emit_word(size_t fidx) {
                 goto retry_emit;
             }
             if (is_816 && be->cur_addr() > start_addr &&
-                ((start_addr >> 16) != ((be->cur_addr() - 1) >> 16))) {
+                ((start_addr >> 16) != (be->cur_addr() >> 16))) {
                 ir4_status_clear();
                 fprintf(stderr, "ir4c: function '%s' (%lu bytes) exceeds 64 KB 65816 bank limit\n",
                         sig->name, (unsigned long)(be->cur_addr() - start_addr));

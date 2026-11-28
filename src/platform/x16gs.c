@@ -36,8 +36,15 @@ static void x16gs_emit_dp_data_addr(u8 dp, size_t data_off) {
 
 static void x16gs_end(int main_idx) {
     const FuncSig *sig = ir4_func_sig((size_t)main_idx);
-    size_t entry_addr = cb_cur_addr();
+    size_t entry_addr;
     size_t putc_call1 = 0, putc_call2 = 0, print_call = 0;
+
+    if ((cb_cur_addr() & 0xFFFFUL) > 0xFE80UL) {
+        size_t pad = 0x10000UL - (cb_cur_addr() & 0xFFFFUL);
+        while (pad-- > 0)
+            cb_emit8(0);
+    }
+    entry_addr = cb_cur_addr();
 
     if (sig->in_types.len != 0 || sig->out_types.len > 1) {
         fprintf(stderr, "-t x16gs requires 'main' with 0 inputs and at most 1 output\n");

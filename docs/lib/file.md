@@ -34,7 +34,7 @@ Sequential file I/O (fallback stubs + convenience wrappers)
 
   Open directory at NUL-terminated path0; returns dd >= 0 or < 0 on error
 
-- **fsdirread** ( dd :i buf :a max :i -> :i :i :i )
+- **fsdirread** ( dd :i buf :a max :i -> :i :i :i32 )
 
   Read next directory entry into buf (up to max bytes); returns (namelen, flags, size) with namelen=0 at end or <0 on error
 
@@ -75,7 +75,7 @@ Sequential file I/O (fallback stubs + convenience wrappers)
 
   Open NUL-terminated path0 with mode; returns fd >= 0 or < 0 on error
 
-- **fspos** ( fd :i -> :i ) — Return current byte offset in fd or < 0 on error
+- **fspos** ( fd :i -> :i32 ) — Return current 32-bit byte offset in fd or < 0 on error
 - **fsputc** ( fd :i c :i -> :i )
 
   Write a single byte c to fd; returns 0 on success or < 0 on error
@@ -100,11 +100,11 @@ Sequential file I/O (fallback stubs + convenience wrappers)
 
   Remove empty directory at NUL-terminated path0; returns 0 on success or < 0 on error
 
-- **fsseek** ( fd :i pos :i -> :i )
+- **fsseek** ( fd :i pos :i32 -> :i )
 
-  Seek fd to byte offset pos from start; returns 0 on success or < 0 on error
+  Seek fd to 32-bit byte offset pos from start; returns 0 on success or < 0 on error
 
-- **fssize** ( fd :i -> :i ) — Return total byte size of open fd or < 0 on error
+- **fssize** ( fd :i -> :i32 ) — Return total 32-bit byte size of open fd or < 0 on error
 - **fswrite** ( fd :i buf :a len :i -> :i )
 
   Write len bytes from buf to fd; returns bytes written or < 0 on error

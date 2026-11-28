@@ -153,6 +153,22 @@ fn main ( -> :i )
   heapreset
   8 heapalloc p1 a= -1 14 assert_eq
   dup 0 <> if return then drop
+  heapreset
+  heapavail 0 > -1 15 assert_eq
+  dup 0 <> if return then drop
+  heapavail heapmax >= -1 16 assert_eq
+  dup 0 <> if return then drop
+  heapavail -> var av0 :i
+  16000 heapalloc -> p1
+  heapavail -> var av1 :i
+  av1 av0 < -1 21 assert_eq
+  dup 0 <> if return then drop
+  p1 heapfree
+  heapavail av1 > -1 22 assert_eq
+  dup 0 <> if return then drop
+  heapreset
+  heapavail av0 = -1 23 assert_eq
+  dup 0 <> if return then drop
 
   cr
 

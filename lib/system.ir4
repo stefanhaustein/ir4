@@ -45,3 +45,8 @@ end
 fn sysenv0 ( name0 :a buf :a max :i -> :i )
   name0 str0>str buf max sysenv
 end
+
+\ Return exclusive upper RAM ceiling for the heap (0 = unknown)
+default fn sysramtop ( -> :a )
+  0 i>a
+end

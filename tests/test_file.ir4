@@ -1,6 +1,7 @@
 \ Test lib/file.ir4 (files, seeking, sizing, renaming, deleting, fsgranularity, directories)
 
 require "file.ir4"
+require "i32.ir4"
 
 data test_fname  "IR4TEST.TMP" 0 :i8 end
 data test_fname2 "IR4TEST2.TMP" 0 :i8 end
@@ -36,11 +37,11 @@ fn __test_c64 ( -> :i )
   test_fname fsmode_write fsopen0 -> var fd :i
   fd 0 < if 2 return then
   fd test_payload 24 fswrite 24 <> if 3 return then
-  fd fspos 24 <> if 4 return then
-  fd fssize 24 <> if 5 return then
+  fd fspos 24 i>i32 i32<> if 4 return then
+  fd fssize 24 i>i32 i32<> if 5 return then
   fd fsflush 0 <> if 6 return then
-  fd 24 fsseek 0 <> if 7 return then
-  fd 0 fsseek 0 = if 8 return then
+  fd 24 i>i32 fsseek 0 <> if 7 return then
+  fd 0 i>i32 fsseek 0 = if 8 return then
   fd fsclose 0 <> if 9 return then
 
   test_fname fsmode_append fsopen0 -> fd
@@ -50,7 +51,7 @@ fn __test_c64 ( -> :i )
 
   test_fname fsmode_read fsopen0 -> fd
   fd 0 < if 13 return then
-  fd fssize 508 <> if 14 return then
+  fd fssize 508 i>i32 i32<> if 14 return then
   fd rbuf 64 fsread 27 <> if 15 return then
   0 -> var i :i
   begin i 24 < while
@@ -74,14 +75,14 @@ fn __test_c64 ( -> :i )
   dd 0 < if 24 return then
   0 -> var seen2 :i
   begin
-    dd rbuf 64 fsdirread -> var esz :i -> var efl :i -> var en :i
+    dd rbuf 64 fsdirread -> var esz :i32 -> var efl :i -> var en :i
     en 0 < if 25 return then
     en 0 >
   while
     rbuf en test_fname2 12 __str_eq if
       1 -> seen2
       efl 0 <> if 26 return then
-      esz 508 <> if 27 return then
+      esz 508 i>i32 i32<> if 27 return then
     then
   repeat
   dd fsdirclose 0 <> if 28 return then
@@ -107,11 +108,11 @@ fn main ( -> :i )
   test_fname 11 fsmode_write fsopen -> var fd :i
   fd 0 < if 1 return then
   fd test_payload 24 fswrite 24 <> if 2 return then
-  fd fspos 24 <> if 3 return then
-  fd fssize 24 <> if 4 return then
+  fd fspos 24 i>i32 i32<> if 3 return then
+  fd fssize 24 i>i32 i32<> if 4 return then
   fd fsflush 0 <> if 5 return then
-  fd 0 fsseek 0 <> if 6 return then
-  fd fspos 0 <> if 7 return then
+  fd 0 i>i32 fsseek 0 <> if 6 return then
+  fd fspos 0 i>i32 i32<> if 7 return then
   fd rbuf 24 fsread 24 <> if 8 return then
   0 -> var i :i
   begin i 24 < while
@@ -123,10 +124,10 @@ fn main ( -> :i )
   \ Test fsmode_append
   test_fname 11 fsmode_append fsopen -> fd
   fd 0 < if 11 return then
-  fd fspos -> var app_off :i
-  app_off 24 < if 12 return then
+  fd fspos -> var app_off :i32
+  app_off 24 i>i32 i32< if 12 return then
   fd test_app 3 fswrite 3 <> if 13 return then
-  fd fspos app_off 3 + <> if 14 return then
+  fd fspos app_off 3 i>i32 i32+ i32<> if 14 return then
   fd fsclose 0 <> if 15 return then
 
   \ Re-open read-only and verify appended bytes at app_off
@@ -144,11 +145,11 @@ fn main ( -> :i )
   \ Test fsmode_readwrite in-place seek + overwrite
   test_fname 11 fsmode_readwrite fsopen -> fd
   fd 0 < if 21 return then
-  fd 7 fsseek 0 <> if 22 return then
+  fd 7 i>i32 fsseek 0 <> if 22 return then
   fd test_pat 4 fswrite 4 <> if 23 return then
-  fd fspos 11 <> if 24 return then
+  fd fspos 11 i>i32 i32<> if 24 return then
   fd fsflush 0 <> if 25 return then
-  fd 7 fsseek 0 <> if 26 return then
+  fd 7 i>i32 fsseek 0 <> if 26 return then
   fd rbuf 4 fsread 4 <> if 27 return then
   0 -> i
   begin i 4 < while
@@ -211,7 +212,7 @@ fn main ( -> :i )
     \ Small buffer check
     test_dname fsdiropen0 -> var dd :i
     dd 0 < if 58 return then
-    dd rbuf 2 fsdirread -> var esz :i -> var efl :i -> var en :i
+    dd rbuf 2 fsdirread -> var esz :i32 -> var efl :i -> var en :i
     en 0 >= if 59 return then
     dd fsdirclose 0 <> if 60 return then
 
@@ -230,12 +231,12 @@ fn main ( -> :i )
       rbuf en str_subtxt 7 __str_eq if
         1 -> seen_file
         efl fsattr_dir and 0 <> if 65 return then
-        esz 5 <> if 66 return then
+        esz 5 i>i32 i32<> if 66 return then
       then
       rbuf en str_subdir 6 __str_eq if
         1 -> seen_dir
         efl fsattr_dir and 0 = if 67 return then
-        esz 0 <> if 68 return then
+        esz 0 i>i32 i32<> if 68 return then
       then
     repeat
     dd fsdirclose 0 <> if 69 return then

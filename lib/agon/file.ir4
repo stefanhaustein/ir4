@@ -2,6 +2,7 @@
 
 require "memory.ir4"
 require "string.ir4"
+require "i32.ir4"
 
 \ __mos_del ( path0 :a -> :i )  MOS $05: HL=path0 -> A=status (0=ok)
 code agon __mos_del ( path0 :a -> :i )
@@ -178,8 +179,8 @@ end \\ 061a
 var __agon_handles :bytes 8
 var __agon_modes   :bytes 8
 var __agon_bkind   :bytes 8
-var __agon_pos     :bytes 24
-var __agon_size    :bytes 24
+var __agon_pos     :bytes 32
+var __agon_size    :bytes 32
 var __agon_bpos    :bytes 24
 var __agon_blen    :bytes 24
 var __agon_buf     :bytes 2048
@@ -188,6 +189,10 @@ var __agon_path2   :bytes 256
 
 fn __agon_cell ( base :a fd :i -> :a )
   base fd 3 * a+
+end
+
+fn __agon_cell32 ( base :a fd :i -> :a )
+  base fd 2 << a+
 end
 
 fn __agon_fbuf ( fd :i -> :a )
@@ -214,7 +219,7 @@ fn __agon_flush_buf ( fd :i -> :i )
     0 return
   then
   bp bl < if
-    __agon_handles fd a+ u8@ __agon_pos fd __agon_cell @ __mos_flseek 0 <> if -1 return then
+    __agon_handles fd a+ u8@ __agon_pos fd __agon_cell32 i32@ i32>i __mos_flseek 0 <> if -1 return then
   then
   0
 end
@@ -253,11 +258,12 @@ fn fsopen ( path :a len :i mode :i -> :i )
     3 -> smode
   then then then
   h 0 = if -1 return then
-  h __mos_getfil 11 a+ @ -> var sz :i
-  0 -> var pos :i
+  h __mos_getfil 11 a+ i32@ -> var sz :i32
+  sz 0 i>i32 i32< if 2147483647 i>i32 -> sz then
+  0 i>i32 -> var pos :i32
   mode 2 = if
-    sz 0 > if
-      h sz __mos_flseek drop
+    0 i>i32 sz i32< if
+      h sz i32>i __mos_flseek drop
       sz -> pos
     then
   then
@@ -266,8 +272,8 @@ fn fsopen ( path :a len :i mode :i -> :i )
   0 __agon_bkind fd a+ i8!
   0 __agon_bpos fd __agon_cell !
   0 __agon_blen fd __agon_cell !
-  pos __agon_pos fd __agon_cell !
-  sz __agon_size fd __agon_cell !
+  pos __agon_pos fd __agon_cell32 i32!
+  sz __agon_size fd __agon_cell32 i32!
   fd
 end
 
@@ -298,7 +304,7 @@ fn fsread ( fd :i buf :a len :i -> :i )
       bp take + -> bp
       bp __agon_bpos fd __agon_cell !
       bp __agon_blen fd __agon_cell @ >= if 0 __agon_bkind fd a+ i8! then
-      __agon_pos fd __agon_cell @ take + __agon_pos fd __agon_cell !
+      __agon_pos fd __agon_cell32 i32@ take i>i32 i32+ __agon_pos fd __agon_cell32 i32!
       buf take a+ -> buf
       len take - -> len
       take -> total
@@ -309,7 +315,7 @@ fn fsread ( fd :i buf :a len :i -> :i )
   then
   len 256 >= if
     __agon_handles fd a+ u8@ buf len __mos_fread -> var got :i
-    __agon_pos fd __agon_cell @ got + __agon_pos fd __agon_cell !
+    __agon_pos fd __agon_cell32 i32@ got i>i32 i32+ __agon_pos fd __agon_cell32 i32!
     total got + return
   then
   __agon_handles fd a+ u8@ fd __agon_fbuf 256 __mos_fread -> var rgot :i
@@ -323,7 +329,7 @@ fn fsread ( fd :i buf :a len :i -> :i )
   else
     0 __agon_bkind fd a+ i8!
   then
-  __agon_pos fd __agon_cell @ rtake + __agon_pos fd __agon_cell !
+  __agon_pos fd __agon_cell32 i32@ rtake i>i32 i32+ __agon_pos fd __agon_cell32 i32!
   total rtake +
 end
 
@@ -341,10 +347,10 @@ fn fswrite ( fd :i buf :a len :i -> :i )
     bl len + -> bl
     2 __agon_bkind fd a+ i8!
     bl __agon_blen fd __agon_cell !
-    __agon_pos fd __agon_cell @ len + -> var npos :i
-    npos __agon_pos fd __agon_cell !
-    npos __agon_size fd __agon_cell @ > if
-      npos __agon_size fd __agon_cell !
+    __agon_pos fd __agon_cell32 i32@ len i>i32 i32+ -> var npos :i32
+    npos __agon_pos fd __agon_cell32 i32!
+    __agon_size fd __agon_cell32 i32@ npos i32< if
+      npos __agon_size fd __agon_cell32 i32!
     then
     bl 256 >= if
       fd __agon_flush_buf 0 <> if -1 return then
@@ -354,20 +360,20 @@ fn fswrite ( fd :i buf :a len :i -> :i )
   fd __agon_flush_buf 0 <> if -1 return then
   len 256 >= if
     __agon_handles fd a+ u8@ buf len __mos_fwrite -> var put :i
-    __agon_pos fd __agon_cell @ put + -> var npos2 :i
-    npos2 __agon_pos fd __agon_cell !
-    npos2 __agon_size fd __agon_cell @ > if
-      npos2 __agon_size fd __agon_cell !
+    __agon_pos fd __agon_cell32 i32@ put i>i32 i32+ -> var npos2 :i32
+    npos2 __agon_pos fd __agon_cell32 i32!
+    __agon_size fd __agon_cell32 i32@ npos2 i32< if
+      npos2 __agon_size fd __agon_cell32 i32!
     then
     put return
   then
   fd __agon_fbuf buf len memcpy
   2 __agon_bkind fd a+ i8!
   len __agon_blen fd __agon_cell !
-  __agon_pos fd __agon_cell @ len + -> var npos3 :i
-  npos3 __agon_pos fd __agon_cell !
-  npos3 __agon_size fd __agon_cell @ > if
-    npos3 __agon_size fd __agon_cell !
+  __agon_pos fd __agon_cell32 i32@ len i>i32 i32+ -> var npos3 :i32
+  npos3 __agon_pos fd __agon_cell32 i32!
+  __agon_size fd __agon_cell32 i32@ npos3 i32< if
+    npos3 __agon_size fd __agon_cell32 i32!
   then
   len
 end
@@ -379,7 +385,7 @@ fn fsgetc ( fd :i -> :i )
       bp __agon_blen fd __agon_cell @ < if
         fd __agon_fbuf bp a+ u8@ -> var ch :i
         bp 1 + __agon_bpos fd __agon_cell !
-        __agon_pos fd __agon_cell @ 1 + __agon_pos fd __agon_cell !
+        __agon_pos fd __agon_cell32 i32@ 1 i>i32 i32+ __agon_pos fd __agon_cell32 i32!
         ch return
       then
     then
@@ -395,7 +401,7 @@ fn fsgetc ( fd :i -> :i )
   1 __agon_bkind fd a+ i8!
   1 __agon_bpos fd __agon_cell !
   got __agon_blen fd __agon_cell !
-  __agon_pos fd __agon_cell @ 1 + __agon_pos fd __agon_cell !
+  __agon_pos fd __agon_cell32 i32@ 1 i>i32 i32+ __agon_pos fd __agon_cell32 i32!
   fd __agon_fbuf u8@
 end
 
@@ -410,10 +416,10 @@ fn fsputc ( fd :i c :i -> :i )
   bl 1 + -> bl
   2 __agon_bkind fd a+ i8!
   bl __agon_blen fd __agon_cell !
-  __agon_pos fd __agon_cell @ 1 + -> var npos :i
-  npos __agon_pos fd __agon_cell !
-  npos __agon_size fd __agon_cell @ > if
-    npos __agon_size fd __agon_cell !
+  __agon_pos fd __agon_cell32 i32@ 1 i>i32 i32+ -> var npos :i32
+  npos __agon_pos fd __agon_cell32 i32!
+  __agon_size fd __agon_cell32 i32@ npos i32< if
+    npos __agon_size fd __agon_cell32 i32!
   then
   bl 256 >= if
     fd __agon_flush_buf return
@@ -421,27 +427,27 @@ fn fsputc ( fd :i c :i -> :i )
   0
 end
 
-fn fsseek ( fd :i pos :i -> :i )
-  pos 0 < fd __agon_valid_fd 0 = or if -1 return then
+fn fsseek ( fd :i pos :i32 -> :i )
+  pos 0 i>i32 i32< 8388607 i>i32 pos i32< or fd __agon_valid_fd 0 = or if -1 return then
   __agon_bkind fd a+ u8@ 2 = if
     fd __agon_flush_buf 0 <> if -1 return then
   then
   0 __agon_bkind fd a+ i8!
   0 __agon_bpos fd __agon_cell !
   0 __agon_blen fd __agon_cell !
-  __agon_handles fd a+ u8@ pos __mos_flseek 0 <> if -1 return then
-  pos __agon_pos fd __agon_cell !
+  __agon_handles fd a+ u8@ pos i32>i __mos_flseek 0 <> if -1 return then
+  pos __agon_pos fd __agon_cell32 i32!
   0
 end
 
-fn fspos ( fd :i -> :i )
-  fd __agon_valid_fd 0 = if -1 return then
-  __agon_pos fd __agon_cell @
+fn fspos ( fd :i -> :i32 )
+  fd __agon_valid_fd 0 = if -1 i>i32 return then
+  __agon_pos fd __agon_cell32 i32@
 end
 
-fn fssize ( fd :i -> :i )
-  fd __agon_valid_fd 0 = if -1 return then
-  __agon_size fd __agon_cell @
+fn fssize ( fd :i -> :i32 )
+  fd __agon_valid_fd 0 = if -1 i>i32 return then
+  __agon_size fd __agon_cell32 i32@
 end
 
 fn fsflush ( fd :i -> :i )
@@ -495,42 +501,38 @@ fn fsdiropen ( path :a len :i -> :i )
   dd
 end
 
-fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
-  dd 0 < dd 3 > or max 0 < or if -1 0 0 return then
-  __agon_diropen dd a+ u8@ 0 = if -1 0 0 return then
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i32 )
+  dd 0 < dd 3 > or max 0 < or if -1 0 0 i>i32 return then
+  __agon_diropen dd a+ u8@ 0 = if -1 0 0 i>i32 return then
   dd __agon_dir_ptr -> var dp :a
   begin
     -1
   while
-    dp __agon_filinfo __ffs_dread 0 <> if -1 0 0 return then
+    dp __agon_filinfo __ffs_dread 0 <> if -1 0 0 i>i32 return then
     __agon_filinfo 22 a+ -> var namep :a
-    namep u8@ 0 = if 0 0 0 return then
+    namep u8@ 0 = if 0 0 0 i>i32 return then
     namep strlen0 -> var namelen :i
     namelen 1 = namep u8@ 46 = and if
       \ skip "."
     else namelen 2 = namep u8@ 46 = and namep 1 a+ u8@ 46 = and if
       \ skip ".."
     else
-      namelen max > if -1 0 0 return then
+      namelen max > if -1 0 0 i>i32 return then
       buf namep namelen memcpy
       __agon_filinfo 8 a+ u8@ -> var attr :i
       0 -> var flags :i
-      0 -> var sz :i
+      0 i>i32 -> var sz :i32
       attr 16 and 0 <> if
         flags 1 or -> flags
       else
-        __agon_filinfo 3 a+ u8@ 0 <> if
-          8388607 -> sz
-        else
-          __agon_filinfo @ -> sz
-          sz 0 < if 8388607 -> sz then
-        then
+        __agon_filinfo i32@ -> sz
+        sz 0 i>i32 i32< if 2147483647 i>i32 -> sz then
       then
       attr 1 and 0 <> if flags 2 or -> flags then
       namelen flags sz return
     then then
   repeat
-  0 0 0
+  0 0 0 i>i32
 end
 
 fn fsdirclose ( dd :i -> :i )

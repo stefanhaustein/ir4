@@ -65,3 +65,7 @@ fn syscwd ( buf :a max :i -> :i )
   max 2 > if 0 buf 2 a+ i8! then
   max 2 < if max else 2 then
 end
+
+fn sysramtop ( -> :a )
+  0x0006 i>a u16@ 512 - i>a
+end

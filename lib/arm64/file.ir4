@@ -92,28 +92,29 @@ fn fswrite ( fd :i buf :a len :i -> :i )
   buf 1 len fp fwrite
 end
 
-fn fsseek ( fd :i pos :i -> :i )
-  pos 0 < if -1 return then
+fn fsseek ( fd :i pos :i32 -> :i )
+  pos 0 i>i32 i32< if -1 return then
   fd __arm64_get_fp -> var fp :a
   fp 0 i>a a= if -1 return then
-  fp pos 0 fseek 0 <> if -1 else 0 then
+  fp pos i32>i 0 fseek 0 <> if -1 else 0 then
 end
 
-fn fspos ( fd :i -> :i )
+fn fspos ( fd :i -> :i32 )
   fd __arm64_get_fp -> var fp :a
-  fp 0 i>a a= if -1 return then
-  fp ftell
+  fp 0 i>a a= if -1 i>i32 return then
+  fp ftell -> var pos :i
+  pos 0 < if -1 i>i32 else pos i>i32 then
 end
 
-fn fssize ( fd :i -> :i )
+fn fssize ( fd :i -> :i32 )
   fd __arm64_get_fp -> var fp :a
-  fp 0 i>a a= if -1 return then
+  fp 0 i>a a= if -1 i>i32 return then
   fp ftell -> var cur :i
-  cur 0 < if -1 return then
-  fp 0 2 fseek 0 <> if -1 return then
+  cur 0 < if -1 i>i32 return then
+  fp 0 2 fseek 0 <> if -1 i>i32 return then
   fp ftell -> var sz :i
   fp cur 0 fseek drop
-  sz
+  sz i>i32
 end
 
 fn fsflush ( fd :i -> :i )
@@ -168,15 +169,15 @@ fn fsdiropen ( path :a len :i -> :i )
   dd
 end
 
-fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
-  dd 0 < dd 7 > or max 0 < or if -1 0 0 return then
+fn fsdirread ( dd :i buf :a max :i -> :i :i :i32 )
+  dd 0 < dd 7 > or max 0 < or if -1 0 0 i>i32 return then
   dd __arm64_dir_addr a@ -> var dp :a
-  dp 0 i>a a= if -1 0 0 return then
+  dp 0 i>a a= if -1 0 0 i>i32 return then
   begin
     -1
   while
     dp readdir -> var ent :a
-    ent 0 i>a a= if 0 0 0 return then
+    ent 0 i>a a= if 0 0 0 i>i32 return then
     ent 18 a+ u16@ -> var namelen :i
     ent 21 a+ -> var namep :a
     namelen 1 = namep u8@ 46 = and if
@@ -184,7 +185,7 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
     else namelen 2 = namep u8@ 46 = and namep 1 a+ u8@ 46 = and if
       \ skip ".."
     else
-      namelen max > if -1 0 0 return then
+      namelen max > if -1 0 0 i>i32 return then
       namelen 0 > if buf namep namelen memcpy then
       dd __arm64_dir_path -> var base :a
       base strlen -> var blen :i
@@ -197,21 +198,22 @@ fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
         __arm64_path __arm64_statbuf stat 0 = if
           __arm64_statbuf 4 a+ u16@ -> var mode :i
           0 -> var flags :i
-          0 -> var sz :i
+          0 i>i32 -> var sz :i32
           mode 0xF000 and 0x4000 = if
             flags 1 or -> flags
           else
-            __arm64_statbuf 96 a+ @ -> sz
+            __arm64_statbuf 96 a+ @ -> var raw_sz :i
+            raw_sz 2147483647 > if 2147483647 i>i32 -> sz else raw_sz i>i32 -> sz then
           then
           mode 0x0080 and 0 = if flags 2 or -> flags then
           namelen flags sz return
         then
       then
       ent 20 a+ u8@ 4 = if 1 else 0 then -> var dflags :i
-      namelen dflags 0 return
+      namelen dflags 0 i>i32 return
     then then
   repeat
-  0 0 0
+  0 0 0 i>i32
 end
 
 fn fsdirclose ( dd :i -> :i )

@@ -34,6 +34,46 @@ fn emit ( c :i )
   c __ascii_to_zx81 __zx81_rst10
 end
 
+\ Scroll 22-line D_FILE text area up by 1 row and clear row 21.
+fn __zx81_scroll ( )
+  0x400C i>a a@ -> var dfile :a
+  dfile 1 a+ -> var dst :a
+  dfile 34 a+ -> var src :a
+  0 -> var i :i
+  begin i 693 < while
+    src i a+ u8@ dst i a+ i8!
+    1 +-> i
+  repeat
+  dfile 694 a+ -> dst
+  0 -> i
+  begin i 32 < while
+    0 dst i a+ i8!
+    1 +-> i
+  repeat
+end
+
+\ Text output with automatic 22-line D_FILE scrolling (avoids ZX81 ROM SCROLL? prompt).
+fn xemit ( c :i )
+  0x403A i>a u8@ -> var row :i
+  0x4039 i>a u8@ -> var col :i
+  c 10 = c 13 = or if
+    row 3 <= if
+      __zx81_scroll
+      0x400C i>a a@ 661 a+ 0x400E i>a a!
+      33 0x4039 i>a i8!
+      4 0x403A i>a i8!
+    then
+  else
+    row 3 <= col 1 <= and row 2 <= or if
+      __zx81_scroll
+      0x400C i>a a@ 694 a+ 0x400E i>a a!
+      33 0x4039 i>a i8!
+      3 0x403A i>a i8!
+    then
+  then
+  c emit
+end
+
 \ Convert ZX81 character code to ASCII
 fn __zx81_to_ascii ( c :i -> :i )
   c 0x76 = if 13 return then

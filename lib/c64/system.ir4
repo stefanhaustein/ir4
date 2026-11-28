@@ -39,3 +39,7 @@ fn syssleep ( ms :i )
     dt dur i32<
   while repeat
 end
+
+fn sysramtop ( -> :a )
+  0xCC00 i>a
+end

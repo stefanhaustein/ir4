@@ -37,22 +37,22 @@ default fn fswrite ( fd :i buf :a len :i -> :i )
   -1
 end
 
-\ Seek fd to byte offset pos from start; returns 0 on success or < 0 on error
-default fn fsseek ( fd :i pos :i -> :i )
+\ Seek fd to 32-bit byte offset pos from start; returns 0 on success or < 0 on error
+default fn fsseek ( fd :i pos :i32 -> :i )
   fd drop pos drop
   -1
 end
 
-\ Return current byte offset in fd or < 0 on error
-default fn fspos ( fd :i -> :i )
+\ Return current 32-bit byte offset in fd or < 0 on error
+default fn fspos ( fd :i -> :i32 )
   fd drop
-  -1
+  -1 i>i32
 end
 
-\ Return total byte size of open fd or < 0 on error
-default fn fssize ( fd :i -> :i )
+\ Return total 32-bit byte size of open fd or < 0 on error
+default fn fssize ( fd :i -> :i32 )
   fd drop
-  -1
+  -1 i>i32
 end
 
 \ Flush buffered writes on fd; returns 0 on success or < 0 on error
@@ -95,9 +95,9 @@ default fn fsdiropen ( path :a len :i -> :i )
 end
 
 \ Read next directory entry into buf (up to max bytes); returns (namelen, flags, size) with namelen=0 at end or <0 on error
-default fn fsdirread ( dd :i buf :a max :i -> :i :i :i )
+default fn fsdirread ( dd :i buf :a max :i -> :i :i :i32 )
   dd drop buf drop max drop
-  -1 0 0
+  -1 0 0 i>i32
 end
 
 \ Close directory descriptor dd; returns 0 on success or < 0 on error

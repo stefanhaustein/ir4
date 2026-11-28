@@ -115,3 +115,7 @@ code agon sysexit ( code :i )
   0xDA :i8 0x30 :i8 0x00 :i8 0x04 :i8  \\   JP C, 0x040030
   0xC3 :i8 0x30 :i8 0x00 :i8 0x0B :i8  \\   JP 0x0B0030
 end \\ 32e5
+
+fn sysramtop ( -> :a )
+  & __agon_scan_args a>i 0x0B0000 >= if 0x0BA000 else 0x0AF000 then i>a
+end

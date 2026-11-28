@@ -206,3 +206,7 @@ fn syssleep ( ms :i )
     dt dur i32<
   while repeat
 end
+
+fn sysramtop ( -> :a )
+  0x9F00 i>a
+end
