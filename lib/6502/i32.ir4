@@ -78,7 +78,7 @@ code 6502 i32* ( a :i32 b :i32 -> :i32 )
   0x9D :i8 2 :as                \\   STA STACK+2,X
   0xA5 :i8 0x0D :i8             \\   LDA R3
   0x9D :i8 3 :as                \\   STA STACK+3,X
-end \\ 4c22
+end \\ 0619
 
 code 6502 u32/ ( a :i32 b :i32 -> :i32 )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -148,7 +148,7 @@ code 6502 u32/ ( a :i32 b :i32 -> :i32 )
   0x9D :i8 2 :as                \\   STA STACK+2,X
   0xA5 :i8 0x05 :i8             \\   LDA A3
   0x9D :i8 3 :as                \\   STA STACK+3,X
-end \\ 1718
+end \\ 1e6d
 
 code 6502 u32mod ( a :i32 b :i32 -> :i32 )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -218,7 +218,7 @@ code 6502 u32mod ( a :i32 b :i32 -> :i32 )
   0x9D :i8 2 :as                \\   STA STACK+2,X
   0xA5 :i8 0x0D :i8             \\   LDA R3
   0x9D :i8 3 :as                \\   STA STACK+3,X
-end \\ 5218
+end \\ 9923
 
 code 6502 i32<< ( a :i32 cnt :i -> :i32 )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -241,7 +241,7 @@ code 6502 i32<< ( a :i32 cnt :i -> :i32 )
   0x88 :i8                      \\   DEY
   0xD0 :i8 0xE5 :i8             \\   BNE loop
                                 \\ done:
-end \\ f4fb
+end \\ da52
 
 code 6502 u32>> ( a :i32 cnt :i -> :i32 )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -258,7 +258,7 @@ code 6502 u32>> ( a :i32 cnt :i -> :i32 )
   0x88 :i8                      \\   DEY
   0xD0 :i8 0xF1 :i8             \\   BNE loop
                                 \\ done:
-end \\ b028
+end \\ 4caa
 
 code 6502 i32>> ( a :i32 cnt :i -> :i32 )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -277,4 +277,4 @@ code 6502 i32>> ( a :i32 cnt :i -> :i32 )
   0x88 :i8                      \\   DEY
   0xD0 :i8 0xED :i8             \\   BNE loop
                                 \\ done:
-end \\ 0226
+end \\ fcf2

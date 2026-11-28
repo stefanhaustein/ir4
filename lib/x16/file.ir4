@@ -33,7 +33,7 @@ code x16 __x16_setlfs ( lfn :i dev :i sa :i )
   0x20 :i8 0xBA :i8 0xFF :i8    \\   JSR $FFBA
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
-end \\ 823c
+end \\ 854a
 
 \ __x16_setnam ( addr :a len :i ) -> SETNAM $FFBD (A=len, X=lo, Y=hi)
 code x16 __x16_setnam ( addr :a len :i )
@@ -54,7 +54,7 @@ code x16 __x16_setnam ( addr :a len :i )
   0x20 :i8 0xBD :i8 0xFF :i8    \\   JSR $FFBD
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
-end \\ 7fec
+end \\ 9e10
 
 \ __x16_open ( -> :i ) -> OPEN $FFC0 (0 ok, -1 on C=1)
 code x16 __x16_open ( -> :i )
@@ -74,7 +74,7 @@ code x16 __x16_open ( -> :i )
   0xA9 :i8 0xFF :i8             \\   LDA #$FF
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ fba5
+end \\ 2b57
 
 \ __x16_chkin ( lfn :i -> :i ) -> CHKIN $FFC6 (0 ok, -1 on C=1)
 code x16 __x16_chkin ( lfn :i -> :i )
@@ -95,7 +95,7 @@ code x16 __x16_chkin ( lfn :i -> :i )
   0xA9 :i8 0xFF :i8             \\   LDA #$FF
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ f17b
+end \\ 69ca
 
 \ __x16_ckout ( lfn :i -> :i ) -> CKOUT $FFC9 (0 ok, -1 on C=1)
 code x16 __x16_ckout ( lfn :i -> :i )
@@ -116,7 +116,7 @@ code x16 __x16_ckout ( lfn :i -> :i )
   0xA9 :i8 0xFF :i8             \\   LDA #$FF
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ 8810
+end \\ 3eed
 
 \ 4 open file slots (LFNs 2..5, SA 2..5) + 1 directory slot (LFN 6, SA 0)
 var __x16_fmode   :bytes 4

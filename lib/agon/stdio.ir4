@@ -7,7 +7,7 @@ code agon emit ( c :i )
   0xD5 :i8                      \\   PUSH DE
   0x7D :i8                      \\   LD A, L
   0x5B :i8 0xD7 :i8             \\   RST.LIL 0x10
-end \\ 9143
+end \\ 670d
 
 fn xemit ( c :i )
   c 10 = if 13 emit then
@@ -34,7 +34,7 @@ code agon inkey ( -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ c113
+end \\ 82a2
 
 \ Blocking read of next native key event: (vkeycode << 8) | keyascii.
 fn key ( -> :i )

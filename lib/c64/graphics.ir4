@@ -38,20 +38,20 @@ hot code c64 __c64_ram_on ( )
   0x78 :i8                      \\   SEI
   0xA9 :i8 0x35 :i8             \\   LDA #$35
   0x85 :i8 0x01 :i8             \\   STA $01
-end \\ 612d
+end \\ effd
 
 hot code c64 __c64_ram_off ( )
   0xA9 :i8 0x36 :i8             \\   LDA #$36
   0x85 :i8 0x01 :i8             \\   STA $01
   0x58 :i8                      \\   CLI
-end \\ 42dc
+end \\ 7ff4
 
 \ Map Character ROM at $D000-$DFFF with IRQs disabled
 hot code c64 __c64_char_on ( )
   0x78 :i8                      \\   SEI
   0xA9 :i8 0x32 :i8             \\   LDA #$32
   0x85 :i8 0x01 :i8             \\   STA $01
-end \\ 71da
+end \\ b259
 
 fn gfxmodes ( -> :a :i )
   __c64_modes 1
@@ -151,7 +151,7 @@ code c64 __c64_hline_bg ( p :a cnt :i -> :a )
                                 \\ pop_done:
   0xE8 :i8                      \\   INX
   0xE8 :i8                      \\   INX
-end \\ 18de
+end \\ 9821
 
 \ Fill cnt interior 8-pixel horizontal cells ($FF bitmap + high-nibble color RAM); returns updated (p, cell).
 \ Preserves X; uses ZP $02..$06, $08.
@@ -209,7 +209,7 @@ code c64 __c64_hline_fg ( p :a cell :a cnt :i fgnib :i -> :a :a )
                                 \\ pop_done:
   0xE8 :i8                      \\   INX
   0xE8 :i8                      \\   INX
-end \\ 2983
+end \\ 03ed
 
 hot fn gfxhline ( x :i y :i w :i )
   y 0 < y 200 >= or if return then
@@ -329,7 +329,7 @@ code c64 __c64_vline_bg ( p :a h :i nmask :i )
   0x85 :i8 0x03 :i8             \\   STA $03
   0xD0 :i8 0xE0 :i8             \\   BNE loop
                                 \\ done:
-end \\ f919
+end \\ 2770
 
 \ Set h vertical pixels with bitmask mask and update color RAM high nibbles via cell.
 \ Preserves X; uses ZP $02..$06, $08..$09.
@@ -401,7 +401,7 @@ code c64 __c64_vline_fg ( p :a cell :a h :i mask :i fgnib :i )
   0xB8 :i8                      \\   CLV
   0x50 :i8 0xCC :i8             \\   BVC loop
                                 \\ done:
-end \\ 3119
+end \\ 33c0
 
 hot fn gfxvline ( x :i y :i h :i )
   x 0 < x 320 >= or if return then

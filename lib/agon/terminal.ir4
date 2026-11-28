@@ -11,7 +11,7 @@ code agon __agon_term_sysvars ( -> :a )
   0xD1 :i8                      \\   POP DE
   0xE5 :i8                      \\   PUSH HL
   0xD5 :i8                      \\   PUSH DE
-end \\ 6c85
+end \\ f605
 
 fn __agon_term_query ( flag :i vdu :i -> :a )
   __agon_term_sysvars -> var sv :a

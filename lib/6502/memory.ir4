@@ -51,7 +51,7 @@ code 6502 memfill ( dst :a len :i val :i )
   0xC4 :i8 0x06 :i8             \\   CPY L0
   0xD0 :i8 0xF9 :i8             \\   BNE fill_tloop
                                 \\ fill_done:
-end \\ 0c8f
+end \\ abb1
 
 code 6502 memcpy ( dst :a src :a len :i )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -140,7 +140,7 @@ code 6502 memcpy ( dst :a src :a len :i )
   0xC4 :i8 0x06 :i8             \\   CPY L0
   0xD0 :i8 0xF7 :i8             \\   BNE fwd_tloop
                                 \\ copy_done:
-end \\ 5c53
+end \\ ef86
 
 code 6502 memcmp ( a :a b :a len :i -> :i )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -200,4 +200,4 @@ code 6502 memcmp ( a :a b :a len :i -> :i )
   0xA9 :i8 0x00 :i8             \\   LDA #0
   0xE9 :i8 0x00 :i8             \\   SBC #0
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ 0050
+end \\ 7adf

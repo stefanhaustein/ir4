@@ -7,15 +7,15 @@ Automated results from running the PASTA/80 v1.00 test suites across IR4(th) tar
 |  | Target | core | heap | files | more | params | sound | overlays | Total | Time |
 | :---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 |  | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
-| 🟦 | [Agon](#agon) | ²⁾1551 | 26 | 194 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.10s |
-| 🟦 | [ARM64](#arm64) | ²⁾1549 | 26 | 194 | ²⁾45 | ²⁾5 | 4 | 32 | 1855 | 4.68s |
-| 🟥 | [C64](#c64) | ¹⁾n/a | 26 | ⁴⁾??? | 49 | ³⁾n/a | 4 | 32 | 111 | 99.79s |
-| 🟥 | [CP/M](#cpm) | ¹⁾n/a | 17 | ⁴⁾180 | 49 | 6 | 4 | 32 | 288 | 0.95s |
-| 🟦 | [RV32](#rv32) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 0.36s |
-| 🟦 | [Web](#web) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 1.02s |
-| 🟩 | [X16](#x16) | ¹⁾n/a | 26 | ³⁾n/a | 49 | ³⁾n/a | 4 | 32 | 111 | 6.39s |
-| 🟩 | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 11.21s |
-| 🟥 | [ZX81](#zx81) | ¹⁾n/a | ⁴⁾??? | ³⁾n/a | ⁴⁾??? | ³⁾n/a | 4 | ⁴⁾??? | 4 | 44.46s |
+| 🟦 | [Agon](#agon) | ²⁾1551 | 26 | 194 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.16s |
+| 🟦 | [ARM64](#arm64) | ²⁾1549 | 26 | 194 | ²⁾45 | ²⁾5 | 4 | 32 | 1855 | 4.72s |
+| 🟥 | [C64](#c64) | ¹⁾n/a | 26 | ⁴⁾??? | 49 | ³⁾n/a | 4 | 32 | 111 | 99.93s |
+| 🟥 | [CP/M](#cpm) | ¹⁾n/a | 17 | ⁴⁾180 | 49 | 6 | 4 | 32 | 288 | 0.94s |
+| 🟦 | [RV32](#rv32) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 0.35s |
+| 🟦 | [Web](#web) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 1.00s |
+| 🟩 | [X16](#x16) | ¹⁾n/a | 26 | ³⁾n/a | 49 | ³⁾n/a | 4 | 32 | 111 | 5.80s |
+| 🟥 | [X16GS](#x16gs) | ⁴⁾??? | ⁴⁾??? | ⁴⁾??? | ⁴⁾??? | ⁴⁾??? | ⁴⁾??? | ⁴⁾??? | 0 | 0.10s |
+| 🟥 | [ZX81](#zx81) | ¹⁾n/a | ⁴⁾??? | ³⁾n/a | ⁴⁾??? | ³⁾n/a | 4 | ⁴⁾??? | 4 | 44.44s |
 
 ## Notes
 
@@ -59,7 +59,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (16.103s).
+Tests finished (16.157s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -114,7 +114,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (4.682s).
+Tests finished (4.720s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -172,7 +172,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (99.787s).
+Tests finished (99.926s).
 ```
 
 ### CP/M
@@ -202,7 +202,7 @@ Wrong number of tests (311 expected)!
 
               [  FAIL  ]
 
-Tests finished (0.953s).
+Tests finished (0.943s).
 
 Failed assertions:
   heap.pas:118 (TestStress)
@@ -256,7 +256,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (0.356s).
+Tests finished (0.352s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -312,7 +312,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (1.019s).
+Tests finished (1.004s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -368,7 +368,7 @@ overlays        32         0        32
 
               [  PASS  ]
 
-Tests finished (6.392s).
+Tests finished (5.798s).
 ```
 
 ### X16GS
@@ -384,19 +384,19 @@ Results of PASTA/80 version 1.00 tests
 
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
-    core      1572         0      1572
-    heap        26         0        26
-   files       194         0       194
-    more        49         0        49
-  params         6         0         6
-   sound         4         0         4
-overlays        32         0        32
+    core       ???       ???       ???
+    heap       ???       ???       ???
+   files       ???       ???       ???
+    more       ???       ???       ???
+  params       ???       ???       ???
+   sound       ???       ???       ???
+overlays       ???       ???       ???
 --------  --------  --------  --------
-   Total      1883         0      1883
+   Total         0         0         0
 
-              [  PASS  ]
+              [  FAIL  ]
 
-Tests finished (11.207s).
+Tests finished (0.101s).
 ```
 
 ### ZX81
@@ -424,5 +424,5 @@ overlays       ???       ???       ???
 
               [  FAIL  ]
 
-Tests finished (44.465s).
+Tests finished (44.439s).
 ```

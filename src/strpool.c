@@ -5,12 +5,11 @@ static char **ht_slots = NULL;
 static size_t ht_cap = 0;
 static size_t ht_len = 0;
 
-static u32 fnv1a_n(const char *s, size_t len) {
-    u32 h = 2166136261UL;
+static size_t hash_str_n(const char *s, size_t len) {
+    size_t h = 5381U;
     size_t i;
     for (i = 0; i < len; i++) {
-        h ^= (unsigned char)s[i];
-        h *= 16777619UL;
+        h = ((h << 5) + h) ^ (unsigned char)s[i];
     }
     return h;
 }
@@ -24,7 +23,7 @@ static void ht_grow(size_t new_cap) {
     for (i = 0; i < ht_cap; i++) {
         char *p = ht_slots[i];
         if (p) {
-            size_t slot = (size_t)fnv1a_n(p, strlen(p)) & mask;
+            size_t slot = hash_str_n(p, strlen(p)) & mask;
             while (new_slots[slot])
                 slot = (slot + 1) & mask;
             new_slots[slot] = p;
@@ -41,7 +40,7 @@ const char *intern_find(const char *s) {
     if (ht_len == 0)
         return NULL;
     mask = ht_cap - 1;
-    slot = (size_t)fnv1a_n(s, len) & mask;
+    slot = hash_str_n(s, len) & mask;
     while (ht_slots[slot]) {
         const char *p = ht_slots[slot];
         if (memcmp(p, s, len) == 0 && p[len] == '\0')
@@ -57,7 +56,7 @@ const char *intern_str_n(const char *s, size_t len) {
     if (ht_len * 10 >= ht_cap * 7)
         ht_grow(ht_cap ? ht_cap * 2 : 512);
     mask = ht_cap - 1;
-    slot = (size_t)fnv1a_n(s, len) & mask;
+    slot = hash_str_n(s, len) & mask;
     while (ht_slots[slot]) {
         const char *p = ht_slots[slot];
         if (memcmp(p, s, len) == 0 && p[len] == '\0')

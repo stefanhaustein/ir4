@@ -321,7 +321,7 @@ static int x16gs_write_streaming(FILE *fp, size_t base, u32 sz, u32 sz_even) {
         fclose(bin_fp);
         return 0;
     }
-    if (sz & 1U)
+    if (sz & 1UL)
         fputc(0x00, bin_fp);
     if (ferror(bin_fp)) {
         fclose(bin_fp);
@@ -360,7 +360,7 @@ static int x16gs_write(FILE *fp, size_t base) {
      *   lp: LDA $000835,X; STA $011000,X; INX; INX; CPX #sz_even; BCC lp;
      *   JSL $011000; SEC; XCE; CLI; LDA #$8F; JSR $FFD2; LDA #$8E; JMP $FFD2 */
     u32 sz = (u32)(cb_pc() + cb_init_data_size());
-    u32 sz_even = (sz + 1U) & ~1U;
+    u32 sz_even = (sz + 1UL) & ~1UL;
     u16 src = 0x080D + 40; /* $0835 */
     u8 loader[40];
 
@@ -416,7 +416,7 @@ static int x16gs_write(FILE *fp, size_t base) {
 
     if (!cb_write_raw(fp, 1))
         return 0;
-    if (sz & 1U)
+    if (sz & 1UL)
         fputc(0x00, fp);
     return ferror(fp) ? 0 : 1;
 }

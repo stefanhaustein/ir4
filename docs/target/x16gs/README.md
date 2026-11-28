@@ -18,7 +18,8 @@
   - `$00:0400..$00:043F`: Direct Page (`D = $0400` in Golden RAM)
   - `$00:0440..$00:04FF`: Saved caller stack pointer and `E=1` KERNAL call trampolines (switching cleanly between `E=0` native mode in SuperRAM and `E=1` 65C02 KERNAL routines in Bank `$00`)
   - `$00:0500..$00:05FF`: `"IR4A"` command-line argument mailbox (`sysargc` / `sysargv`)
-  - `$00:0600..$00:06FF`: 256-byte Golden RAM block I/O bounce buffer for `MACPTR` (`$FF44`) / `MCIOUT` (`$FEB1`)
+  - `$00:0600..$00:06FF`: Saved Bank `$00` stack and hardware return stack (`S = $06FF` downward) for resident high-bank launchers (`-b 0xF01000`)
+  - `$00:0700..$00:07FF`: 256-byte Golden RAM block I/O bounce buffer for `MACPTR` (`$FF44`) / `MCIOUT` (`$FEB1`)
   - `$00:0801+`: `.prg` bootstrap loader
   - `$00:1FFF` (downward): Native hardware return stack (`S`)
 - **Banks `$01+` (Contiguous SuperRAM):**
@@ -48,4 +49,4 @@ make x16gs        # builds build/x16gs/ir4c.prg + IR4C.BIN
 make test-x16gs   # runs all X16GS library tests and verifies self-hosted HELLO.PRG & SPHERES.PRG
 ```
 
-When launched interactively on X16GS without a pre-populated `$0500` argument mailbox, `ir4c.prg` prompts for the input `.ir4` file and output `.prg` path.
+When launched interactively on X16GS without a pre-populated `$0500` argument mailbox, `ir4c.prg` prompts for the input `.ir4` file and output `.prg` path. For full on-device Pascal self-hosting (`MCP.PRG` + `PASTA80.PRG` + `IR4C.PRG`), see [../../frontend/pasta80/x16gs.md](../../frontend/pasta80/x16gs.md).

@@ -210,6 +210,8 @@ int main(int argc, char **argv) {
             ir4_set_opt_level(0);
         } else if (strcmp(argv[i], "-O1") == 0 || strcmp(argv[i], "-O") == 0) {
             ir4_set_opt_level(1);
+        } else if (strcmp(argv[i], "--no-asm-check") == 0) {
+            ir4_set_asm_check(0);
         } else if (strcmp(argv[i], "--platform") == 0 && i + 1 < argc) {
             i++;
             platform = argv[i];

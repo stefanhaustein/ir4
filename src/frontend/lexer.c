@@ -11,19 +11,22 @@ static StrVec extra_lib_roots;
 static StrVec seen_files;
 static StrBuf tok_sb;
 
-#define FNV1A_INIT 2166136261UL
+#define ASM_HASH_INIT 5381UL
 
 static int code_asm_active = 0;
 static int code_asm_seen = 0;
+static int check_asm_hash = 1;
 static int last_tok_ended_line = 0;
-static u32 code_asm_hash = FNV1A_INIT;
-static u32 code_tok_hash = FNV1A_INIT;
+static u32 code_asm_hash = ASM_HASH_INIT;
+static u32 code_tok_hash = ASM_HASH_INIT;
 
-static u32 fnv1a_byte(u32 h, u8 b) {
-    return (h ^ (u32)b) * 16777619UL;
+void ir4_set_asm_check(int enable) { check_asm_hash = enable ? 1 : 0; }
+
+static u32 asm_hash_byte(u32 h, u8 b) {
+    return (((h << 5) + h) ^ (u32)b) & 0xFFFFFFFFUL;
 }
 
-static u32 fnv1a_trimmed_line(u32 h, const char *s, size_t len) {
+static u32 asm_hash_trimmed_line(u32 h, const char *s, size_t len) {
     size_t a = 0;
     size_t b = len;
     while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r'))
@@ -31,9 +34,9 @@ static u32 fnv1a_trimmed_line(u32 h, const char *s, size_t len) {
     while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r'))
         b--;
     while (a < b) {
-        h = fnv1a_byte(h, (u8)s[a++]);
+        h = asm_hash_byte(h, (u8)s[a++]);
     }
-    return fnv1a_byte(h, (u8)'\n');
+    return asm_hash_byte(h, (u8)'\n');
 }
 
 void ir4_add_lib_root(const char *path) {
@@ -136,7 +139,7 @@ void lex_init(FILE *in, const char *path) {
     sf->fp = in;
     sf->path = root_path;
     sf->line_num = 1;
-    sf->hdr_asm_hash = FNV1A_INIT;
+    sf->hdr_asm_hash = ASM_HASH_INIT;
     sf->req_group = 0;
     sf->req_rank = 0;
     sf->can_reopen = 0;
@@ -245,9 +248,9 @@ int skip_ws_and_comments(void) {
                     }
                     if (code_asm_active) {
                         code_asm_seen = 1;
-                        code_asm_hash = fnv1a_trimmed_line(code_asm_hash, ln, n);
+                        code_asm_hash = asm_hash_trimmed_line(code_asm_hash, ln, n);
                     } else {
-                        cur->hdr_asm_hash = fnv1a_trimmed_line(cur->hdr_asm_hash, ln, n);
+                        cur->hdr_asm_hash = asm_hash_trimmed_line(cur->hdr_asm_hash, ln, n);
                     }
                     continue;
                 }
@@ -341,15 +344,15 @@ void lex_begin_code_asm(void) {
     SrcFile *cur = lex_cur();
     code_asm_active = 1;
     code_asm_seen = 0;
-    code_asm_hash = cur ? cur->hdr_asm_hash : FNV1A_INIT;
-    code_tok_hash = FNV1A_INIT;
+    code_asm_hash = cur ? cur->hdr_asm_hash : ASM_HASH_INIT;
+    code_tok_hash = ASM_HASH_INIT;
 }
 
 void lex_feed_code_tok(const char *tok) {
     while (*tok) {
-        code_tok_hash = fnv1a_byte(code_tok_hash, (u8)*tok++);
+        code_tok_hash = asm_hash_byte(code_tok_hash, (u8)*tok++);
     }
-    code_tok_hash = fnv1a_byte(code_tok_hash, (u8)'\n');
+    code_tok_hash = asm_hash_byte(code_tok_hash, (u8)'\n');
 }
 
 void lex_finish_code_asm(void) {
@@ -412,11 +415,13 @@ void lex_finish_code_asm(void) {
         }
     }
 
-    if (code_asm_seen) {
-        if (!has_tag || got != expected)
-            ir4_die("missing or stale '\\\\' assembly hash on 'end' (run make)");
-    } else if (has_tag) {
-        ir4_die("unexpected 'end \\\\' hash on code block without '\\\\' assembly");
+    if (check_asm_hash) {
+        if (code_asm_seen) {
+            if (!has_tag || got != expected)
+                ir4_die("missing or stale '\\\\' assembly hash on 'end' (run make)");
+        } else if (has_tag) {
+            ir4_die("unexpected 'end \\\\' hash on code block without '\\\\' assembly");
+        }
     }
 }
 
@@ -444,7 +449,7 @@ static void push_src_file(FILE *fp, const char *path, u16 req_group, u8 req_rank
     sf->fp = fp;
     sf->path = ipath;
     sf->line_num = 1;
-    sf->hdr_asm_hash = FNV1A_INIT;
+    sf->hdr_asm_hash = ASM_HASH_INIT;
     sf->req_group = req_group;
     sf->req_rank = req_rank;
     sf->can_reopen = (fp == NULL) ? 1 : 0;
@@ -582,6 +587,8 @@ void push_require(const char *name) { push_require_ex(name, 0); }
 int parse_int(const char *s, i32 *val) {
     char *endp;
     int base = 0;
+    int neg = 0;
+    unsigned long uv;
     const char *p = s;
 
     if (*p == '$') {
@@ -589,27 +596,26 @@ int parse_int(const char *s, i32 *val) {
         p++;
         if (*p == '\0')
             return 0;
-    } else if ((p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) ||
-               ((p[0] == '-' || p[0] == '+') && p[1] == '0' &&
-                (p[2] == 'b' || p[2] == 'B'))) {
-        int neg = (p[0] == '-');
-        p += (p[0] == '-' || p[0] == '+') ? 3 : 2;
-        if (*p == '\0')
-            return 0;
-        *val = (i32)strtol(p, &endp, 2);
-        if (neg)
-            *val = -*val;
-        return (*endp == '\0');
     } else {
-        if (*p == '-' || *p == '+')
+        if (*p == '-' || *p == '+') {
+            neg = (*p == '-');
             p++;
-        if (!isdigit((unsigned char)*p))
+        }
+        if (p[0] == '0' && (p[1] == 'b' || p[1] == 'B')) {
+            base = 2;
+            p += 2;
+            if (*p == '\0')
+                return 0;
+        } else if (!isdigit((unsigned char)*p)) {
             return 0;
-        p = s;
+        }
     }
 
-    *val = (i32)strtol(p, &endp, base);
-    return (*endp == '\0');
+    uv = strtoul(p, &endp, base);
+    if (*endp != '\0')
+        return 0;
+    *val = neg ? (i32)(0UL - uv) : (i32)uv;
+    return 1;
 }
 
 int parse_addr(const char *s, u32 *val) {

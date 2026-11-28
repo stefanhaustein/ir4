@@ -16,7 +16,7 @@ code agon __mos_del ( path0 :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 5c99
+end \\ 266d
 
 \ __mos_ren ( old0 :a new0 :a -> :i )  MOS $06: HL=old0, DE=new0 -> A=status (0=ok)
 code agon __mos_ren ( old0 :a new0 :a -> :i )
@@ -31,7 +31,7 @@ code agon __mos_ren ( old0 :a new0 :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 890f
+end \\ d49d
 
 \ __mos_fopen ( path0 :a mode :i -> :i )  MOS $0A: HL=path0, C=mode -> A=handle (0=err)
 code agon __mos_fopen ( path0 :a mode :i -> :i )
@@ -46,7 +46,7 @@ code agon __mos_fopen ( path0 :a mode :i -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 660d
+end \\ b997
 
 \ __mos_fclose ( handle :i -> :i )  MOS $0B: C=handle -> A=remaining open handles
 code agon __mos_fclose ( handle :i -> :i )
@@ -60,7 +60,7 @@ code agon __mos_fclose ( handle :i -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ edf3
+end \\ 8a65
 
 \ __mos_getfil ( handle :i -> :a )  MOS $19: C=handle -> HLU=FIL*
 code agon __mos_getfil ( handle :i -> :a )
@@ -72,7 +72,7 @@ code agon __mos_getfil ( handle :i -> :a )
   0xD1 :i8                      \\   POP DE
   0xE5 :i8                      \\   PUSH HL
   0xD5 :i8                      \\   PUSH DE
-end \\ 17c3
+end \\ 5c6f
 
 \ __mos_fread ( handle :i buf :a count :i -> :i )  MOS $1A: C=handle, HL=buf, DE=count -> DE=read
 code agon __mos_fread ( handle :i buf :a count :i -> :i )
@@ -86,7 +86,7 @@ code agon __mos_fread ( handle :i buf :a count :i -> :i )
   0xE1 :i8                      \\   POP HL
   0xD5 :i8                      \\   PUSH DE
   0xE5 :i8                      \\   PUSH HL
-end \\ 3c4c
+end \\ 74dd
 
 \ __mos_fwrite ( handle :i buf :a count :i -> :i )  MOS $1B: C=handle, HL=buf, DE=count -> DE=written
 code agon __mos_fwrite ( handle :i buf :a count :i -> :i )
@@ -100,7 +100,7 @@ code agon __mos_fwrite ( handle :i buf :a count :i -> :i )
   0xE1 :i8                      \\   POP HL
   0xD5 :i8                      \\   PUSH DE
   0xE5 :i8                      \\   PUSH HL
-end \\ 2d34
+end \\ 314a
 
 \ __mos_flseek ( handle :i pos :i -> :i )  MOS $1C: C=handle, HLU=pos, E=0 -> A=status
 code agon __mos_flseek ( handle :i pos :i -> :i )
@@ -116,7 +116,7 @@ code agon __mos_flseek ( handle :i pos :i -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ b86f
+end \\ 8de6
 
 \ __mos_mkdir ( path0 :a -> :i )  MOS $07: HL=path0 -> A=status (0=ok)
 code agon __mos_mkdir ( path0 :a -> :i )
@@ -130,7 +130,7 @@ code agon __mos_mkdir ( path0 :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 3140
+end \\ e2e5
 
 \ __ffs_dopen ( dir :a path0 :a -> :i )  MOS $91: HL=dir, DE=path0 -> A=FRESULT
 code agon __ffs_dopen ( dir :a path0 :a -> :i )
@@ -145,7 +145,7 @@ code agon __ffs_dopen ( dir :a path0 :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 2206
+end \\ 4071
 
 \ __ffs_dclose ( dir :a -> :i )  MOS $92: HL=dir -> A=FRESULT
 code agon __ffs_dclose ( dir :a -> :i )
@@ -159,7 +159,7 @@ code agon __ffs_dclose ( dir :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ f5ea
+end \\ d73f
 
 \ __ffs_dread ( dir :a filinfo :a -> :i )  MOS $93: HL=dir, DE=filinfo -> A=FRESULT
 code agon __ffs_dread ( dir :a filinfo :a -> :i )
@@ -174,7 +174,7 @@ code agon __ffs_dread ( dir :a filinfo :a -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 061a
+end \\ a685
 
 var __agon_handles :bytes 8
 var __agon_modes   :bytes 8

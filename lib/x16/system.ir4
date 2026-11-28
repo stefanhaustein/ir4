@@ -24,7 +24,7 @@ code x16 __x16sys_rdtim32 ( -> :i32 )
   0x9D :i8 2 :as                \\   STA STACK+2,X
   0xA9 :i8 0x00 :i8             \\   LDA #$00
   0x9D :i8 3 :as                \\   STA STACK+3,X
-end \\ 60d2
+end \\ 49a0
 
 extern __x16sys_readst 0xFFB7 ( -> A :i )
 extern __x16sys_close  0xFFC3 ( A :i )
@@ -51,7 +51,7 @@ code x16 __x16sys_setlfs ( lfn :i dev :i sa :i )
   0x20 :i8 0xBA :i8 0xFF :i8    \\   JSR $FFBA
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
-end \\ 823c
+end \\ 854a
 
 code x16 __x16sys_setnam ( addr :a len :i )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -71,7 +71,7 @@ code x16 __x16sys_setnam ( addr :a len :i )
   0x20 :i8 0xBD :i8 0xFF :i8    \\   JSR $FFBD
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
-end \\ 7fec
+end \\ 9e10
 
 code x16 __x16sys_open ( -> :i )
   0x8A :i8                      \\   TXA
@@ -87,7 +87,7 @@ code x16 __x16sys_open ( -> :i )
                                 \\ ok:
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ 9ec5
+end \\ 6557
 
 code x16 __x16sys_chkin ( lfn :i -> :i )
   0xBD :i8 0 :as                \\   LDA STACK+0,X
@@ -107,7 +107,7 @@ code x16 __x16sys_chkin ( lfn :i -> :i )
   0xA9 :i8 0xFF :i8             \\   LDA #$FF
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ f17b
+end \\ 69ca
 
 var __x16sys_tok :bytes 64
 var __x16sys_cwd :bytes 128

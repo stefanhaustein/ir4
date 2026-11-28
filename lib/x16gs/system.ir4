@@ -68,10 +68,78 @@ code x16gs __x16gs_rdtim32 ( -> :i32 )
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
   0xA5 :i8 0x22 :i8                    \\   LDA $22             ; $0422..$0423: MSB+0
   0x9D :i8 0x02 :i8 0x02 :i8           \\   STA $0202,X
-end \\ 2d99
+end \\ cbee
+
+code x16gs __x16gs_is_emu ( -> :i )
+  0xCA :i8                             \\   DEX
+  0xCA :i8                             \\   DEX
+  0xAF :i8 0xBE :i8 0x9F :i8 0x00 :i8  \\   LDA f:$009FBE
+  0xC9 :i8 0x31 :i8 0x36 :i8           \\   CMP #$3631
+  0xF0 :i8 0x05 :i8                    \\   BEQ yes
+  0x9E :i8 0x00 :i8 0x02 :i8           \\   STZ $0200,X
+  0x80 :i8 0x06 :i8                    \\   BRA done
+                                       \\ yes:
+  0xA9 :i8 0x01 :i8 0x00 :i8           \\   LDA #$0001
+  0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
+                                       \\ done:
+end \\ 6a85
+
+code x16gs __x16gs_emu_cycles ( -> :i32 )
+  0xCA :i8                             \\   DEX
+  0xCA :i8                             \\   DEX
+  0xCA :i8                             \\   DEX
+  0xCA :i8                             \\   DEX
+  0xE2 :i8 0x20 :i8                    \\   SEP #$20
+                                       \\   .a8
+  0xAF :i8 0xB8 :i8 0x9F :i8 0x00 :i8  \\   LDA f:$009FB8
+  0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
+  0xAF :i8 0xB9 :i8 0x9F :i8 0x00 :i8  \\   LDA f:$009FB9
+  0x9D :i8 0x01 :i8 0x02 :i8           \\   STA $0201,X
+  0xAF :i8 0xBA :i8 0x9F :i8 0x00 :i8  \\   LDA f:$009FBA
+  0x9D :i8 0x02 :i8 0x02 :i8           \\   STA $0202,X
+  0xAF :i8 0xBB :i8 0x9F :i8 0x00 :i8  \\   LDA f:$009FBB
+  0x9D :i8 0x03 :i8 0x02 :i8           \\   STA $0203,X
+  0xC2 :i8 0x20 :i8                    \\   REP #$20
+                                       \\   .a16
+end \\ 4a0d
+
+var __x16gs_c_per_ms :i32
+var __x16gs_last_cyc :i32
+var __x16gs_rem_cyc :i32
+var __x16gs_acc_ms :i32
 
 fn sysmillis ( -> :i32 )
-  __x16gs_rdtim32 50 i>i32 i32* 3 i>i32 i32/
+  __x16gs_is_emu 0 = if
+    __x16gs_rdtim32 50 i>i32 i32* 3 i>i32 i32/ return
+  then
+  __x16gs_c_per_ms 0 i>i32 i32= if
+    __x16gs_rdtim32 -> var r0 :i32
+    var r1 :i32
+    begin __x16gs_rdtim32 -> r1 r1 r0 i32= while repeat
+    __x16gs_emu_cycles -> var c0 :i32
+    var r2 :i32
+    begin __x16gs_rdtim32 -> r2 r2 r1 i32= while repeat
+    __x16gs_emu_cycles -> var c1 :i32
+    c1 c0 i32- 3 i>i32 i32* 50 i>i32 u32/ -> var cpms :i32
+    cpms 0 i>i32 i32= if 8000 i>i32 -> cpms then
+    cpms -> __x16gs_c_per_ms
+    c1 -> __x16gs_last_cyc
+    0 i>i32 -> __x16gs_rem_cyc
+    r2 50 i>i32 i32* 3 i>i32 i32/ -> __x16gs_acc_ms
+    __x16gs_acc_ms return
+  then
+  __x16gs_emu_cycles -> var now :i32
+  now __x16gs_last_cyc i32- -> var delta :i32
+  now -> __x16gs_last_cyc
+  delta __x16gs_c_per_ms u32/ -> var q :i32
+  delta __x16gs_c_per_ms u32mod __x16gs_rem_cyc i32+ -> var rem :i32
+  rem __x16gs_c_per_ms u32>= if
+    q 1 i>i32 i32+ -> q
+    rem __x16gs_c_per_ms i32- -> rem
+  then
+  rem -> __x16gs_rem_cyc
+  __x16gs_acc_ms q i32+ -> __x16gs_acc_ms
+  __x16gs_acc_ms
 end
 
 fn syssleep ( ms :i )

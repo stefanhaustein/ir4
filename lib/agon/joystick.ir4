@@ -11,7 +11,7 @@ code agon __agon_kbmap ( -> :a )
   0xD1 :i8                      \\   POP DE
   0xE5 :i8                      \\   PUSH HL
   0xD5 :i8                      \\   PUSH DE
-end \\ 0cc0
+end \\ acb7
 
 fn __agon_key ( km :a vk :i -> :i )
   km vk 3 >> a+ u8@ 1 vk 7 and << and 0 <>

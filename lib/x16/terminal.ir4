@@ -17,7 +17,7 @@ code x16 __x16_screen ( -> :i )
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x98 :i8                      \\   TYA
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ a9f0
+end \\ 2358
 
 \ Set KERNAL cursor via PLOT ($FFF0, C=0: X=row, Y=col).
 code x16 __x16_plot ( x :i y :i )
@@ -36,7 +36,7 @@ code x16 __x16_plot ( x :i y :i )
   0x20 :i8 0xF0 :i8 0xFF :i8    \\   JSR $FFF0
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
-end \\ 88b6
+end \\ a99f
 
 \ Read KERNAL cursor via PLOT ($FFF0, C=1 -> X=row, Y=col -> (col<<8)|row).
 code x16 __x16_plot_get ( -> :i )
@@ -54,7 +54,7 @@ code x16 __x16_plot_get ( -> :i )
   0x9D :i8 0 :as                \\   STA STACK+0,X
   0x98 :i8                      \\   TYA
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ 7d01
+end \\ ced0
 
 fn termwidth ( -> :i ) __x16_screen 255 and end
 fn termheight ( -> :i ) __x16_screen 8 u>> 255 and end

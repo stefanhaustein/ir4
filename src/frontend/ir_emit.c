@@ -33,8 +33,10 @@ typedef struct {
 VEC_OF(FwdCallVec, FwdCall);
 VEC_OF(PendingBrVec, PendingBr);
 VEC_OF(PendingJtabVec, PendingJtab);
+VEC_OF(U8Vec, u8);
 
 static FwdCallVec fwd_calls;
+static U8Vec br_tgt;
 static size_t heap_start_off = 0;
 
 void ir_emit_reset(void) {
@@ -147,20 +149,8 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
 }
 
 static int ir_is_br_target(const WordIR *w, size_t ir_idx) {
-    size_t j;
-    for (j = 0; j < w->ir.len; j++) {
-        const IrInstr *bi = &w->ir.data[j];
-        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
-            return 1;
-        if (bi->kind == IR_JTAB) {
-            size_t k;
-            for (k = 0; k < bi->u.jtab.count; k++) {
-                if (jtab_targets.data[bi->u.jtab.start + k] == ir_idx)
-                    return 1;
-            }
-        }
-    }
-    return 0;
+    (void)w;
+    return br_tgt.data[ir_idx] != 0;
 }
 
 static int ir_can_fuse(const WordIR *w, size_t i, size_t extra) {
@@ -408,6 +398,21 @@ static void emit_word(size_t fidx) {
 #endif
 
     VEC_ENSURE(ir_addr, w->ir.len + 1);
+    VEC_ENSURE(br_tgt, w->ir.len + 1);
+    memset(br_tgt.data, 0, w->ir.len + 1);
+    for (i = 0; i < w->ir.len; i++) {
+        const IrInstr *bi = &w->ir.data[i];
+        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target <= w->ir.len) {
+            br_tgt.data[bi->u.br.target] = 1;
+        } else if (bi->kind == IR_JTAB) {
+            size_t k;
+            for (k = 0; k < bi->u.jtab.count; k++) {
+                size_t tir = jtab_targets.data[bi->u.jtab.start + k];
+                if (tir <= w->ir.len)
+                    br_tgt.data[tir] = 1;
+            }
+        }
+    }
     {
         int retried = 0;
         int is_816 = (strcmp(be->name, "65816") == 0);
@@ -429,15 +434,23 @@ static void emit_word(size_t fidx) {
     for (i = 0; i <= w->ir.len; i++) {
         if (be->peep_fence && ir_is_br_target(w, i))
             be->peep_fence();
-        for (p = 0; p < pending.len; p++) {
+        p = 0;
+        while (p < pending.len) {
             if (pending.data[p].target_ir == i) {
                 be->patch_fwd(pending.data[p].patch_offset);
+                pending.data[p] = pending.data[--pending.len];
+            } else {
+                p++;
             }
         }
-        for (p = 0; p < pending_jtab.len; p++) {
+        p = 0;
+        while (p < pending_jtab.len) {
             if (pending_jtab.data[p].target_ir == i) {
                 be->patch_jtab(pending_jtab.data[p].patch_offset, pending_jtab.data[p].idx,
                                pending_jtab.data[p].count, be->cur_addr());
+                pending_jtab.data[p] = pending_jtab.data[--pending_jtab.len];
+            } else {
+                p++;
             }
         }
         if (i == w->ir.len)

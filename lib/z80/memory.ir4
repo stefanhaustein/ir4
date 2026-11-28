@@ -22,7 +22,7 @@ code z80 memfill ( dst :a len :i val :i )
   0xED :i8 0xB0 :i8             \\   LDIR
                                 \\ fill_done:
   0xFD :i8 0xE9 :i8             \\   JP (IY)
-end \\ 09ba
+end \\ 5f51
 
 code z80 memcpy ( dst :a src :a len :i )
   0xFD :i8 0xE1 :i8             \\   POP IY
@@ -51,7 +51,7 @@ code z80 memcpy ( dst :a src :a len :i )
   0xED :i8 0xB0 :i8             \\   LDIR
                                 \\ copy_done:
   0xFD :i8 0xE9 :i8             \\   JP (IY)
-end \\ 1d35
+end \\ 282f
 
 code z80 memcmp ( a :a b :a len :i -> :i )
   0xFD :i8 0xE1 :i8             \\   POP IY
@@ -86,4 +86,4 @@ code z80 memcmp ( a :a b :a len :i -> :i )
   0x67 :i8                      \\   LD H, A
   0xE5 :i8                      \\   PUSH HL
   0xFD :i8 0xE9 :i8             \\   JP (IY)
-end \\ b705
+end \\ 20e9

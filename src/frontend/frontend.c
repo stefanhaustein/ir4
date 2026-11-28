@@ -597,11 +597,10 @@ static short builtin_ht[BUILTIN_HT_SIZE];
 static short builtin_next[sizeof(builtins) / sizeof(builtins[0])];
 static int builtin_ht_init = 0;
 
-static u32 builtin_hash(const char *s) {
-    u32 h = 2166136261UL;
+static size_t builtin_hash(const char *s) {
+    size_t h = 5381U;
     while (*s) {
-        h ^= (unsigned char)*s++;
-        h *= 16777619UL;
+        h = ((h << 5) + h) ^ (unsigned char)*s++;
     }
     return h;
 }

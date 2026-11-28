@@ -77,7 +77,7 @@ code agon gfxticks ( -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 9c98
+end \\ 4f25
 
 fn gfxvsync ( )
   23 emit 0 emit 195 emit
@@ -128,7 +128,7 @@ code agon __agon_gfx_sysvars ( -> :a )
   0xD1 :i8                      \\   POP DE
   0xE5 :i8                      \\   PUSH HL
   0xD5 :i8                      \\   PUSH DE
-end \\ 6c85
+end \\ f605
 
 \ Read pixel color index at (*x*, *y*) via VDP `VDU 23, 0, $84`; returns -1 if out of bounds or unsupported.
 fn gfxgetpx ( x :i y :i -> :i )

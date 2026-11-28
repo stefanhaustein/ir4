@@ -62,7 +62,7 @@ code x16gs __x16gs_kernal ( a_in :i addr :i -> :i )
   0x98 :i8                             \\   TYA
   0x29 :i8 0xFF :i8 0x00 :i8           \\   AND #$00FF
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X         ; overwrite a_in slot with result
-end \\ 9541
+end \\ 28a2
 
 fn emit ( c :i )
   c 0xFFD2 __x16gs_kernal drop

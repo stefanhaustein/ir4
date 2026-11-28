@@ -16,6 +16,7 @@ LCC_RCC  ?= ./lcc/build/rcc
 
 .PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 test-web test-x16gs docs-web rt rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web agon x16gs clean
 
+ASM_SYNC ?= 1
 ASM_IR4_FILES = $(wildcard lib/*.ir4 lib/*/*.ir4 pasta84/rtl/*.ir4)
 
 all: $(BUILD)/.asm_sync $(TARGET)
@@ -24,7 +25,9 @@ $(BUILD):
 	mkdir -p $(BUILD)
 
 $(BUILD)/.asm_sync: $(ASM_IR4_FILES) tools/sync_asm.py | $(BUILD)
-	@python3 tools/sync_asm.py --since $(BUILD)/.asm_sync $(ASM_IR4_FILES)
+	@if [ "$(ASM_SYNC)" != "0" ]; then \
+		python3 tools/sync_asm.py --since $(BUILD)/.asm_sync $(ASM_IR4_FILES); \
+	fi
 	@touch $(BUILD)/.asm_sync
 
 $(BUILD)/%.o: src/%.c src/ir4.h

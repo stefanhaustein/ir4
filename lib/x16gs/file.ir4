@@ -83,7 +83,7 @@ code x16gs __x16gs_kernal_xyc ( a_in :i x_in :i y_in :i addr :i -> :i )
   0x98 :i8                             \\   TYA
   0x29 :i8 0x01 :i8 0x00 :i8           \\   AND #$0001
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
-end \\ 7bcc
+end \\ a5c8
 
 \ Call Bank-0 KERNAL MACPTR ($FF44) or MCIOUT ($FEB1) on $00:0700..$00:07FF with C=0, A=cnt_a;
 \ returns (Y_out << 8) | X_out on C=0, or -1 if Carry=1 (unsupported).
@@ -161,7 +161,7 @@ code x16gs __x16gs_block_io ( cnt_a :i addr :i -> :i )
   0xA5 :i8 0x20 :i8                    \\   LDA $20             ; (Y_out << 8) | X_out
                                        \\ store:
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
-end \\ 175d
+end \\ a4e2
 
 fn __x16_readst ( -> :i )
   0 0xFFB7 __x16gs_kernal

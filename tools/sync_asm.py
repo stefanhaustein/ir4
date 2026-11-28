@@ -9,8 +9,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-FNV1A_INIT = 2166136261
-FNV1A_PRIME = 16777619
+HASH_INIT = 5381
 
 CPU_FAMILY = {
     "6502": "6502",
@@ -33,23 +32,23 @@ END_RE = re.compile(r"^(\s*end)(?:\s+\\\\\s*([0-9a-fA-F]{4})\s*|\s*(\\(?!\\).*)?
 LABEL_RE = re.compile(r"^[A-Za-z_.@][A-Za-z0-9_.$@]*:")
 
 
-def fnv1a_byte(h: int, b: int) -> int:
-    return ((h ^ b) * FNV1A_PRIME) & 0xFFFFFFFF
+def hash_byte(h: int, b: int) -> int:
+    return (((h << 5) + h) ^ b) & 0xFFFFFFFF
 
 
-def fnv1a_trimmed_line(h: int, s: str) -> int:
+def hash_trimmed_line(h: int, s: str) -> int:
     trimmed = s.strip(" \t\r").encode("latin1")
     for b in trimmed:
-        h = fnv1a_byte(h, b)
-    return fnv1a_byte(h, 0x0A)
+        h = hash_byte(h, b)
+    return hash_byte(h, 0x0A)
 
 
-def fnv1a_tokens(toks: list[str]) -> int:
-    h = FNV1A_INIT
+def hash_tokens(toks: list[str]) -> int:
+    h = HASH_INIT
     for t in toks:
         for b in t.encode("latin1"):
-            h = fnv1a_byte(h, b)
-        h = fnv1a_byte(h, 0x0A)
+            h = hash_byte(h, b)
+        h = hash_byte(h, 0x0A)
     return h
 
 
@@ -363,7 +362,7 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
                 seen_syms.add(nm)
                 syms.append(nm)
 
-    hdr_asm_hash = FNV1A_INIT
+    hdr_asm_hash = HASH_INIT
     header_asm = []
     out_lines = []
     changed = False
@@ -377,7 +376,7 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
             sp = split_asm_comment(ln)
             if sp is not None:
                 _, asm_part = sp
-                hdr_asm_hash = fnv1a_trimmed_line(hdr_asm_hash, asm_part)
+                hdr_asm_hash = hash_trimmed_line(hdr_asm_hash, asm_part)
                 header_asm.append(asm_part.strip(" \t\r"))
             out_lines.append(ln)
             i += 1
@@ -412,7 +411,7 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
             sp = split_asm_comment(bl)
             if sp is not None:
                 left_part, asm_part = sp
-                asm_h = fnv1a_trimmed_line(asm_h, asm_part)
+                asm_h = hash_trimmed_line(asm_h, asm_part)
                 asm_entries.append((bi, asm_part))
                 cur_toks.extend(extract_code_tokens(left_part))
             else:
@@ -424,7 +423,7 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
             out_lines.append(end_line)
             continue
 
-        cur_tok_h = fnv1a_tokens(cur_toks)
+        cur_tok_h = hash_tokens(cur_toks)
         cur_expected = fold_hash16(asm_h, cur_tok_h)
         cur_tag_ok = end_hash_str is not None and int(end_hash_str, 16) == cur_expected
 
@@ -457,7 +456,7 @@ def process_file(path: Path, check_only: bool, force: bool) -> bool:
             )
 
         all_new_toks = [t for lt in per_line_toks for t in lt]
-        new_tok_h = fnv1a_tokens(all_new_toks)
+        new_tok_h = hash_tokens(all_new_toks)
         new_hash16 = fold_hash16(asm_h, new_tok_h)
 
         tok_strs = ["  " + " ".join(lt) if lt else "" for lt in per_line_toks]

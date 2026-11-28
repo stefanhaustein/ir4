@@ -131,7 +131,7 @@ code x16gs __x16gs_joy_get ( port :i -> :i )
   0xA5 :i8 0x20 :i8                    \\   LDA $20
                                        \\ store:
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
-end \\ 44e3
+end \\ 2ca9
 
 fn joycount ( -> :i ) 5 end
 

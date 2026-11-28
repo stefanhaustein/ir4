@@ -45,7 +45,7 @@ code z80 i32* ( a :i32 b :i32 -> :i32 )
   0x39 :i8                             \\   ADD HL, SP
   0xF9 :i8                             \\   LD SP, HL
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ 1083
+end \\ 847e
 
 code z80 u32/ ( a :i32 b :i32 -> :i32 )
   0xFD :i8 0xE1 :i8                    \\   POP IY
@@ -88,7 +88,7 @@ code z80 u32/ ( a :i32 b :i32 -> :i32 )
   0x39 :i8                             \\   ADD HL, SP
   0xF9 :i8                             \\   LD SP, HL
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ ef58
+end \\ 727c
 
 code z80 u32mod ( a :i32 b :i32 -> :i32 )
   0xFD :i8 0xE1 :i8                    \\   POP IY
@@ -139,7 +139,7 @@ code z80 u32mod ( a :i32 b :i32 -> :i32 )
   0x39 :i8                             \\   ADD HL, SP
   0xF9 :i8                             \\   LD SP, HL
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ a5af
+end \\ da9f
 
 code z80 i32<< ( a :i32 cnt :i -> :i32 )
   0xFD :i8 0xE1 :i8                    \\   POP IY
@@ -158,7 +158,7 @@ code z80 i32<< ( a :i32 cnt :i -> :i32 )
   0x10 :i8 0xEE :i8                    \\   DJNZ shl_loop
                                        \\ shl_done:
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ 555f
+end \\ 23ef
 
 code z80 u32>> ( a :i32 cnt :i -> :i32 )
   0xFD :i8 0xE1 :i8                    \\   POP IY
@@ -177,7 +177,7 @@ code z80 u32>> ( a :i32 cnt :i -> :i32 )
   0x10 :i8 0xEE :i8                    \\   DJNZ shr_loop
                                        \\ shr_done:
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ e64f
+end \\ 6a4a
 
 code z80 i32>> ( a :i32 cnt :i -> :i32 )
   0xFD :i8 0xE1 :i8                    \\   POP IY
@@ -196,4 +196,4 @@ code z80 i32>> ( a :i32 cnt :i -> :i32 )
   0x10 :i8 0xEE :i8                    \\   DJNZ ashr_loop
                                        \\ ashr_done:
   0xFD :i8 0xE9 :i8                    \\   JP (IY)
-end \\ 3a3b
+end \\ fdbb

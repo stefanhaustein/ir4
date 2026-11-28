@@ -77,7 +77,7 @@ code x16gs __x16gs_kernal_xy_out ( c_in :i x_in :i y_in :i addr :i -> :i )
   0x1B :i8                             \\   TCS                 ; restore native S
   0xA5 :i8 0x20 :i8                    \\   LDA $20             ; (Y_out << 8) | X_out
   0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
-end \\ 1601
+end \\ a346
 
 \ Query KERNAL screen size via SCREEN ($FFED: X=cols, Y=rows)
 fn __x16gs_screen ( -> :i )

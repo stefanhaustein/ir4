@@ -42,7 +42,7 @@ code x16 __x16_keyhdl ( )
   0x68 :i8                      \\   PLA
   0xAA :i8                      \\   TAX
   0x68 :i8                      \\   PLA
-end \\ c078
+end \\ 0d8d
 
 init
   & __x16_keyhdl 0x032E i>a a!
@@ -72,7 +72,7 @@ code x16 __x16_joy_get ( port :i -> :i )
   0xA5 :i8 0x03 :i8             \\   LDA $03             ; byte1
   0x49 :i8 0xFF :i8             \\   EOR #$FF            ; invert byte1
   0x9D :i8 1 :as                \\   STA STACK+1,X
-end \\ a8cc
+end \\ a156
 
 fn joycount ( -> :i ) 5 end
 

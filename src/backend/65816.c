@@ -62,7 +62,7 @@ void be_65816_relax_reset(void) {
 
 int be_65816_need_relax(void) { return m816_br_need_relax; }
 
-#define M816_RSTACK_BYTES 16384U
+#define M816_RSTACK_BYTES 65536UL
 
 static void ensure_rt_data(void) {
     if (!m816_rt_inited) {

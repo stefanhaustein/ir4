@@ -42,7 +42,7 @@ code 65816 memfill ( dst :a len :i val :i )
   0x97 :i8 0x00 :i8             \\   STA [$00],Y
   0xC2 :i8 0x20 :i8             \\   REP #$20
                                 \\ done:
-end \\ 698e
+end \\ badd
 
 code 65816 memcpy ( dst :a src :a len :i )
   0xBD :i8 0x00 :i8 0x02 :i8    \\   LDA $0200,X         ; len
@@ -117,7 +117,7 @@ code 65816 memcpy ( dst :a src :a len :i )
   0x97 :i8 0x00 :i8             \\   STA [$00],Y
   0xC2 :i8 0x20 :i8             \\   REP #$20
                                 \\ done:
-end \\ 1751
+end \\ 8e26
 
 code 65816 memcmp ( a :a b :a len :i -> :i )
   0xBD :i8 0x00 :i8 0x02 :i8    \\   LDA $0200,X         ; len
@@ -177,4 +177,4 @@ code 65816 memcmp ( a :a b :a len :i -> :i )
   0x9D :i8 0x01 :i8 0x02 :i8    \\   STA $0201,X
   0xC2 :i8 0x20 :i8             \\   REP #$20
                                 \\ done:
-end \\ 4ad8
+end \\ 5a01

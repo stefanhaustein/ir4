@@ -292,6 +292,7 @@ void ir4_status_clear(void);
 /* Optimization control (implemented in frontend/frontend.c) */
 void ir4_set_opt_level(int level);
 int ir4_get_opt_level(void);
+void ir4_set_asm_check(int enable);
 
 /* Platform / output-format hooks (startup stub, epilogue, file writer, runner). */
 typedef struct {

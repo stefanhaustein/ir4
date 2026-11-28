@@ -23,7 +23,7 @@ code c64 __c64_rdtim32 ( -> :i32 )
   0x9D :i8 2 :as                \\   STA STACK+2,X
   0xA9 :i8 0x00 :i8             \\   LDA #$00
   0x9D :i8 3 :as                \\   STA STACK+3,X
-end \\ 405c
+end \\ 7f56
 
 fn sysmillis ( -> :i32 )
   __c64_rdtim32 50 i>i32 i32* 3 i>i32 i32/

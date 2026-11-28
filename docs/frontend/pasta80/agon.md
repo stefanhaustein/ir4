@@ -2,7 +2,7 @@
 
 This guide covers running the self-hosted Pascal edit-compile-run loop directly on Agon Light / Console8 or in fab-agon-emulator.
 
-## 1. Basic Setup First
+## Basic Setup
 
 Before setting up the on-device IDE, follow [README.md](README.md) to build the host tools and verify cross-compilation for Agon with hello.pas:
 
@@ -12,7 +12,7 @@ Before setting up the on-device IDE, follow [README.md](README.md) to build the 
 
 Run the resulting hello.bin in fab-agon-emulator or on Agon hardware to confirm your Agon target setup works.
 
-## 2. Additional Prerequisite
+## Additional Prerequisite
 
 - [agondev](https://github.com/pcawte/agondev) (with `agondev-config` in PATH or `~/opt/agondev/bin`) — needed to cross-compile ir4c for Agon.
 
@@ -34,7 +34,7 @@ make agon
 ./pasta84/pasta84.sh --release -t agon pasta84/pasta80.pas
 ```
 
-## 4. Stage the Agon SD Card
+## Stage the Agon SD Card
 
 Copy the binaries and runtime libraries onto your Agon SD card (or an emulator SD directory such as build/agon-sd):
 
@@ -49,7 +49,7 @@ Copy the binaries and runtime libraries onto your Agon SD card (or an emulator S
 
 For quick testing, copy pasta84/examples/ onto the SD card as well.
 
-## 5. Running the IDE
+## Running the IDE
 
 From the MOS prompt:
 
@@ -69,3 +69,29 @@ If compilation fails, mcp captures the error message from the screen into PANO.E
 
 Note that this is still pretty slow at the moment -- we might be able to squeeze a few seconds,
 but please don't expect too much.
+
+## Test Results
+
+Via mcp --selftest
+
+```
+======================================
+Results of PASTA/80 version 1.00 tests
+======================================
+
+           Agon ---> Agon
+
+   Tests    Passed    Failed     Total
+--------  --------  --------  --------
+    core       ???       ???       ???
+    heap        26         0        26
+   files       ???       ???       ???
+    more        45         4        49
+  params         6         0         6
+   sound         4         0         4
+overlays        32         0        32
+--------  --------  --------  --------
+   Total       113         4       117
+
+              [  FAIL  ]
+```

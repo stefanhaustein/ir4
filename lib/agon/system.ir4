@@ -11,7 +11,7 @@ code agon __agon_sysvars ( -> :a )
   0xD1 :i8                      \\   POP DE
   0xE5 :i8                      \\   PUSH HL
   0xD5 :i8                      \\   PUSH DE
-end \\ 6c85
+end \\ f605
 
 \ __agon_ffs_getcwd ( buf :a max :i -> :i )  MOS $9E: HL=buf, BC=max -> A=FRESULT
 code agon __agon_ffs_getcwd ( buf :a max :i -> :i )
@@ -26,7 +26,7 @@ code agon __agon_ffs_getcwd ( buf :a max :i -> :i )
   0xD1 :i8                             \\   POP DE
   0xE5 :i8                             \\   PUSH HL
   0xD5 :i8                             \\   PUSH DE
-end \\ 12c2
+end \\ 53fe
 
 var __agon_cwdbuf :bytes 256
 
@@ -114,7 +114,7 @@ code agon sysexit ( code :i )
   0xED :i8 0x52 :i8                    \\   SBC HL, DE
   0xDA :i8 0x30 :i8 0x00 :i8 0x04 :i8  \\   JP C, 0x040030
   0xC3 :i8 0x30 :i8 0x00 :i8 0x0B :i8  \\   JP 0x0B0030
-end \\ 32e5
+end \\ 6d89
 
 fn sysramtop ( -> :a )
   & __agon_scan_args a>i 0x0B0000 >= if 0x0BA000 else 0x0AF000 then i>a
