@@ -38,3 +38,31 @@ make agon   # builds build/ir4c_agon.bin via agondev (-DIR4_MINIMAL -DIR4_ENABLE
   load out.bin
   run
   ```
+
+### Self-Hosted PASTA/80 Test Results
+
+With `mcp.bin` in `/mos/`, `pasta80.bin` and `ir4c.bin` in `/bin/`, and `pasta84/rtl`, `lib`, and `pasta84/tests` on the SD card, `mcp --selftest` compiles and runs the PASTA/80 suites natively on Agon (`core` and `files` currently hit `ir4c: out of memory` in Agon's ~334 KB compiler heap; `more` matches the 24-bit integer results):
+
+```text
+======================================
+Results of PASTA/80 version 1.00 tests
+======================================
+
+           Agon ---> Agon
+
+   Tests    Passed    Failed     Total
+--------  --------  --------  --------
+    core       ???       ???       ???
+    heap        26         0        26
+   files       ???       ???       ???
+    more        45         4        49
+  params         6         0         6
+   sound         4         0         4
+overlays        32         0        32
+--------  --------  --------  --------
+   Total       113         4       117
+
+              [  FAIL  ]
+```
+
+Tests finished in 66.18s under `fab-agon-emulator`.

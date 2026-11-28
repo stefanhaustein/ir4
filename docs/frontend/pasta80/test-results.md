@@ -7,15 +7,15 @@ Automated results from running the PASTA/80 v1.00 test suites across IR4(th) tar
 |  | Target | core | heap | files | more | prm | snd | ovl | Total | Time |
 | :---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 |  | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
-| 🟥 | [Agon](#agon) | ²⁾1553 | 26 | 192 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.12s |
-| 🟦 | [ARM64](#arm64) | ²⁾1549 | 26 | 194 | ²⁾45 | ²⁾5 | 4 | 32 | 1855 | 4.70s |
-| 🟥 | [C64](#c64) | ¹⁾n/a | 26 | ⁴⁾??? | 49 | ³⁾n/a | 4 | 32 | 111 | 99.73s |
+| 🟦 | [Agon](#agon) | ²⁾1551 | 26 | 194 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.10s |
+| 🟦 | [ARM64](#arm64) | ²⁾1549 | 26 | 194 | ²⁾45 | ²⁾5 | 4 | 32 | 1855 | 4.68s |
+| 🟥 | [C64](#c64) | ¹⁾n/a | 26 | ⁴⁾??? | 49 | ³⁾n/a | 4 | 32 | 111 | 99.79s |
 | 🟥 | [CP/M](#cpm) | ¹⁾n/a | 17 | ⁴⁾180 | 49 | 6 | 4 | 32 | 288 | 0.95s |
-| 🟦 | [RV32](#rv32) | ²⁾1538 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1645 | 0.51s |
-| 🟦 | [Web](#web) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 0.99s |
-| 🟩 | [X16](#x16) | ¹⁾n/a | 26 | ³⁾n/a | 49 | ³⁾n/a | 4 | 32 | 111 | 5.74s |
-| 🟩 | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 10.98s |
-| 🟥 | [ZX81](#zx81) | ¹⁾n/a | ⁴⁾??? | ³⁾n/a | ⁴⁾??? | ³⁾n/a | 4 | ⁴⁾??? | 4 | 44.53s |
+| 🟦 | [RV32](#rv32) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 0.36s |
+| 🟦 | [Web](#web) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 1.02s |
+| 🟩 | [X16](#x16) | ¹⁾n/a | 26 | ³⁾n/a | 49 | ³⁾n/a | 4 | 32 | 111 | 6.39s |
+| 🟩 | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 11.21s |
+| 🟥 | [ZX81](#zx81) | ¹⁾n/a | ⁴⁾??? | ³⁾n/a | ⁴⁾??? | ³⁾n/a | 4 | ⁴⁾??? | 4 | 44.46s |
 
 ## Notes
 
@@ -47,9 +47,9 @@ Results of PASTA/80 version 1.00 tests
 
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
-    core      1553        19      1572
+    core      1551        21      1572
     heap        26         0        26
-   files       192         2       194
+   files       194         0       194
     more        45         4        49
   params         6         0         6
    sound         4         0         4
@@ -59,7 +59,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (16.118s).
+Tests finished (16.103s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -76,13 +76,13 @@ Failed assertions:
   core.pas:975 (TestVariantRecords)
   core.pas:976 (TestVariantRecords)
   core.pas:977 (TestVariantRecords)
+  core.pas:2749 (TestReal)
+  core.pas:2751 (TestReal)
   core.pas:2315 (TestSizeOf)
   core.pas:2320 (TestSizeOf)
   core.pas:2321 (TestSizeOf)
   core.pas:2323 (TestSizeOf)
   core.pas:2329 (TestSizeOf)
-  files.pas:492 (TestTextReadIOResult)
-  files.pas:585 (TestTextWithReals)
   more.pas:112 (TestSizeOfSubranges)
   more.pas:114 (TestSizeOfSubranges)
   more.pas:150 (TestNegativeLiteralBounds)
@@ -114,7 +114,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (4.700s).
+Tests finished (4.682s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -172,7 +172,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (99.728s).
+Tests finished (99.787s).
 ```
 
 ### CP/M
@@ -202,7 +202,7 @@ Wrong number of tests (311 expected)!
 
               [  FAIL  ]
 
-Tests finished (0.946s).
+Tests finished (0.953s).
 
 Failed assertions:
   heap.pas:118 (TestStress)
@@ -244,7 +244,7 @@ Results of PASTA/80 version 1.00 tests
 
    Tests    Passed    Failed     Total
 --------  --------  --------  --------
-    core      1538        34      1572
+    core      1550        22      1572
     heap        26         0        26
    files       n/a       n/a       n/a
     more        45         4        49
@@ -252,11 +252,11 @@ Results of PASTA/80 version 1.00 tests
    sound         4         0         4
 overlays        32         0        32
 --------  --------  --------  --------
-   Total      1645        38      1683
+   Total      1657        26      1683
 
               [  FAIL  ]
 
-Tests finished (0.512s).
+Tests finished (0.356s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -273,7 +273,6 @@ Failed assertions:
   core.pas:975 (TestVariantRecords)
   core.pas:976 (TestVariantRecords)
   core.pas:977 (TestVariantRecords)
-  core.pas:2684 (TestReal)
   core.pas:2746 (TestReal)
   core.pas:2749 (TestReal)
   core.pas:2751 (TestReal)
@@ -282,17 +281,6 @@ Failed assertions:
   core.pas:2321 (TestSizeOf)
   core.pas:2323 (TestSizeOf)
   core.pas:2329 (TestSizeOf)
-  core.pas:3202 (TestStr)
-  core.pas:3203 (TestStr)
-  core.pas:3206 (TestStr)
-  core.pas:3207 (TestStr)
-  core.pas:3208 (TestStr)
-  core.pas:3223 (TestStr)
-  core.pas:3224 (TestStr)
-  core.pas:3225 (TestStr)
-  core.pas:3226 (TestStr)
-  core.pas:3229 (TestStr)
-  core.pas:3230 (TestStr)
   more.pas:112 (TestSizeOfSubranges)
   more.pas:114 (TestSizeOfSubranges)
   more.pas:150 (TestNegativeLiteralBounds)
@@ -324,7 +312,7 @@ overlays        32         0        32
 
               [  FAIL  ]
 
-Tests finished (0.993s).
+Tests finished (1.019s).
 
 Failed assertions:
   core.pas:174 (TestConst)
@@ -380,7 +368,7 @@ overlays        32         0        32
 
               [  PASS  ]
 
-Tests finished (5.736s).
+Tests finished (6.392s).
 ```
 
 ### X16GS
@@ -408,7 +396,7 @@ overlays        32         0        32
 
               [  PASS  ]
 
-Tests finished (10.978s).
+Tests finished (11.207s).
 ```
 
 ### ZX81
@@ -436,5 +424,5 @@ overlays       ???       ???       ???
 
               [  FAIL  ]
 
-Tests finished (44.535s).
+Tests finished (44.465s).
 ```

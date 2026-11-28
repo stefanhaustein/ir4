@@ -8,15 +8,16 @@
 #include <string.h>
 
 static const char *x16gs_out_path = NULL;
+static size_t x16gs_base = 0x011000UL;
 
 void x16gs_set_out_path(const char *path) {
     x16gs_out_path = path;
 }
 
 static void x16gs_begin(size_t base) {
-    (void)base;
+    x16gs_base = base ? base : 0x011000UL;
     be_65816_reset();
-    /* Entry trampoline at base ($01:1000): JML entry_addr */
+    /* Entry trampoline at base ($01:1000 or e.g. $F0:1000): JML entry_addr */
     cb_emit8(M816_JML);
     cb_emit24(0);
 }
@@ -69,9 +70,9 @@ static void x16gs_end(int main_idx) {
     cb_emit16(0x0400);
     cb_emit8(M816_TCD);
 
-    /* Data stack lives at $01:0200..$01:0FFF (DBR = $01, below code at $01:1000) */
+    /* Data stack lives at <bank>:0200..<bank>:0FFF (DBR = base >> 16, below code at <bank>:1000) */
     cb_emit8_8(M816_SEP, 0x20);
-    cb_emit8_8(M816_LDA_IMM, 0x01);
+    cb_emit8_8(M816_LDA_IMM, (u8)((x16gs_base >> 16) & 0xFFU));
     cb_emit8(M816_PHA);
     cb_emit8(M816_PLB);
     cb_emit8_8(M816_REP, 0x20);

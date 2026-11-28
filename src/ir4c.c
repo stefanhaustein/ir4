@@ -95,6 +95,29 @@ int main(int argc, char **argv) {
     FILE *out_fp;
 
 #ifdef IR4_INTERACTIVE_ARGS
+    if (argc <= 1) {
+        volatile unsigned int ir4a_addr = 0x0500;
+        const unsigned char *ir4a = (const unsigned char *)ir4a_addr;
+        if (ir4a[0] == 'I' && ir4a[1] == 'R' && ir4a[2] == '4' && ir4a[3] == 'A') {
+            static char *ir4a_argv[32];
+            int n = (int)ir4a[4];
+            const char *p = (const char *)(ir4a + 5);
+            int k;
+            if (n > 32)
+                n = 32;
+            for (k = 0; k < n; k++) {
+                ir4a_argv[k] = (char *)p;
+                p += strlen(p) + 1;
+            }
+            if (n > 1) {
+                argc = n;
+                argv = ir4a_argv;
+            }
+        }
+    }
+#endif
+
+#ifdef IR4_INTERACTIVE_ARGS
     argv_buf[0] = "ir4c";
     argv_buf[1] = NULL;
 #endif
