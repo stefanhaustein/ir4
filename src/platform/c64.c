@@ -89,7 +89,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         exit(1);
     }
 
-    cb_patch16(c64_jmp_pc, entry_addr);
+    cb_patch_globally16(c64_jmp_pc, entry_addr);
 
     /* CLD; zero BSS; LDX #init_x (initialize IR4th data stack without clobbering hardware SP) */
     cb_emit8(M6502_CLD);
@@ -168,7 +168,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
 
     if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
-        cb_patch16(print_call1, print_u16_addr);
+        cb_patch_globally16(print_call1, print_u16_addr);
 
         /* div10: tmp_lo/tmp_hi /= 10, A = remainder */
         cb_emit8_8(M6502_LDA_IMM, 0x00);
@@ -191,7 +191,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         cb_emit8(M6502_JSR);
         print_call2 = cb_pc();
         cb_emit16(0x0000);
-        cb_patch16(print_call2, print_u16_addr);
+        cb_patch_globally16(print_call2, print_u16_addr);
 
         cb_emit8(M6502_PLA);
         cb_emit8(M6502_CLC);
@@ -201,9 +201,9 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         cb_emit16(0x0000);
         cb_emit8(M6502_RTS);
 
-        cb_patch16(putchar_call1, C64_CHROUT);
-        cb_patch16(putchar_call2, C64_CHROUT);
-        cb_patch16(putchar_call3, C64_CHROUT);
+        cb_patch_globally16(putchar_call1, C64_CHROUT);
+        cb_patch_globally16(putchar_call2, C64_CHROUT);
+        cb_patch_globally16(putchar_call3, C64_CHROUT);
     }
 }
 

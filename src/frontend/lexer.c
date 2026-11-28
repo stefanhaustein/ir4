@@ -1,5 +1,6 @@
 /* lexer.c - Tokenizer, #line directives, and require resolution */
 #include "internal.h"
+#include "codebuf.h"
 #include "path.h"
 
 VEC_OF(SrcVec, SrcFile);
@@ -143,6 +144,7 @@ void ir4_die(const char *msg) {
         fprintf(stderr, "error: ir4c: %s\n", msg);
     }
     fn_ir_cleanup();
+    cb_cleanup();
     exit(1);
 }
 

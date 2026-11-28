@@ -152,11 +152,11 @@ static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_s
         const CodeReloc *rel = &code_relocs.data[reloc_start + i];
         size_t pc = base_pc + rel->ir_off;
         if (rel->kind == CODE_REL_SELF) {
-            cb_patch16(pc, (u16)(base_addr + rel->addend));
+            cb_patch_locally16(pc, (u16)(base_addr + rel->addend));
         } else if (rel->kind == CODE_REL_STACK) {
 #if IR4_ENABLE_6502
             if (be == &be_6502 && be_6502_stack_zp_base() != 0) {
-                cb_patch16(pc, (u16)(be_6502_stack_zp_base() + rel->addend));
+                cb_patch_locally16(pc, (u16)(be_6502_stack_zp_base() + rel->addend));
             } else
 #endif
             {
@@ -951,6 +951,7 @@ void emit_program(void) {
                 if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && fn_irs.data[f]->reachable &&
                     fn_sigs.data[f]->bank == b) {
                     emit_fn(f);
+                    cb_flush();
                 }
             }
 #if IR4_ENABLE_6502
@@ -982,6 +983,7 @@ void emit_program(void) {
                     fn_ir_drop(w);
                 }
                 be_6502_ensure_helpers(need_mul, need_div, need_icall, need_fp);
+                cb_flush();
             }
 #endif
         }
@@ -1005,6 +1007,7 @@ void emit_program(void) {
                     set_be_compact(0);
 #endif
                 emit_fn(f);
+                cb_flush();
                 reach_done++;
                 if ((reach_done & 15) == 0 || reach_done == reach_total)
                     ir4_status_prog("Generating code", reach_done, reach_total);

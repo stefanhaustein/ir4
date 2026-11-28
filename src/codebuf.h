@@ -10,9 +10,14 @@
 #include "ir4.h"
 
 void cb_reset(size_t base);
+void cb_set_spill_file(FILE *fp);
+void cb_cleanup(void);
 size_t cb_pc(void);
 size_t cb_cur_addr(void);
-const u8 *cb_data(void);
+u8 cb_read_u8(size_t offset);
+void cb_read_code(void *dst, size_t offset, size_t len);
+Bool cb_write_code(FILE *fp, size_t len);
+void cb_flush(void);
 
 void cb_emit8(u8 b);
 void cb_emit16(u16 w);
@@ -34,10 +39,14 @@ typedef struct {
 CbCheckpoint cb_checkpoint(void);
 void cb_restore(CbCheckpoint cp);
 
-void cb_patch8(size_t patch_offset, u8 val);
-void cb_patch16(size_t patch_offset, u16 target_addr);
-void cb_patch24(size_t patch_offset, u32 target_addr);
-void cb_patch32(size_t patch_offset, u32 val);
+void cb_patch_locally8(size_t patch_offset, u8 val);
+void cb_patch_locally16(size_t patch_offset, u16 target_addr);
+void cb_patch_locally24(size_t patch_offset, u32 target_addr);
+void cb_patch_locally32(size_t patch_offset, u32 val);
+void cb_patch_globally8(size_t patch_offset, u8 val);
+void cb_patch_globally16(size_t patch_offset, u16 target_addr);
+void cb_patch_globally24(size_t patch_offset, u32 target_addr);
+void cb_patch_globally32(size_t patch_offset, u32 val);
 void cb_put_le16(u8 *p, u16 v);
 void cb_put_le32(u8 *p, u32 v);
 Bool cb_write_raw(FILE *fp, Bool include_data);

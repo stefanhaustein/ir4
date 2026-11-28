@@ -71,9 +71,9 @@ static void ez_ensure_fcmp(void) {
     cb_emit8(0xC9); /* RET */
 
     not_both_zero = cb_cur_addr();
-    cb_patch8(jnz1, (u8)(not_both_zero - (jnz1 + 1)));
-    cb_patch8(jnz2, (u8)(not_both_zero - (jnz2 + 1)));
-    cb_patch8(jnz3, (u8)(not_both_zero - (jnz3 + 1)));
+    cb_patch_locally8(jnz1, (u8)(not_both_zero - (jnz1 + 1)));
+    cb_patch_locally8(jnz2, (u8)(not_both_zero - (jnz2 + 1)));
+    cb_patch_locally8(jnz3, (u8)(not_both_zero - (jnz3 + 1)));
     cb_emit8(0x7B); /* LD A, E */
     cb_emit8(0xAA); /* XOR D */
     cb_emit8(EZ80_JP_M); jp_diff = cb_pc(); cb_emit24(0); /* JP M, diff_sign */
@@ -85,29 +85,29 @@ static void ez_ensure_fcmp(void) {
     cb_emit8(0x28); jz_eq = cb_pc(); cb_emit8(0); /* JR Z, ret_eq */
 
     got_c = cb_cur_addr();
-    cb_patch8(jnz_c, (u8)(got_c - (jnz_c + 1)));
+    cb_patch_locally8(jnz_c, (u8)(got_c - (jnz_c + 1)));
     cb_emit8_8(0xCB, 0x7B); /* BIT 7, E */
     cb_emit8(0x28); jz_pos1 = cb_pc(); cb_emit8(0); /* JR Z, ret_c */
     cb_emit8(0x3F); /* CCF */
 
     ret_c = cb_cur_addr();
-    cb_patch8(jz_pos1, (u8)(ret_c - (jz_pos1 + 1)));
+    cb_patch_locally8(jz_pos1, (u8)(ret_c - (jz_pos1 + 1)));
     cb_emit8_8(0x3E, 0x01); /* LD A, 1 */
     cb_emit8(0x30); jnc_pos = cb_pc(); cb_emit8(0); /* JR NC, ret_pos */
     cb_emit8_8(0x3E, 0xFF); /* LD A, 0xFF */
 
     ret_pos = cb_cur_addr();
-    cb_patch8(jnc_pos, (u8)(ret_pos - (jnc_pos + 1)));
+    cb_patch_locally8(jnc_pos, (u8)(ret_pos - (jnc_pos + 1)));
     cb_emit8(0xB7); /* OR A -> S=bit7(A), Z=0 */
     cb_emit8(0xC9); /* RET */
 
     ret_eq = cb_cur_addr();
-    cb_patch8(jz_eq, (u8)(ret_eq - (jz_eq + 1)));
+    cb_patch_locally8(jz_eq, (u8)(ret_eq - (jz_eq + 1)));
     cb_emit8(0xAF); /* XOR A -> Z=1, S=0 */
     cb_emit8(0xC9); /* RET */
 
     diff_sign = cb_cur_addr();
-    cb_patch24(jp_diff, (u32)diff_sign);
+    cb_patch_locally24(jp_diff, (u32)diff_sign);
     cb_emit8_8(0xCB, 0x7B); /* BIT 7, E */
     cb_emit8(0x28); jz_pos2 = cb_pc(); cb_emit8(0); /* JR Z, ret_pos1 */
     cb_emit8_8(0x3E, 0xFF); /* LD A, 0xFF */
@@ -115,12 +115,12 @@ static void ez_ensure_fcmp(void) {
     cb_emit8(0xC9); /* RET */
 
     ret_pos1 = cb_cur_addr();
-    cb_patch8(jz_pos2, (u8)(ret_pos1 - (jz_pos2 + 1)));
+    cb_patch_locally8(jz_pos2, (u8)(ret_pos1 - (jz_pos2 + 1)));
     cb_emit8_8(0x3E, 0x01); /* LD A, 1 */
     cb_emit8(0xB7); /* OR A -> S=0, Z=0 */
     cb_emit8(0xC9); /* RET */
 
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ez_ensure_rt(void) {
@@ -139,9 +139,9 @@ static void ez_ensure_rt(void) {
         u16 rel = ez80_rt_relocs[i];
         u32 v = (u32)ez80_rt_code[rel] | ((u32)ez80_rt_code[rel + 1] << 8) |
                 ((u32)ez80_rt_code[rel + 2] << 16);
-        cb_patch24(base_pc + rel, v + (u32)ez_rt_addr);
+        cb_patch_locally24(base_pc + rel, v + (u32)ez_rt_addr);
     }
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ez_ensure_rt_data(void) {
@@ -736,12 +736,12 @@ static void ez_ensure_mul24(void) {
         skip_add = cb_pc();
         cb_emit24(0);
         cb_emit8(EZ80_ADD_HL_BC);
-        cb_patch24(skip_add, (u32)cb_cur_addr());
+        cb_patch_locally24(skip_add, (u32)cb_cur_addr());
         cb_emit8(EZ80_DEC_A);
         emit8_24(EZ80_JP_NZ, (u32)l);
         cb_emit8(EZ80_RET);
     }
-    cb_patch24(loop_pc, (u32)cb_cur_addr());
+    cb_patch_locally24(loop_pc, (u32)cb_cur_addr());
 }
 
 static void ez_ensure_udivmod24(void) {
@@ -775,15 +775,15 @@ static void ez_ensure_udivmod24(void) {
             cb_emit8(EZ80_JP);
             done = cb_pc();
             cb_emit24(0);
-            cb_patch24(no_sub, (u32)cb_cur_addr());
+            cb_patch_locally24(no_sub, (u32)cb_cur_addr());
             cb_emit8(EZ80_INC_DE);
-            cb_patch24(done, (u32)cb_cur_addr());
+            cb_patch_locally24(done, (u32)cb_cur_addr());
         }
         cb_emit8(EZ80_DEC_A);
         emit8_24(EZ80_JP_NZ, (u32)l);
         cb_emit8(EZ80_RET);
     }
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ez_ensure_sdivmod24(void) {
@@ -824,7 +824,7 @@ static void ez_ensure_sdivmod24(void) {
     cb_emit8(EZ80_ED);
     cb_emit8(EZ80_ED_SBC_HL_DE);
     ez_ld_data_hl(ez_tmp_off);
-    cb_patch24(pos_a, (u32)cb_cur_addr());
+    cb_patch_locally24(pos_a, (u32)cb_cur_addr());
 
     cb_emit8(EZ80_LD_A_C);
     cb_emit8(EZ80_OR_A);
@@ -838,7 +838,7 @@ static void ez_ensure_sdivmod24(void) {
     cb_emit8(EZ80_ED);
     cb_emit8(EZ80_ED_SBC_HL_DE);
     ez_ld_data_hl(ez_tmp_off + 3);
-    cb_patch24(pos_b, (u32)cb_cur_addr());
+    cb_patch_locally24(pos_b, (u32)cb_cur_addr());
 
     ez_ld_hl_ind_data(ez_tmp_off);
     cb_emit8(EZ80_EX_DE_HL); /* DE = |dividend| */
@@ -859,7 +859,7 @@ static void ez_ensure_sdivmod24(void) {
     cb_emit8(EZ80_ED_SBC_HL_DE);
     cb_emit8(EZ80_EX_DE_HL); /* DE = -quot */
     cb_emit8(EZ80_POP_HL); /* restore rem */
-    cb_patch24(pos_q, (u32)cb_cur_addr());
+    cb_patch_locally24(pos_q, (u32)cb_cur_addr());
     /* Negate remainder if dividend was negative (sign in B) */
     cb_emit8(EZ80_LD_A_B);
     cb_emit8(EZ80_OR_A);
@@ -874,10 +874,10 @@ static void ez_ensure_sdivmod24(void) {
         cb_emit8(EZ80_ED);
         cb_emit8(EZ80_ED_SBC_HL_DE); /* HL = -|rem| */
         cb_emit8(EZ80_POP_DE); /* restore quot */
-        cb_patch24(pos_r, (u32)cb_cur_addr());
+        cb_patch_locally24(pos_r, (u32)cb_cur_addr());
     }
     cb_emit8(EZ80_RET);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ez_ensure_shifts(void) {
@@ -901,7 +901,7 @@ static void ez_ensure_shifts(void) {
         cb_emit8(EZ80_DEC_A);
         emit8_24(EZ80_JP_NZ, (u32)l);
     }
-    cb_patch24(done1, (u32)cb_cur_addr());
+    cb_patch_locally24(done1, (u32)cb_cur_addr());
     cb_emit8(EZ80_RET);
 
     /* shr24: HL >> A (unsigned) */
@@ -924,7 +924,7 @@ static void ez_ensure_shifts(void) {
         cb_emit8((u8)((i8)((int)l - (int)(cb_cur_addr() + 1))));
     }
     ez_ld_hl_ind_data(ez_tmp_off);
-    cb_patch24(done2, (u32)cb_cur_addr());
+    cb_patch_locally24(done2, (u32)cb_cur_addr());
     cb_emit8(EZ80_RET);
 
     /* ashr24: HL >> A (signed) */
@@ -947,10 +947,10 @@ static void ez_ensure_shifts(void) {
         cb_emit8((u8)((i8)((int)l - (int)(cb_cur_addr() + 1))));
     }
     ez_ld_hl_ind_data(ez_tmp_off);
-    cb_patch24(done3, (u32)cb_cur_addr());
+    cb_patch_locally24(done3, (u32)cb_cur_addr());
     cb_emit8(EZ80_RET);
 
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ez_op(IrOp op) {
@@ -1103,15 +1103,15 @@ static void ez_op(IrOp op) {
             cb_emit8(EZ80_JP);
             done_pc = cb_pc();
             cb_emit24(0);
-            cb_patch24(ov_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(ov_pc, (u32)cb_cur_addr());
             emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
             cb_emit8(j_ov);
             skip_t = cb_pc();
             cb_emit24(0);
             emit8_24(EZ80_LD_HL_N24, 0);
-            cb_patch24(t_pc, (u32)cb_cur_addr());
-            cb_patch24(done_pc, (u32)cb_cur_addr());
-            cb_patch24(skip_t, (u32)cb_cur_addr());
+            cb_patch_locally24(t_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(done_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(skip_t, (u32)cb_cur_addr());
             ez_push_hl();
             break;
         }
@@ -1120,7 +1120,7 @@ static void ez_op(IrOp op) {
         skip_t = cb_pc();
         cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0);
-        cb_patch24(skip_t, (u32)cb_cur_addr());
+        cb_patch_locally24(skip_t, (u32)cb_cur_addr());
         ez_push_hl();
         break;
     }
@@ -1141,7 +1141,7 @@ static void ez_op(IrOp op) {
         pos = cb_pc();
         cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-        cb_patch24(pos, (u32)cb_cur_addr());
+        cb_patch_locally24(pos, (u32)cb_cur_addr());
         cb_emit8(EZ80_LD_L_A);
         ez_push_hl();
         break;
@@ -1197,7 +1197,7 @@ static void ez_op(IrOp op) {
         pos = cb_pc();
         cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-        cb_patch24(pos, (u32)cb_cur_addr());
+        cb_patch_locally24(pos, (u32)cb_cur_addr());
         cb_emit8(EZ80_LD_L_E);
         cb_emit8(EZ80_LD_H_D);
         ez_push_hl();
@@ -1220,7 +1220,7 @@ static void ez_op(IrOp op) {
         pos = cb_pc();
         cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-        cb_patch24(pos, (u32)cb_cur_addr());
+        cb_patch_locally24(pos, (u32)cb_cur_addr());
         cb_emit8(EZ80_LD_L_A);
         ez_push_hl();
         break;
@@ -1247,7 +1247,7 @@ static void ez_op(IrOp op) {
         skip = cb_pc();
         cb_emit24(0);
         cb_emit8_8(EZ80_ED, EZ80_ED_LDIR);
-        cb_patch24(skip, (u32)cb_cur_addr());
+        cb_patch_locally24(skip, (u32)cb_cur_addr());
         break;
     }
     case OP_W2A:
@@ -1480,7 +1480,7 @@ static void ez_op(IrOp op) {
             cb_emit8(EZ80_JP);
             ret_f_pc = cb_pc();
             cb_emit24(0);
-            cb_patch24(ov_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(ov_pc, (u32)cb_cur_addr());
             cb_emit8(j_ov);
             /* patch both ret_t_pc? No, jump to ret_t/ret_f below */
             {
@@ -1490,7 +1490,7 @@ static void ez_op(IrOp op) {
                 {
                     size_t f2 = cb_pc();
                     cb_emit24(0);
-                    cb_patch24(cmp_lo_pc, (u32)cb_cur_addr());
+                    cb_patch_locally24(cmp_lo_pc, (u32)cb_cur_addr());
                     /* Compare unsigned 24-bit HL vs (tmp) */
                     cb_emit8(EZ80_EX_DE_HL); /* DE = lhs_lo */
                     ez_ld_hl_ind_data(ez_tmp_off); /* HL = rhs_lo */
@@ -1518,17 +1518,17 @@ static void ez_op(IrOp op) {
                         {
                             size_t t3 = cb_pc();
                             cb_emit24(0);
-                            cb_patch24(ret_f_pc, (u32)cb_cur_addr());
-                            cb_patch24(f2, (u32)cb_cur_addr());
+                            cb_patch_locally24(ret_f_pc, (u32)cb_cur_addr());
+                            cb_patch_locally24(f2, (u32)cb_cur_addr());
                             emit8_24(EZ80_LD_HL_N24, 0);
                             cb_emit8(EZ80_JP);
                             done_pc = cb_pc();
                             cb_emit24(0);
-                            cb_patch24(ret_t_pc, (u32)cb_cur_addr());
-                            cb_patch24(t2, (u32)cb_cur_addr());
-                            cb_patch24(t3, (u32)cb_cur_addr());
+                            cb_patch_locally24(ret_t_pc, (u32)cb_cur_addr());
+                            cb_patch_locally24(t2, (u32)cb_cur_addr());
+                            cb_patch_locally24(t3, (u32)cb_cur_addr());
                             emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-                            cb_patch24(done_pc, (u32)cb_cur_addr());
+                            cb_patch_locally24(done_pc, (u32)cb_cur_addr());
                         }
                     }
                 }
@@ -1539,7 +1539,7 @@ static void ez_op(IrOp op) {
             ez_push_hl();
             break;
         }
-        cb_patch24(cmp_lo_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(cmp_lo_pc, (u32)cb_cur_addr());
         cb_emit8(EZ80_EX_DE_HL);
         ez_ld_hl_ind_data(ez_tmp_off);
         cb_emit8(EZ80_EX_DE_HL);
@@ -1557,16 +1557,16 @@ static void ez_op(IrOp op) {
             t3 = cb_pc();
             cb_emit24(0);
             if (op != OP_NE32)
-                cb_patch24(ret_f_pc, (u32)cb_cur_addr());
+                cb_patch_locally24(ret_f_pc, (u32)cb_cur_addr());
             emit8_24(EZ80_LD_HL_N24, 0);
             cb_emit8(EZ80_JP);
             done_pc = cb_pc();
             cb_emit24(0);
             if (op != OP_EQ32)
-                cb_patch24(ret_t_pc, (u32)cb_cur_addr());
-            cb_patch24(t3, (u32)cb_cur_addr());
+                cb_patch_locally24(ret_t_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(t3, (u32)cb_cur_addr());
             emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-            cb_patch24(done_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(done_pc, (u32)cb_cur_addr());
         }
         ez_push_hl();
         break;
@@ -1635,7 +1635,7 @@ static void ez_op(IrOp op) {
         skip_t = cb_pc();
         cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0);
-        cb_patch24(skip_t, (u32)cb_cur_addr());
+        cb_patch_locally24(skip_t, (u32)cb_cur_addr());
         ez_push_hl();
         break;
     }
@@ -1741,7 +1741,7 @@ static void ez_op(IrOp op) {
         }
         cb_emit8(EZ80_DJNZ);
         cb_emit8((u8)((i8)((int)l - (int)(cb_cur_addr() + 1))));
-        cb_patch24(skip, (u32)cb_cur_addr());
+        cb_patch_locally24(skip, (u32)cb_cur_addr());
         break;
     }
     default:
@@ -1952,15 +1952,15 @@ static int ez_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t targ
             skip1_pc = cb_pc();
             cb_emit24(0);
             cb_emit8_8(0x18, 4); /* JR +4 */
-            cb_patch24(ov_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(ov_pc, (u32)cb_cur_addr());
             cb_emit8(skip_ov);
             skip2_pc = cb_pc();
             cb_emit24(0);
             cb_emit8(EZ80_JP);
             *patch_offset = cb_pc();
             cb_emit24(0);
-            cb_patch24(skip1_pc, (u32)cb_cur_addr());
-            cb_patch24(skip2_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(skip1_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(skip2_pc, (u32)cb_cur_addr());
         } else {
             size_t skip_pc;
             u8 j_noov = is_lt ? EZ80_JP_P : EZ80_JP_M;
@@ -1969,9 +1969,9 @@ static int ez_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t targ
             cb_emit8(EZ80_JP);
             skip_pc = cb_pc();
             cb_emit24(0);
-            cb_patch24(ov_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(ov_pc, (u32)cb_cur_addr());
             emit8_24(j_ov, (u32)target_addr);
-            cb_patch24(skip_pc, (u32)cb_cur_addr());
+            cb_patch_locally24(skip_pc, (u32)cb_cur_addr());
         }
         return 1;
     }
@@ -2018,7 +2018,7 @@ static size_t ez_emit_jtab(size_t count) {
     cb_emit8(EZ80_ADD_HL_DE);
     cb_emit8_8(EZ80_ED, EZ80_ED_LD_HL_MHL);
     cb_emit8(EZ80_JP_MHL);
-    cb_patch24(tbl_addr_pc, (u32)cb_cur_addr());
+    cb_patch_locally24(tbl_addr_pc, (u32)cb_cur_addr());
     tbl_off = cb_pc();
     for (k = 0; k < count; k++)
         cb_emit24(0);
@@ -2027,14 +2027,14 @@ static size_t ez_emit_jtab(size_t count) {
 
 static void ez_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     (void)count;
-    cb_patch24(patch_offset + idx * 3, (u32)target_addr);
+    cb_patch_locally24(patch_offset + idx * 3, (u32)target_addr);
 }
 
-static void ez_patch_fwd(size_t patch_offset) { cb_patch24(patch_offset, (u32)cb_cur_addr()); }
+static void ez_patch_fwd(size_t patch_offset) { cb_patch_locally24(patch_offset, (u32)cb_cur_addr()); }
 
 static void ez_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
-    cb_patch24(call_pc + 1, (u32)target_addr);
+    cb_patch_globally24(call_pc + 1, (u32)target_addr);
 }
 
 static size_t ez_push_fn(size_t target_addr) {
@@ -2054,7 +2054,7 @@ static size_t ez_push_fn(size_t target_addr) {
 
 static void ez_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     (void)patch_addr;
-    cb_patch24(patch_pc, (u32)target_addr);
+    cb_patch_globally24(patch_pc, (u32)target_addr);
 }
 
 static void ez_icall(void) {
@@ -2068,7 +2068,7 @@ static void ez_icall(void) {
     ret_pc = cb_pc() - 3;
     cb_emit8(EZ80_PUSH_DE);
     cb_emit8(EZ80_JP_MHL);
-    cb_patch24(ret_pc, (u32)cb_cur_addr());
+    cb_patch_locally24(ret_pc, (u32)cb_cur_addr());
 }
 
 static size_t ez_stack_data_off(void) { return 0; }
@@ -2161,7 +2161,7 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8(EZ80_JP_MHL);
 
         /* push_imm7 */
-        cb_patch24(bmi_imm7_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(bmi_imm7_pc, (u32)cb_cur_addr());
         cb_emit8_8(EZ80_AND_N, 0x7F);
         emit8_24(EZ80_LD_HL_N24, 0);
         cb_emit8(EZ80_LD_L_A);
@@ -2189,7 +2189,7 @@ static void ez_ensure_bc_vm(void) {
         /* Jump table */
         vm_tbl_pc = cb_pc();
         vm_tbl_addr = cb_cur_addr();
-        cb_patch24(tbl_ref_pc, (u32)vm_tbl_addr);
+        cb_patch_locally24(tbl_ref_pc, (u32)vm_tbl_addr);
         for (i = 0; i <= BC_STORE16; i++)
             cb_emit24(0);
     }
@@ -2246,10 +2246,10 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8_8(0xFE, 4); cb_emit8(EZ80_JP_C); s4 = cb_pc(); cb_emit24(0);
         cb_emit8(EZ80_POP_HL);
         ez_ld_data_hl(ez_tmp_off + 3);
-        cb_patch24(s1, (u32)cb_cur_addr());
-        cb_patch24(s2, (u32)cb_cur_addr());
-        cb_patch24(s3, (u32)cb_cur_addr());
-        cb_patch24(s4, (u32)cb_cur_addr());
+        cb_patch_locally24(s1, (u32)cb_cur_addr());
+        cb_patch_locally24(s2, (u32)cb_cur_addr());
+        cb_patch_locally24(s3, (u32)cb_cur_addr());
+        cb_patch_locally24(s4, (u32)cb_cur_addr());
 
         ez_ld_hl_ind_data(ez_vm_leave_off);
         cb_emit8(EZ80_ADD_HL_SP);
@@ -2261,17 +2261,17 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8_8(0xFE, 4); cb_emit8(EZ80_JP_C); r4 = cb_pc(); cb_emit24(0);
         ez_ld_hl_ind_data(ez_tmp_off + 3);
         cb_emit8(EZ80_PUSH_HL);
-        cb_patch24(r4, (u32)cb_cur_addr());
+        cb_patch_locally24(r4, (u32)cb_cur_addr());
         cb_emit8_8(0xFE, 3); cb_emit8(EZ80_JP_C); r3 = cb_pc(); cb_emit24(0);
         ez_ld_hl_ind_data(ez_tmp_off);
         cb_emit8(EZ80_PUSH_HL);
-        cb_patch24(r3, (u32)cb_cur_addr());
+        cb_patch_locally24(r3, (u32)cb_cur_addr());
         cb_emit8_8(0xFE, 2); cb_emit8(EZ80_JP_C); r2 = cb_pc(); cb_emit24(0);
         cb_emit8(EZ80_PUSH_BC);
-        cb_patch24(r2, (u32)cb_cur_addr());
+        cb_patch_locally24(r2, (u32)cb_cur_addr());
         cb_emit8(EZ80_OR_A); cb_emit8(EZ80_JP_Z); r1 = cb_pc(); cb_emit24(0);
         cb_emit8(EZ80_PUSH_DE);
-        cb_patch24(r1, (u32)cb_cur_addr());
+        cb_patch_locally24(r1, (u32)cb_cur_addr());
         emit8_24(EZ80_JP, (u32)vm_next_addr);
     }
 
@@ -2291,9 +2291,9 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8(EZ80_JP_M); neg_pc = cb_pc(); cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0);
         cb_emit8(EZ80_JP); done_pc = cb_pc(); cb_emit24(0);
-        cb_patch24(neg_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(neg_pc, (u32)cb_cur_addr());
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-        cb_patch24(done_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(done_pc, (u32)cb_cur_addr());
     }
     cb_emit8(EZ80_LD_L_A);
     cb_emit8(EZ80_PUSH_HL);
@@ -2314,9 +2314,9 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8(EZ80_JP_M); neg_pc = cb_pc(); cb_emit24(0);
         emit8_24(EZ80_LD_HL_N24, 0);
         cb_emit8(EZ80_JP); done_pc = cb_pc(); cb_emit24(0);
-        cb_patch24(neg_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(neg_pc, (u32)cb_cur_addr());
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
-        cb_patch24(done_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(done_pc, (u32)cb_cur_addr());
     }
     cb_emit8(EZ80_LD_H_D);
     cb_emit8(EZ80_LD_L_E);
@@ -2364,9 +2364,9 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8(EZ80_JP_M); neg_pc = cb_pc(); cb_emit24(0);
         emit8_24(EZ80_LD_DE_N24, 0);
         cb_emit8(EZ80_JP); done_pc = cb_pc(); cb_emit24(0);
-        cb_patch24(neg_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(neg_pc, (u32)cb_cur_addr());
         emit8_24(EZ80_LD_DE_N24, 0xFFFFFFUL);
-        cb_patch24(done_pc, (u32)cb_cur_addr());
+        cb_patch_locally24(done_pc, (u32)cb_cur_addr());
     }
     cb_emit8(0x5F); /* LD E, A */
     cb_emit8(EZ80_POP_HL);
@@ -2486,8 +2486,8 @@ static void ez_ensure_bc_vm(void) {
         cb_emit8_8(EZ80_ED, EZ80_ED_LD_HL_MHL);
         ez_ld_data_hl(ez_vm_ip_off);
         emit8_24(EZ80_JP, (u32)vm_next_addr);
-        cb_patch24(oob1, (u32)cb_cur_addr());
-        cb_patch24(oob2, (u32)cb_cur_addr());
+        cb_patch_locally24(oob1, (u32)cb_cur_addr());
+        cb_patch_locally24(oob2, (u32)cb_cur_addr());
         ez_ld_hl_ind_data(ez_vm_ip_off);
         cb_emit8(EZ80_ADD_HL_BC);
         cb_emit8(EZ80_ADD_HL_BC);
@@ -2550,8 +2550,8 @@ static void ez_ensure_bc_vm(void) {
     }
 
     for (i = 0; i <= BC_STORE16; i++)
-        cb_patch24(vm_tbl_pc + i * 3, (u32)handlers[i]);
-    cb_patch24(skip_vm, (u32)cb_cur_addr());
+        cb_patch_locally24(vm_tbl_pc + i * 3, (u32)handlers[i]);
+    cb_patch_locally24(skip_vm, (u32)cb_cur_addr());
     ez_compact = saved;
 }
 

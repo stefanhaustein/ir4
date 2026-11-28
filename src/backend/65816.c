@@ -338,13 +338,13 @@ static void ensure_mul16(void) {
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP2);
     cb_emit8_8(M816_ADC_DP, M816_DP_TMP0);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP2);
-    cb_patch8(skip_add + 1, (u8)(cb_pc() - (skip_add + 2)));
+    cb_patch_locally8(skip_add + 1, (u8)(cb_pc() - (skip_add + 2)));
     cb_emit8_8(M816_ASL_DP, M816_DP_TMP0);
     cb_emit8(M816_DEY);
     cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP2);
     cb_emit8(M816_RTL);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ensure_udivmod16(void) {
@@ -369,12 +369,12 @@ static void ensure_udivmod16(void) {
     cb_emit8_8(M816_BCC, 0);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP2);
     cb_emit8_8(M816_INC_DP, M816_DP_TMP0);
-    cb_patch8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
+    cb_patch_locally8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
     cb_emit8(M816_DEY);
     cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP0);
     cb_emit8(M816_RTL);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ensure_sdivmod16(void) {
@@ -400,7 +400,7 @@ static void ensure_sdivmod16(void) {
     emit8_16(M816_EOR_IMM, 0xFFFF);
     cb_emit8(M816_INC_A);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP0);
-    cb_patch8(b1 + 1, (u8)(cb_pc() - (b1 + 2)));
+    cb_patch_locally8(b1 + 1, (u8)(cb_pc() - (b1 + 2)));
     /* Abs DP_TMP1 */
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP1);
     b2 = cb_pc();
@@ -408,7 +408,7 @@ static void ensure_sdivmod16(void) {
     emit8_16(M816_EOR_IMM, 0xFFFF);
     cb_emit8(M816_INC_A);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP1);
-    cb_patch8(b2 + 1, (u8)(cb_pc() - (b2 + 2)));
+    cb_patch_locally8(b2 + 1, (u8)(cb_pc() - (b2 + 2)));
     emit8_24(M816_JSL, (u32)m816_udivmod16_addr);
     /* Negate quotient if DP_PTR0[0] < 0 */
     cb_emit8_8(M816_LDA_DP, M816_DP_PTR0);
@@ -418,7 +418,7 @@ static void ensure_sdivmod16(void) {
     emit8_16(M816_EOR_IMM, 0xFFFF);
     cb_emit8(M816_INC_A);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP0);
-    cb_patch8(b3 + 1, (u8)(cb_pc() - (b3 + 2)));
+    cb_patch_locally8(b3 + 1, (u8)(cb_pc() - (b3 + 2)));
     /* Negate remainder if DP_PTR0[2] < 0 */
     cb_emit8_8(M816_LDA_DP, M816_DP_PTR0 + 2);
     b4 = cb_pc();
@@ -427,10 +427,10 @@ static void ensure_sdivmod16(void) {
     emit8_16(M816_EOR_IMM, 0xFFFF);
     cb_emit8(M816_INC_A);
     cb_emit8_8(M816_STA_DP, M816_DP_TMP2);
-    cb_patch8(b4 + 1, (u8)(cb_pc() - (b4 + 2)));
+    cb_patch_locally8(b4 + 1, (u8)(cb_pc() - (b4 + 2)));
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP0);
     cb_emit8(M816_RTL);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ensure_shift16(IrOp op) {
@@ -460,9 +460,9 @@ static void ensure_shift16(IrOp op) {
     }
     cb_emit8(M816_DEY);
     cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
     cb_emit8(M816_RTL);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 static void ensure_bcopy(void) {
@@ -490,7 +490,7 @@ static void ensure_bcopy(void) {
     cb_emit8(M816_INY);
     cb_emit8_8(0xC4, M816_DP_TMP1); /* CPY DP_TMP1 */
     cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
-    cb_patch8(tail_br + 1, (u8)(cb_pc() - (tail_br + 2)));
+    cb_patch_locally8(tail_br + 1, (u8)(cb_pc() - (tail_br + 2)));
     cb_emit8_8(M816_LDA_DP, M816_DP_TMP0);
     cb_emit8(M816_LSR_A);
     odd_done = cb_pc();
@@ -499,10 +499,10 @@ static void ensure_bcopy(void) {
     cb_emit8_8(M816_LDA_IDLY, M816_DP_PTR0);
     cb_emit8_8(M816_STA_IDLY, M816_DP_PTR1);
     emit_rep_m();
-    cb_patch8(odd_done + 1, (u8)(cb_pc() - (odd_done + 2)));
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(odd_done + 1, (u8)(cb_pc() - (odd_done + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
     cb_emit8(M816_RTL);
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 /* ---- Software IEEE-754 single-precision float runtime (32-bit in DP_TMP0/1) ----
@@ -532,7 +532,7 @@ static void emit_fp_conv_cmp(void) {
         cb_emit8_8(M816_BNE, 0);
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
-        cb_patch8(nz + 1, (u8)(cb_pc() - (nz + 2)));
+        cb_patch_locally8(nz + 1, (u8)(cb_pc() - (nz + 2)));
         cb_emit8_8(M816_STZ_DP, M816_DP_RET); /* sign = 0 */
         pos = cb_pc();
         cb_emit8_8(M816_BPL, 0);
@@ -540,7 +540,7 @@ static void emit_fp_conv_cmp(void) {
         cb_emit8(M816_INC_A);
         emit8_16(M816_LDY_IMM, 0x8000);
         cb_emit8_8(M816_STY_DP, M816_DP_RET);
-        cb_patch8(pos + 1, (u8)(cb_pc() - (pos + 2)));
+        cb_patch_locally8(pos + 1, (u8)(cb_pc() - (pos + 2)));
         /* A = abs(w), normalize left until bit 15 is 1 */
         emit8_16(M816_LDY_IMM, 127 + 15);
         loop_pc = cb_cur_addr();
@@ -621,15 +621,15 @@ static void emit_fp_conv_cmp(void) {
         cb_emit8(M816_LSR_A);
         cb_emit8(M816_DEY);
         cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
-        cb_patch8(shift_done + 1, (u8)(cb_pc() - (shift_done + 2)));
+        cb_patch_locally8(shift_done + 1, (u8)(cb_pc() - (shift_done + 2)));
         cb_emit8_8(M816_LDY_DP, M816_DP_RET);
         neg_done = cb_pc();
         cb_emit8_8(M816_BPL, 0);
         emit8_16(M816_EOR_IMM, 0xFFFF);
         cb_emit8(M816_INC_A);
-        cb_patch8(neg_done + 1, (u8)(cb_pc() - (neg_done + 2)));
+        cb_patch_locally8(neg_done + 1, (u8)(cb_pc() - (neg_done + 2)));
         cb_emit8(M816_RTL);
-        cb_patch8(zero_br + 1, (u8)(cb_pc() - (zero_br + 2)));
+        cb_patch_locally8(zero_br + 1, (u8)(cb_pc() - (zero_br + 2)));
         emit8_16(M816_LDA_IMM, 0);
         cb_emit8(M816_RTL);
     }
@@ -651,7 +651,7 @@ static void emit_fp_conv_cmp(void) {
         cb_emit8_8(M816_BNE, 0);
         emit8_16(M816_LDA_IMM, 0);
         cb_emit8(M816_RTL);
-        cb_patch8(not_both_z + 1, (u8)(cb_pc() - (not_both_z + 2)));
+        cb_patch_locally8(not_both_z + 1, (u8)(cb_pc() - (not_both_z + 2)));
 
         /* Check if signs differ */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
@@ -664,7 +664,7 @@ static void emit_fp_conv_cmp(void) {
         cb_emit8(M816_RTL);
         emit8_16(M816_LDA_IMM, 0xFFFF);
         cb_emit8(M816_RTL);
-        cb_patch8(same_sign + 1, (u8)(cb_pc() - (same_sign + 2)));
+        cb_patch_locally8(same_sign + 1, (u8)(cb_pc() - (same_sign + 2)));
 
         /* Same sign: compare magnitude (hi then lo) */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
@@ -682,17 +682,17 @@ static void emit_fp_conv_cmp(void) {
         emit8_16(M816_LDA_IMM, 0xFFFF);
         cb_emit8(M816_RTL);
 
-        cb_patch8(eq_hi + 1, (u8)(cb_pc() - (eq_hi + 2)));
+        cb_patch_locally8(eq_hi + 1, (u8)(cb_pc() - (eq_hi + 2)));
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0);
         cb_emit8_8(M816_CMP_DP, M816_DP_TMP1);
         eq_done = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         emit8_16(M816_LDA_IMM, 0);
         cb_emit8(M816_RTL);
-        cb_patch8(eq_done + 1, (u8)(cb_pc() - (eq_done + 2)));
+        cb_patch_locally8(eq_done + 1, (u8)(cb_pc() - (eq_done + 2)));
         cb_emit8_8(M816_BCS, (u8)((i8)((i32)a_gt - (i32)(cb_cur_addr() + 2))));
 
-        cb_patch8(pos_cmp + 1, (u8)(cb_pc() - (pos_cmp + 2)));
+        cb_patch_locally8(pos_cmp + 1, (u8)(cb_pc() - (pos_cmp + 2)));
         /* |a| < |b| */
         a_lt = cb_cur_addr();
         (void)a_lt;
@@ -726,7 +726,7 @@ static void emit_fp_fadd_fsub(void) {
         b_nz = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         cb_emit8(M816_RTL);
-        cb_patch8(b_nz + 1, (u8)(cb_pc() - (b_nz + 2)));
+        cb_patch_locally8(b_nz + 1, (u8)(cb_pc() - (b_nz + 2)));
         /* If a == 0 return b */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
         emit8_16(M816_AND_IMM, 0x7FFF);
@@ -738,7 +738,7 @@ static void emit_fp_fadd_fsub(void) {
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP1 + 2);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
-        cb_patch8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
+        cb_patch_locally8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
 
         /* Unpack a -> DP_PTR0 (ma), DP_RET (ea), stack (sa); b -> DP_PTR1 (mb), DP_TMP2 (eb) */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0);
@@ -792,7 +792,7 @@ static void emit_fp_fadd_fsub(void) {
         cb_emit8_8(M816_LDY_DP, M816_DP_TMP1 + 2);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP1 + 2);
         cb_emit8_8(M816_STY_DP, M816_DP_TMP0 + 2);
-        cb_patch8(no_swap + 1, (u8)(cb_pc() - (no_swap + 2)));
+        cb_patch_locally8(no_swap + 1, (u8)(cb_pc() - (no_swap + 2)));
 
         /* Align mb right by (ea - eb), clamped to 25 */
         cb_emit8_8(M816_LDA_DP, M816_DP_RET);
@@ -808,7 +808,7 @@ static void emit_fp_fadd_fsub(void) {
         m816_emit_fp_shr32(M816_DP_PTR1);
         cb_emit8(M816_DEY);
         cb_emit8_8(M816_BNE, (u8)((i8)((i32)align_lp - (i32)(cb_cur_addr() + 2))));
-        cb_patch8(align_done + 1, (u8)(cb_pc() - (align_done + 2)));
+        cb_patch_locally8(align_done + 1, (u8)(cb_pc() - (align_done + 2)));
 
         /* Check if sa == sb */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
@@ -829,12 +829,12 @@ static void emit_fp_fadd_fsub(void) {
         cb_emit8_8(M816_BCC, 0);
         m816_emit_fp_shr32(M816_DP_PTR0);
         cb_emit8_8(M816_INC_DP, M816_DP_RET);
-        cb_patch8(ov_chk + 1, (u8)(cb_pc() - (ov_chk + 2)));
+        cb_patch_locally8(ov_chk + 1, (u8)(cb_pc() - (ov_chk + 2)));
         same_s = cb_pc();
         cb_emit8_8(M816_BRA, 0);
 
         /* Different sign: ma -= mb; if < 0 negate ma and flip sa */
-        cb_patch8(do_sub + 1, (u8)(cb_pc() - (do_sub + 2)));
+        cb_patch_locally8(do_sub + 1, (u8)(cb_pc() - (do_sub + 2)));
         cb_emit8(M816_SEC);
         cb_emit8_8(M816_LDA_DP, M816_DP_PTR0);
         cb_emit8_8(M816_SBC_DP, M816_DP_PTR1);
@@ -855,7 +855,7 @@ static void emit_fp_fadd_fsub(void) {
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
         emit8_16(M816_EOR_IMM, 0x8000);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0 + 2);
-        cb_patch8(sub_ok + 1, (u8)(cb_pc() - (sub_ok + 2)));
+        cb_patch_locally8(sub_ok + 1, (u8)(cb_pc() - (sub_ok + 2)));
 
         /* Normalize DP_PTR0 left until bit 23 ($0080 in high word) is set */
         cb_emit8_8(M816_LDA_DP, M816_DP_PTR0);
@@ -872,13 +872,13 @@ static void emit_fp_fadd_fsub(void) {
         cb_emit8_8(M816_BEQ, 2);
         cb_emit8_8(M816_BRA, (u8)((i8)((i32)norm_lp - (i32)(cb_cur_addr() + 2))));
         /* underflow -> 0 */
-        cb_patch8(ret_zero + 1, (u8)(cb_pc() - (ret_zero + 2)));
+        cb_patch_locally8(ret_zero + 1, (u8)(cb_pc() - (ret_zero + 2)));
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0);
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
 
-        cb_patch8(norm_chk + 1, (u8)(cb_pc() - (norm_chk + 2)));
-        cb_patch8(same_s + 1, (u8)(cb_pc() - (same_s + 2)));
+        cb_patch_locally8(norm_chk + 1, (u8)(cb_pc() - (norm_chk + 2)));
+        cb_patch_locally8(same_s + 1, (u8)(cb_pc() - (same_s + 2)));
         /* Pack: sa (DP_TMP0+2 & $8000) | (ea << 7) | (PTR0+2 & $7F) */
         cb_emit8_8(M816_LDA_DP, M816_DP_PTR0);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0);
@@ -920,14 +920,14 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0);
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
-        cb_patch8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
+        cb_patch_locally8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP1 + 2);
         emit8_16(M816_AND_IMM, 0x7FFF);
         cb_emit8_8(M816_ORA_DP, M816_DP_TMP1);
         b_nz = cb_pc();
         cb_emit8_8(M816_BNE, 0);
         cb_emit8_8(M816_BRA, (u8)((i8)((i32)zero_out - (i32)(cb_cur_addr() + 2))));
-        cb_patch8(b_nz + 1, (u8)(cb_pc() - (b_nz + 2)));
+        cb_patch_locally8(b_nz + 1, (u8)(cb_pc() - (b_nz + 2)));
 
         /* Sign = (sa ^ sb) & $8000 -> DP_RET+2 */
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
@@ -982,7 +982,7 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP2 + 2);
         cb_emit8_8(M816_ADC_DP, M816_DP_PTR0 + 2);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP2 + 2);
-        cb_patch8(skip_add + 1, (u8)(cb_pc() - (skip_add + 2)));
+        cb_patch_locally8(skip_add + 1, (u8)(cb_pc() - (skip_add + 2)));
         m816_emit_fp_shr32(M816_DP_TMP2);
         cb_emit8(M816_DEY);
         cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
@@ -996,7 +996,7 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_BEQ, 0);
         cb_emit8_8(M816_INC_DP, M816_DP_RET);
         cb_emit8_8(M816_BRA, 4);
-        cb_patch8(norm_done + 1, (u8)(cb_pc() - (norm_done + 2)));
+        cb_patch_locally8(norm_done + 1, (u8)(cb_pc() - (norm_done + 2)));
         m816_emit_fp_shl32(M816_DP_TMP2);
 
         /* Pack DP_TMP2 into DP_TMP0 */
@@ -1032,7 +1032,7 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0);
         cb_emit8_8(M816_STZ_DP, M816_DP_TMP0 + 2);
         cb_emit8(M816_RTL);
-        cb_patch8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
+        cb_patch_locally8(a_nz + 1, (u8)(cb_pc() - (a_nz + 2)));
 
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP0 + 2);
         cb_emit8_8(M816_EOR_DP, M816_DP_TMP1 + 2);
@@ -1091,7 +1091,7 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_SBC_DP, M816_DP_PTR1);
         cb_emit8_8(M816_STA_DP, M816_DP_PTR0);
         cb_emit8_8(M816_INC_DP, M816_DP_TMP2);
-        cb_patch8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
+        cb_patch_locally8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
         m816_emit_fp_shl32(M816_DP_PTR0);
         cb_emit8(M816_DEY);
         cb_emit8_8(M816_BNE, (u8)((i8)((i32)loop_pc - (i32)(cb_cur_addr() + 2))));
@@ -1103,7 +1103,7 @@ static void emit_fp_fmul_fdiv(void) {
         cb_emit8_8(M816_BNE, 0);
         m816_emit_fp_shl32(M816_DP_TMP2);
         cb_emit8_8(M816_DEC_DP, M816_DP_RET);
-        cb_patch8(norm_ok + 1, (u8)(cb_pc() - (norm_ok + 2)));
+        cb_patch_locally8(norm_ok + 1, (u8)(cb_pc() - (norm_ok + 2)));
 
         cb_emit8_8(M816_LDA_DP, M816_DP_TMP2);
         cb_emit8_8(M816_STA_DP, M816_DP_TMP0);
@@ -1137,7 +1137,7 @@ static void ensure_fp(void) {
     emit_fp_conv_cmp();
     emit_fp_fadd_fsub();
     emit_fp_fmul_fdiv();
-    cb_patch24(skip, (u32)cb_cur_addr());
+    cb_patch_locally24(skip, (u32)cb_cur_addr());
 }
 
 /* ---- Backend interface methods ---- */
@@ -1436,7 +1436,7 @@ static void m816_local_op(LocalOp op, int slot, StackType type, size_t stack_byt
                 skip = cb_pc();
                 cb_emit8_8(M816_BCC, 0);
                 cb_emit8(M816_INC_A);
-                cb_patch8(skip + 1, (u8)(cb_pc() - (skip + 2)));
+                cb_patch_locally8(skip + 1, (u8)(cb_pc() - (skip + 2)));
                 emit8_16(M816_STA_ABSX, M816_STACK_BASE + 2);
                 emit_rep_m();
             }
@@ -1508,7 +1508,7 @@ static int m816_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 
             cb_add_data_reloc24(cb_pc(), addr_off + 2);
             cb_emit24(0);
             emit_rep_m();
-            cb_patch8(skip + 1, (u8)(cb_pc() - (skip + 2)));
+            cb_patch_locally8(skip + 1, (u8)(cb_pc() - (skip + 2)));
         }
         return 1;
     }
@@ -1540,7 +1540,7 @@ static int m816_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 
             cb_emit8(simm > 0 ? M816_INC_A : M816_DEC_A);
             cb_emit8_8(M816_STA_IDLY, M816_DP_LFP);
             emit_rep_m();
-            cb_patch8(skip + 1, (u8)(cb_pc() - (skip + 2)));
+            cb_patch_locally8(skip + 1, (u8)(cb_pc() - (skip + 2)));
         }
         return 1;
     }
@@ -1633,7 +1633,7 @@ static void emit_cmp16_result(IrOp op) {
         cb_emit8_8(M816_BCC, 0);
         true_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
         goto false_path;
     } else if (op == OP_ULE) {
         /* C=0 or Z=1 */
@@ -1645,12 +1645,12 @@ static void emit_cmp16_result(IrOp op) {
         emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
         done_br = cb_pc();
         cb_emit8_8(M816_BRA, 0);
-        cb_patch8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
-        cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+        cb_patch_locally8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
+        cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
         emit_inx_n(2);
         emit8_16(M816_LDA_IMM, 0xFFFF);
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-        cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+        cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
         return;
     } else if (op == OP_LT || op == OP_GE) {
         /* Signed N^V: BVC +2; EOR #$8000; BMI is_lt */
@@ -1669,7 +1669,7 @@ static void emit_cmp16_result(IrOp op) {
             emit8_16(M816_EOR_IMM, 0x8000);
             true_br = cb_pc();
             cb_emit8_8(M816_BPL, 0);
-            cb_patch8(z_br + 1, (u8)(cb_pc() - (z_br + 2)));
+            cb_patch_locally8(z_br + 1, (u8)(cb_pc() - (z_br + 2)));
         } else {
             size_t t1 = cb_pc();
             cb_emit8_8(M816_BEQ, 0);
@@ -1681,12 +1681,12 @@ static void emit_cmp16_result(IrOp op) {
             emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
             done_br = cb_pc();
             cb_emit8_8(M816_BRA, 0);
-            cb_patch8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
-            cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+            cb_patch_locally8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
+            cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
             emit_inx_n(2);
             emit8_16(M816_LDA_IMM, 0xFFFF);
             emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-            cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+            cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
             return;
         }
     }
@@ -1695,11 +1695,11 @@ false_path:
     emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
     done_br = cb_pc();
     cb_emit8_8(M816_BRA, 0);
-    cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+    cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
     emit_inx_n(2);
     emit8_16(M816_LDA_IMM, 0xFFFF);
     emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
 }
 
 static void emit_cmp24_a(IrOp op) {
@@ -1717,7 +1717,7 @@ static void emit_cmp24_a(IrOp op) {
         emit_rep_m();
         true_br = cb_pc();
         cb_emit8_8(M816_BEQ, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
         emit_inx_n(4);
         {
             u16 imm = (op == OP_ANE) ? 0xFFFFU : 0U;
@@ -1726,14 +1726,14 @@ static void emit_cmp24_a(IrOp op) {
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
         done_br = cb_pc();
         cb_emit8_8(M816_BRA, 0);
-        cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+        cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
         emit_inx_n(4);
         {
             u16 imm = (op == OP_AEQ) ? 0xFFFFU : 0U;
             emit8_16(M816_LDA_IMM, imm);
         }
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-        cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+        cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
         return;
     }
     /* OP_ALT / OP_AGT: compare bank byte first, then low 16 bits */
@@ -1745,7 +1745,7 @@ static void emit_cmp24_a(IrOp op) {
     cb_emit8_8(M816_BNE, 0);
     emit8_16(M816_LDA_ABSX, M816_STACK_BASE + 3);
     emit8_16(M816_CMP_ABSX, M816_STACK_BASE);
-    cb_patch8(neq_hi + 1, (u8)(cb_pc() - (neq_hi + 2)));
+    cb_patch_locally8(neq_hi + 1, (u8)(cb_pc() - (neq_hi + 2)));
     if (op == OP_ALT) {
         true_br = cb_pc();
         cb_emit8_8(M816_BCC, 0);
@@ -1754,17 +1754,17 @@ static void emit_cmp24_a(IrOp op) {
         cb_emit8_8(M816_BCC, 0);
         true_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
     }
     emit_inx_n(4);
     emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
     done_br = cb_pc();
     cb_emit8_8(M816_BRA, 0);
-    cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+    cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
     emit_inx_n(4);
     emit8_16(M816_LDA_IMM, 0xFFFF);
     emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
 }
 
 static void emit_cmp32_result(IrOp op) {
@@ -1796,7 +1796,7 @@ static void emit_cmp32_result(IrOp op) {
         cb_emit8_8(M816_ORA_DP, M816_DP_TMP0);
         true_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
     } else if (op == OP_ULE32) {
         size_t t1 = cb_pc();
         cb_emit8_8(M816_BCC, 0);
@@ -1807,12 +1807,12 @@ static void emit_cmp32_result(IrOp op) {
         emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
         done_br = cb_pc();
         cb_emit8_8(M816_BRA, 0);
-        cb_patch8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
-        cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+        cb_patch_locally8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
+        cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
         emit_inx_n(6);
         emit8_16(M816_LDA_IMM, 0xFFFF);
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-        cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+        cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
         return;
     } else if (op == OP_LT32 || op == OP_GE32) {
         cb_emit8_8(M816_BVC, 3);
@@ -1832,7 +1832,7 @@ static void emit_cmp32_result(IrOp op) {
             cb_emit8_8(M816_ORA_DP, M816_DP_TMP0 + 2);
             true_br = cb_pc();
             cb_emit8_8(M816_BNE, 0);
-            cb_patch8(t_gt + 1, (u8)(cb_pc() - (t_gt + 2)));
+            cb_patch_locally8(t_gt + 1, (u8)(cb_pc() - (t_gt + 2)));
         } else {
             size_t t1 = cb_pc();
             cb_emit8_8(M816_BMI, 0);
@@ -1844,12 +1844,12 @@ static void emit_cmp32_result(IrOp op) {
             emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
             done_br = cb_pc();
             cb_emit8_8(M816_BRA, 0);
-            cb_patch8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
-            cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+            cb_patch_locally8(t1 + 1, (u8)(cb_pc() - (t1 + 2)));
+            cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
             emit_inx_n(6);
             emit8_16(M816_LDA_IMM, 0xFFFF);
             emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-            cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+            cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
             return;
         }
     }
@@ -1857,11 +1857,11 @@ static void emit_cmp32_result(IrOp op) {
     emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
     done_br = cb_pc();
     cb_emit8_8(M816_BRA, 0);
-    cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+    cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
     emit_inx_n(6);
     emit8_16(M816_LDA_IMM, 0xFFFF);
     emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
 }
 
 static int m816_op_mem_conv(IrOp op);
@@ -2314,14 +2314,14 @@ static int m816_op_32_fp(IrOp op) {
             cb_emit8_8(M816_BMI, 0);
             t_br = cb_pc();
             cb_emit8_8(M816_BNE, 0);
-            cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+            cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
         }
         emit8_16(M816_LDA_IMM, 0);
         done_br = cb_pc();
         cb_emit8_8(M816_BRA, 0);
-        cb_patch8(t_br + 1, (u8)(cb_pc() - (t_br + 2)));
+        cb_patch_locally8(t_br + 1, (u8)(cb_pc() - (t_br + 2)));
         emit8_16(M816_LDA_IMM, 0xFFFF);
-        cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+        cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
         emit_push_w_a();
         break;
     }
@@ -2357,7 +2357,7 @@ static int m816_add_imm(int is_addr, i32 imm) {
         cb_emit8(imm > 0 ? M816_INC_A : M816_DEC_A);
         emit8_16(M816_STA_ABSX, M816_STACK_BASE + 2);
         emit_rep_m();
-        cb_patch8(skip + 1, (u8)(cb_pc() - (skip + 2)));
+        cb_patch_locally8(skip + 1, (u8)(cb_pc() - (skip + 2)));
         return 1;
     }
 }
@@ -2378,9 +2378,9 @@ static int m816_cmp_imm(IrOp op, i32 imm) {
         emit8_16(M816_LDA_IMM, 0xFFFF);
         done_eq = cb_pc();
         cb_emit8_8(M816_BRA, 0);
-        cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
+        cb_patch_locally8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
         emit8_16(M816_LDA_IMM, 0);
-        cb_patch8(done_eq + 1, (u8)(cb_pc() - (done_eq + 2)));
+        cb_patch_locally8(done_eq + 1, (u8)(cb_pc() - (done_eq + 2)));
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
         return 1;
     }
@@ -2391,7 +2391,7 @@ static int m816_cmp_imm(IrOp op, i32 imm) {
         cb_emit8_8(M816_BEQ, 0);
         emit8_16(M816_LDA_IMM, 0xFFFF);
         emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-        cb_patch8(z_br + 1, (u8)(cb_pc() - (z_br + 2)));
+        cb_patch_locally8(z_br + 1, (u8)(cb_pc() - (z_br + 2)));
         return 1;
     }
 
@@ -2426,7 +2426,7 @@ static int m816_cmp_imm(IrOp op, i32 imm) {
         cb_emit8_8(M816_BCC, 0);
         true_br = cb_pc();
         cb_emit8_8(M816_BNE, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
     } else if (op == OP_LT || op == OP_GE) {
         cb_emit8_8(M816_BVC, 3);
         emit8_16(M816_EOR_IMM, 0x8000);
@@ -2447,18 +2447,18 @@ static int m816_cmp_imm(IrOp op, i32 imm) {
         emit8_16(M816_EOR_IMM, 0x8000);
         true_br = cb_pc();
         cb_emit8_8(M816_BPL, 0);
-        cb_patch8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
+        cb_patch_locally8(f_br + 1, (u8)(cb_pc() - (f_br + 2)));
     }
 
     emit8_16(M816_STZ_ABSX, M816_STACK_BASE);
     done_br = cb_pc();
     cb_emit8_8(M816_BRA, 0);
-    cb_patch8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
+    cb_patch_locally8(true_br + 1, (u8)(cb_pc() - (true_br + 2)));
     if (has_true2)
-        cb_patch8(true2_br + 1, (u8)(cb_pc() - (true2_br + 2)));
+        cb_patch_locally8(true2_br + 1, (u8)(cb_pc() - (true2_br + 2)));
     emit8_16(M816_LDA_IMM, 0xFFFF);
     emit8_16(M816_STA_ABSX, M816_STACK_BASE);
-    cb_patch8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
+    cb_patch_locally8(done_br + 1, (u8)(cb_pc() - (done_br + 2)));
     return 1;
 }
 
@@ -2840,14 +2840,14 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         if (op == OP_AEQ) {
             skip1 = cb_pc();
             cb_emit8_8(M816_BEQ, 0);
-            cb_patch8(neq_br + 1, (u8)(cb_pc() - (neq_br + 2)));
+            cb_patch_locally8(neq_br + 1, (u8)(cb_pc() - (neq_br + 2)));
         } else {
             size_t eq_br = cb_pc();
             cb_emit8_8(M816_BEQ, 0);
-            cb_patch8(neq_br + 1, (u8)(cb_pc() - (neq_br + 2)));
+            cb_patch_locally8(neq_br + 1, (u8)(cb_pc() - (neq_br + 2)));
             skip1 = cb_pc();
             cb_emit8_8(M816_BRA, 0);
-            cb_patch8(eq_br + 1, (u8)(cb_pc() - (eq_br + 2)));
+            cb_patch_locally8(eq_br + 1, (u8)(cb_pc() - (eq_br + 2)));
         }
         goto emit_target_brl;
     }
@@ -2937,11 +2937,11 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         cb_emit8_8(M816_BEQ, 0);
         if (is_fwd && is_short) {
             *patch_offset = m816_emit_fwd_short(M816_BCS, bidx);
-            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            cb_patch_locally8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
             return 1;
         }
         if (!is_fwd && m816_emit_back_short(M816_BCS, target_addr)) {
-            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            cb_patch_locally8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
             return 1;
         }
         has_skip2 = 1;
@@ -2952,7 +2952,7 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         cb_emit8_8(M816_BCC, 0);
         skip1 = cb_pc();
         cb_emit8_8(M816_BNE, 0);
-        cb_patch8(to_brl + 1, (u8)(cb_pc() - (to_brl + 2)));
+        cb_patch_locally8(to_brl + 1, (u8)(cb_pc() - (to_brl + 2)));
     } else if (op == OP_LE) {
         skip2 = cb_pc();
         cb_emit8_8(M816_BEQ, 0);
@@ -2960,11 +2960,11 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         emit8_16(M816_EOR_IMM, 0x8000);
         if (is_fwd && is_short) {
             *patch_offset = m816_emit_fwd_short(M816_BPL, bidx);
-            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            cb_patch_locally8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
             return 1;
         }
         if (!is_fwd && m816_emit_back_short(M816_BPL, target_addr)) {
-            cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+            cb_patch_locally8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
             return 1;
         }
         has_skip2 = 1;
@@ -2977,7 +2977,7 @@ static int m816_cmp_br_emit(IrOp op, int has_imm, i32 imm, int is_fwd, size_t ta
         emit8_16(M816_EOR_IMM, 0x8000);
         skip1 = cb_pc();
         cb_emit8_8(M816_BPL, 0);
-        cb_patch8(to_brl + 1, (u8)(cb_pc() - (to_brl + 2)));
+        cb_patch_locally8(to_brl + 1, (u8)(cb_pc() - (to_brl + 2)));
     }
 
 emit_target_brl:
@@ -2992,9 +2992,9 @@ emit_target_brl:
         i32 rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
         cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
     }
-    cb_patch8(skip1 + 1, (u8)(cb_pc() - (skip1 + 2)));
+    cb_patch_locally8(skip1 + 1, (u8)(cb_pc() - (skip1 + 2)));
     if (has_skip2)
-        cb_patch8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
+        cb_patch_locally8(skip2 + 1, (u8)(cb_pc() - (skip2 + 2)));
     return 1;
 }
 
@@ -3026,7 +3026,7 @@ static size_t m816_emit_br_fwd(BranchCond cond) {
         cb_emit8_8(M816_BNE, 0);
         patch_off = cb_pc();
         cb_emit8_16(M816_BRL, 0);
-        cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
+        cb_patch_locally8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
     } else {
         if (is_short)
             return m816_emit_fwd_short(M816_BRA, bidx);
@@ -3055,7 +3055,7 @@ static void m816_emit_br_back(BranchCond cond, size_t target_addr) {
         cb_emit8_8(M816_BNE, 0);
         rel = (i32)target_addr - (i32)(cb_cur_addr() + 3);
         cb_emit8_16(M816_BRL, (u16)(rel & 0xFFFF));
-        cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
+        cb_patch_locally8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
     } else {
         i32 rel;
         if (m816_emit_back_short(M816_BRA, target_addr))
@@ -3067,10 +3067,10 @@ static void m816_emit_br_back(BranchCond cond, size_t target_addr) {
 
 static void m816_patch_fwd(size_t patch_offset) {
     m816_peep_fence();
-    if (cb_data()[patch_offset] != M816_BRL) {
+    if (cb_read_u8(patch_offset) != M816_BRL) {
         i32 rel = (i32)cb_pc() - (i32)(patch_offset + 2);
         if (rel >= -128 && rel <= 127) {
-            cb_patch8(patch_offset + 1, (u8)(i8)rel);
+            cb_patch_locally8(patch_offset + 1, (u8)(i8)rel);
         } else {
             size_t k;
             for (k = 0; k < m816_fwd_list.len; k++) {
@@ -3085,7 +3085,7 @@ static void m816_patch_fwd(size_t patch_offset) {
     }
     {
         i32 rel = (i32)cb_pc() - (i32)(patch_offset + 3);
-        cb_patch16(patch_offset + 1, (u16)(rel & 0xFFFF));
+        cb_patch_locally16(patch_offset + 1, (u16)(rel & 0xFFFF));
     }
 }
 
@@ -3124,8 +3124,8 @@ static size_t m816_emit_jtab(size_t count) {
     cb_emit8(M816_PHA);
     cb_emit8(M816_RTL);
     tbl_addr = cb_cur_addr();
-    cb_patch16(lda_lo, (u16)(tbl_addr & 0xFFFF));
-    cb_patch16(lda_bk, (u16)((tbl_addr + 2) & 0xFFFF));
+    cb_patch_locally16(lda_lo, (u16)(tbl_addr & 0xFFFF));
+    cb_patch_locally16(lda_bk, (u16)((tbl_addr + 2) & 0xFFFF));
     for (i = 0; i < count; i++)
         cb_emit24(0);
     return def_patch;
@@ -3138,13 +3138,13 @@ static void m816_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_
     } else {
         /* Table starts 32 bytes after def_patch */
         size_t entry_off = patch_offset + 32 + idx * 3;
-        cb_patch24(entry_off, (u32)target_addr);
+        cb_patch_locally24(entry_off, (u32)target_addr);
     }
 }
 
 static void m816_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
-    cb_patch24(call_pc + 1, (u32)target_addr);
+    cb_patch_globally24(call_pc + 1, (u32)target_addr);
 }
 
 static size_t m816_push_fn(size_t target_addr) {
@@ -3163,9 +3163,9 @@ static size_t m816_push_fn(size_t target_addr) {
 
 static void m816_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     (void)patch_addr;
-    cb_patch16(patch_pc, (u16)(target_addr & 0xFFFF));
+    cb_patch_globally16(patch_pc, (u16)(target_addr & 0xFFFF));
     /* Bank byte is at patch_pc + 8 (imm16=2, STA=3, SEP=2, LDA_IMM_op=1) */
-    cb_patch8(patch_pc + 8, (u8)((target_addr >> 16) & 0xFF));
+    cb_patch_globally8(patch_pc + 8, (u8)((target_addr >> 16) & 0xFF));
 }
 
 static void m816_icall(void) {
@@ -3184,7 +3184,7 @@ static void m816_icall(void) {
     cb_emit8(M816_DEC_A);
     cb_emit8(M816_PHA);
     cb_emit8(M816_RTL);
-    cb_patch16(ret_pc, (u16)((cb_cur_addr() - 1) & 0xFFFF));
+    cb_patch_locally16(ret_pc, (u16)((cb_cur_addr() - 1) & 0xFFFF));
 }
 
 static size_t m816_stack_data_off(void) { return M816_STACK_BASE; }

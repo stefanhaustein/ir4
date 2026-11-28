@@ -19,7 +19,7 @@ static void zx81_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch16(1, entry_addr);
+    cb_patch_globally16(1, entry_addr);
     be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
     if (sig->out_cnt == 1) {

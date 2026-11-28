@@ -822,7 +822,7 @@ static void z80_emit_sdivmod(void) {
         cb_emit8_16(Z80_JP_P, (u16)(cb_cur_addr() + 9));
         z80_neg_hl();
         cb_emit8(Z80_RET);
-        cb_patch16(patch_over, cb_cur_addr());
+        cb_patch_locally16(patch_over, cb_cur_addr());
     }
     z80_call(rt_sdivmod_addr);
 }
@@ -848,10 +848,10 @@ static void z80_ensure_rt_blob(u16 *addr, const u8 *code, u16 code_len, const u1
     for (i = 0; i < reloc_cnt; i++) {
         u16 rel_off = relocs[i];
         u16 rel_val = (u16)(code[rel_off] | ((u16)code[rel_off + 1] << 8));
-        cb_patch16((u16)(base_off + rel_off), (u16)(*addr + rel_val));
+        cb_patch_locally16((u16)(base_off + rel_off), (u16)(*addr + rel_val));
     }
 
-    cb_patch16(skip_patch, cb_cur_addr());
+    cb_patch_locally16(skip_patch, cb_cur_addr());
 }
 
 static void z80_ensure_math48(void) {
@@ -1736,12 +1736,12 @@ static size_t z80_emit_jtab(size_t count) {
 
 static void z80_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     (void)count;
-    cb_patch16(patch_offset + idx * 2, (u16)target_addr);
+    cb_patch_locally16(patch_offset + idx * 2, (u16)target_addr);
 }
 
 static void z80_patch_fwd(size_t patch_offset) {
     z80_peep_barrier();
-    cb_patch16(patch_offset, cb_cur_addr());
+    cb_patch_locally16(patch_offset, cb_cur_addr());
 }
 
 static int z80_add_imm(int is_addr, i32 imm) {
@@ -1877,7 +1877,7 @@ static int z80_bit_imm(IrOp op, i32 imm) {
 
 static void z80_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
-    cb_patch16(call_pc + 1, (u16)target_addr);
+    cb_patch_globally16(call_pc + 1, (u16)target_addr);
 }
 
 static size_t z80_push_fn(size_t target_addr) {
@@ -1889,7 +1889,7 @@ static size_t z80_push_fn(size_t target_addr) {
 
 static void z80_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     (void)patch_addr;
-    cb_patch16(patch_pc + 1, (u16)target_addr);
+    cb_patch_globally16(patch_pc + 1, (u16)target_addr);
 }
 
 static void z80_icall(void) {

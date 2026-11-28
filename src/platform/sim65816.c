@@ -40,7 +40,7 @@ static void sim816_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch24(1, (u32)entry_addr);
+    cb_patch_globally24(1, (u32)entry_addr);
 
     /* Switch to native mode (CLC; XCE), 16-bit A/X/Y (REP #$30), CLD */
     cb_emit8(M816_CLC);
@@ -96,7 +96,7 @@ static void sim816_end(int main_idx) {
         cb_emit8(M816_EOR_IMM);
         cb_emit16(0xFFFF);
         cb_emit8(M816_INC_A);
-        cb_patch8(pos_br + 1, (u8)(cb_pc() - (pos_br + 2)));
+        cb_patch_globally8(pos_br + 1, (u8)(cb_pc() - (pos_br + 2)));
 
         cb_emit8(M816_JSL);
         print_call = cb_pc();
@@ -132,7 +132,7 @@ static void sim816_end(int main_idx) {
         cb_emit8(M816_JSL);
         cb_emit24((u32)putchar_addr);
         cb_emit8(M816_RTL);
-        cb_patch8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
+        cb_patch_globally8(nz_br + 1, (u8)(cb_pc() - (nz_br + 2)));
 
         /* Push digits on hardware stack (count in Y) */
         cb_emit8(M816_LDY_IMM);
@@ -156,7 +156,7 @@ static void sim816_end(int main_idx) {
             cb_emit8_8(M816_BCC, 0);
             cb_emit8_8(M816_STA_DP, M816_DP_TMP2);
             cb_emit8_8(M816_INC_DP, M816_DP_TMP0);
-            cb_patch8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
+            cb_patch_globally8(skip_sub + 1, (u8)(cb_pc() - (skip_sub + 2)));
             cb_emit8_8(M816_DEC_DP, M816_DP_PTR1);
             cb_emit8_8(M816_BNE, (u8)((i8)((i32)bit_lp - (i32)(cb_cur_addr() + 2))));
         }
@@ -179,11 +179,11 @@ static void sim816_end(int main_idx) {
     }
 
     if (putc_call1)
-        cb_patch24(putc_call1, (u32)putchar_addr);
+        cb_patch_globally24(putc_call1, (u32)putchar_addr);
     if (putc_call2)
-        cb_patch24(putc_call2, (u32)putchar_addr);
+        cb_patch_globally24(putc_call2, (u32)putchar_addr);
     if (print_call)
-        cb_patch24(print_call, (u32)print_u16_addr);
+        cb_patch_globally24(print_call, (u32)print_u16_addr);
 }
 
 static int sim816_write(FILE *fp, size_t base) {
@@ -576,7 +576,6 @@ static void sim816_step(Cpu816 *c) {
 
 static void sim816_run(int main_idx) {
     Cpu816 cpu;
-    const u8 *code = cb_data();
     const u8 *idata = cb_init_data();
     size_t code_sz = cb_pc();
     size_t data_sz = cb_init_data_size();
@@ -594,7 +593,7 @@ static void sim816_run(int main_idx) {
     if (sim816_base + code_sz + cb_data_size() > SIM816_MEM_SIZE)
         ir4_die("sim65816: program exceeds 512KB simulator RAM");
 
-    memcpy(cpu.mem + sim816_base, code, code_sz);
+    cb_read_code(cpu.mem + sim816_base, 0, code_sz);
     if (data_sz > 0)
         memcpy(cpu.mem + data_base, idata, data_sz);
 

@@ -137,15 +137,15 @@ static void arm64_run_jit(int main_idx) {
                     exit(1);
                 }
                 addr = (unsigned long)sym;
-                cb_patch32(off, (u32)(0xD2800009UL | (((addr >> 0) & 0xFFFFUL) << 5)));
-                cb_patch32(off + 4, (u32)(0xF2A00009UL | (((addr >> 16) & 0xFFFFUL) << 5)));
-                cb_patch32(off + 8, (u32)(0xF2C00009UL | (((addr >> 32) & 0xFFFFUL) << 5)));
-                cb_patch32(off + 12, (u32)(0xF2E00009UL | (((addr >> 48) & 0xFFFFUL) << 5)));
+                cb_patch_globally32(off, (u32)(0xD2800009UL | (((addr >> 0) & 0xFFFFUL) << 5)));
+                cb_patch_globally32(off + 4, (u32)(0xF2A00009UL | (((addr >> 16) & 0xFFFFUL) << 5)));
+                cb_patch_globally32(off + 8, (u32)(0xF2C00009UL | (((addr >> 32) & 0xFFFFUL) << 5)));
+                cb_patch_globally32(off + 12, (u32)(0xF2E00009UL | (((addr >> 48) & 0xFFFFUL) << 5)));
             }
         }
 
         pthread_jit_write_protect_np(0);
-        memcpy(mem, cb_data(), cb_pc());
+        cb_read_code(mem, 0, cb_pc());
         pthread_jit_write_protect_np(1);
         sys_icache_invalidate(mem, cb_pc());
 

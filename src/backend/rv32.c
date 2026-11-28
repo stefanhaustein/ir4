@@ -36,9 +36,9 @@ void be_rv32_set_obj(int obj) {
 }
 
 static u32 read32(size_t offset) {
-    const u8 *d = cb_data();
-    return (u32)d[offset] | ((u32)d[offset + 1] << 8) | ((u32)d[offset + 2] << 16) |
-           ((u32)d[offset + 3] << 24);
+    u8 d[4];
+    cb_read_code(d, offset, 4);
+    return (u32)d[0] | ((u32)d[1] << 8) | ((u32)d[2] << 16) | ((u32)d[3] << 24);
 }
 
 static void ensure_rv32_fp(void) {
@@ -58,7 +58,7 @@ static void ensure_rv32_fp(void) {
     for (i = 0; i < (size_t)BE_RV32_FP_RELOC32_CNT; i++) {
         u16 off = be_rv32_fp_relocs32[i * 2];
         u16 tgt = be_rv32_fp_relocs32[i * 2 + 1];
-        cb_patch32(base_pc + off, (u32)(RV_LOAD_BASE + rv_fp_addr + tgt));
+        cb_patch_locally32(base_pc + off, (u32)(RV_LOAD_BASE + rv_fp_addr + tgt));
     }
     for (i = 0; i < (size_t)BE_RV32_FP_RELOC_PAIR_CNT; i++) {
         u16 hi_off = be_rv32_fp_reloc_pairs[i * 3];
@@ -69,10 +69,10 @@ static void ensure_rv32_fp(void) {
         u32 lo = (addr - hi) & 0xFFFUL;
         u32 hi_ins = read32(base_pc + hi_off);
         u32 lo_ins = read32(base_pc + lo_off);
-        cb_patch32(base_pc + hi_off, (hi_ins & 0x00000FFFUL) | hi);
-        cb_patch32(base_pc + lo_off, (lo_ins & 0x000FFFFFUL) | (lo << 20));
+        cb_patch_locally32(base_pc + hi_off, (hi_ins & 0x00000FFFUL) | hi);
+        cb_patch_locally32(base_pc + lo_off, (lo_ins & 0x000FFFFFUL) | (lo << 20));
     }
-    cb_patch32(skip_pos, ((((u32)((i32)cb_pc() - (i32)skip_pos) >> 20) & 1UL) << 31) |
+    cb_patch_locally32(skip_pos, ((((u32)((i32)cb_pc() - (i32)skip_pos) >> 20) & 1UL) << 31) |
                           ((((u32)((i32)cb_pc() - (i32)skip_pos) >> 1) & 0x3FFUL) << 21) |
                           ((((u32)((i32)cb_pc() - (i32)skip_pos) >> 11) & 1UL) << 20) |
                           ((((u32)((i32)cb_pc() - (i32)skip_pos) >> 12) & 0xFFUL) << 12) | 0x6FUL);
@@ -884,12 +884,12 @@ static size_t rv_emit_jtab(size_t count) {
 
 static void rv_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     (void)count;
-    cb_patch32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
+    cb_patch_locally32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
 }
 
 static void rv_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
-    cb_patch32(patch_offset, enc_j(diff, RV_ZERO));
+    cb_patch_locally32(patch_offset, enc_j(diff, RV_ZERO));
 }
 
 static int rv_add_imm(int is_addr, i32 imm) {
@@ -980,7 +980,7 @@ static int rv_shift_imm(IrOp op, u8 count) {
 
 static void rv_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     i32 diff = (i32)target_addr - (i32)call_addr;
-    cb_patch32(call_pc, enc_j(diff, RV_RA));
+    cb_patch_globally32(call_pc, enc_j(diff, RV_RA));
 }
 
 static size_t rv_push_fn(size_t target_addr) {
@@ -999,8 +999,8 @@ static void rv_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) 
     u32 hi = (u32)((diff + 0x800) & 0xFFFFF000L);
     i32 lo = diff - (i32)hi;
     u32 rd = (read32(patch_pc) >> 7) & 0x1FUL;
-    cb_patch32(patch_pc, enc_u(hi, rd, 0x17UL));
-    cb_patch32(patch_pc + 4, enc_i(lo, rd, 0, rd, 0x13UL));
+    cb_patch_globally32(patch_pc, enc_u(hi, rd, 0x17UL));
+    cb_patch_globally32(patch_pc + 4, enc_i(lo, rd, 0, rd, 0x13UL));
 }
 
 static void rv_icall(void) {

@@ -49,7 +49,7 @@ static void sim_end(int main_idx) {
     }
 
     /* Patch the initial JMP 0x0000 at offset 0 (base + 1) to jump here */
-    cb_patch16(1, entry_addr);
+    cb_patch_globally16(1, entry_addr);
 
     /* CLD; LDX #$FF; TXS; zero BSS; LDX #init_x */
     cb_emit8(M6502_CLD);
@@ -120,7 +120,7 @@ static void sim_end(int main_idx) {
 
     if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
-        cb_patch16(print_call1, print_u16_addr);
+        cb_patch_globally16(print_call1, print_u16_addr);
 
         /* div10: $04/$05 /= 10, A = remainder */
         cb_emit8_8(M6502_LDA_IMM, 0x00);
@@ -143,7 +143,7 @@ static void sim_end(int main_idx) {
         cb_emit8(M6502_JSR);
         print_call2 = cb_pc();
         cb_emit16(0x0000);
-        cb_patch16(print_call2, print_u16_addr);
+        cb_patch_globally16(print_call2, print_u16_addr);
 
         cb_emit8(M6502_PLA);
         cb_emit8(M6502_CLC);
@@ -154,9 +154,9 @@ static void sim_end(int main_idx) {
         cb_emit8(M6502_RTS);
 
         putchar_addr = cb_cur_addr();
-        cb_patch16(putchar_call1, putchar_addr);
-        cb_patch16(putchar_call2, putchar_addr);
-        cb_patch16(putchar_call3, putchar_addr);
+        cb_patch_globally16(putchar_call1, putchar_addr);
+        cb_patch_globally16(putchar_call2, putchar_addr);
+        cb_patch_globally16(putchar_call3, putchar_addr);
 
         /* putchar_a: write 1 byte in A to stdout (fd=1) via sim65 _write ($FFF7) */
         cb_emit8_8(M6502_STA_ZP, 0x16); /* char buf */

@@ -80,7 +80,7 @@ static void virt_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch32(0, enc_j((i32)entry_off, 0));
+    cb_patch_globally32(0, enc_j((i32)entry_off, 0));
 
     /* sp = 0x80400000, s1 (data stack) = 0x80200000 */
     cb_emit32(enc_u(0x80400000UL, 2, 0x37UL)); /* LUI sp, 0x80400 */
@@ -140,8 +140,8 @@ static void virt_end(int main_idx) {
     cb_patch_data_init_relocs_base(VIRT_BASE, data_addr);
     hi = (data_addr + 0x800UL) & 0xFFFFF000UL;
     lo = (i32)(data_addr - hi);
-    cb_patch32(db_patch_off, enc_u(hi, 18, 0x37UL));
-    cb_patch32(db_patch_off + 4, enc_i(lo, 18, 0, 18, 0x13UL));
+    cb_patch_globally32(db_patch_off, enc_u(hi, 18, 0x37UL));
+    cb_patch_globally32(db_patch_off + 4, enc_i(lo, 18, 0, 18, 0x13UL));
 }
 
 /* --- Relocatable Object (ET_REL, .o) --- */
@@ -353,7 +353,7 @@ static int obj_write(FILE *fp, size_t base) {
 
     if (fwrite(ehdr, 1, sizeof(ehdr), fp) != sizeof(ehdr))
         return 0;
-    if (text_sz > 0 && fwrite(cb_data(), 1, text_sz, fp) != text_sz)
+    if (text_sz > 0 && !cb_write_code(fp, text_sz))
         return 0;
     if (!write_zeros(fp, text_pad))
         return 0;

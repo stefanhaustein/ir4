@@ -154,11 +154,11 @@ void bc_emit_addr(size_t val, u8 addr_bytes) {
 
 void bc_patch_addr(size_t patch_off, size_t target, u8 addr_bytes) {
     if (addr_bytes == 4)
-        cb_patch32(patch_off, (u32)target);
+        cb_patch_globally32(patch_off, (u32)target);
     else if (addr_bytes == 3)
-        cb_patch24(patch_off, (u32)target);
+        cb_patch_globally24(patch_off, (u32)target);
     else
-        cb_patch16(patch_off, (u16)target);
+        cb_patch_globally16(patch_off, (u16)target);
 }
 
 void bc_emit_data_reloc(size_t data_off, u8 addr_bytes) {

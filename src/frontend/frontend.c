@@ -243,16 +243,9 @@ static int const_matches_fn(StackType ty, const FnSig *fn) {
 
 static IrVec cur_ir = {NULL, 0, 0};
 
-#ifndef IR4_IR_SPILL
-#ifdef __EZ80__
-#define IR4_IR_SPILL 1
-#else
-#define IR4_IR_SPILL 0
-#endif
-#endif
-
 static FILE *ir_spill_fp = NULL;
-#if IR4_IR_SPILL && defined(__EZ80__)
+static long ir_spill_end = 0;
+#if defined(__EZ80__) || defined(__ez80__) || defined(IR4_MINIMAL)
 static const char *ir_spill_path = "ir4c_ir.tmp";
 #endif
 
@@ -260,10 +253,11 @@ void fn_ir_cleanup(void) {
     if (ir_spill_fp) {
         fclose(ir_spill_fp);
         ir_spill_fp = NULL;
-#if IR4_IR_SPILL && defined(__EZ80__)
+#if defined(__EZ80__) || defined(__ez80__) || defined(IR4_MINIMAL)
         remove(ir_spill_path);
 #endif
     }
+    ir_spill_end = 0;
 }
 
 size_t fn_ir_len(const FnIR *w) {
@@ -293,31 +287,29 @@ void fn_ir_drop(FnIR *w) {
     }
 }
 
-#if IR4_IR_SPILL
 static void fn_ir_spill(FnIR *w, const IrInstr *data, size_t len) {
     long off;
     if (len == 0)
         return;
     if (!ir_spill_fp) {
-#ifdef __EZ80__
-        ir_spill_fp = fopen(ir_spill_path, "wb+");
+#if defined(__EZ80__) || defined(__ez80__) || defined(IR4_MINIMAL)
+        ir_spill_fp = fopen(ir_spill_path, "w+b");
 #else
         ir_spill_fp = tmpfile();
 #endif
         if (!ir_spill_fp)
             ir4_die("cannot open IR spill temp file");
+        ir_spill_end = 0;
     }
-    if (fseek(ir_spill_fp, 0L, SEEK_END) != 0)
+    off = ir_spill_end;
+    if (fseek(ir_spill_fp, off, SEEK_SET) != 0)
         ir4_die("failed to seek IR spill file");
-    off = ftell(ir_spill_fp);
-    if (off < 0)
-        ir4_die("ftell failed on IR spill file");
     if (fwrite(data, sizeof(IrInstr), len, ir_spill_fp) != len)
         ir4_die("failed to write IR spill file");
+    ir_spill_end = off + (long)(len * sizeof(IrInstr));
     w->spill_off = off;
     w->spill_len = len;
 }
-#endif
 
 static void reset_word_ir(FnIR *w) {
     free(w->ir.data);
@@ -1346,16 +1338,7 @@ static void compile_fn(int is_default, int is_hot) {
         if (!discard_body) {
             w->param_cnt = (int)param_cnt;
             if (build_fn.ir.len > 0) {
-#if IR4_IR_SPILL
                 fn_ir_spill(w, build_fn.ir.data, build_fn.ir.len);
-#else
-                w->ir.data = (IrInstr *)malloc(build_fn.ir.len * sizeof(IrInstr));
-                if (!w->ir.data)
-                    ir4_die("out of memory");
-                memcpy(w->ir.data, build_fn.ir.data, build_fn.ir.len * sizeof(IrInstr));
-                w->ir.len = build_fn.ir.len;
-                w->ir.cap = build_fn.ir.len;
-#endif
             }
             w->locals = build_fn.locals;
         } else {

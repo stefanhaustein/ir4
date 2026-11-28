@@ -28,6 +28,9 @@ VEC_OF(ExternRelocVec, ExternReloc);
 VEC_OF(BankDescVec, BankDesc);
 
 static ByteVec code_buf;
+static size_t flushed_len = 0;
+static size_t flush_watermark = 0;
+static FILE *spill_fp = NULL;
 static size_t base_addr = 0x0100; /* Default: CP/M .COM load address */
 static ByteVec data_buf;
 static size_t data_init_size = 0;
@@ -41,8 +44,20 @@ static u16 cur_bank_id = 0;
 
 /* Code buffer & emission */
 
+void cb_cleanup(void) {
+    spill_fp = NULL;
+    flushed_len = 0;
+    flush_watermark = 0;
+}
+
+void cb_set_spill_file(FILE *fp) {
+    cb_cleanup();
+    spill_fp = fp;
+}
+
 void cb_reset(size_t base) {
     BankDesc *b0;
+    cb_cleanup();
     code_buf.len = 0;
     base_addr = base;
     data_buf.len = 0;
@@ -60,16 +75,91 @@ void cb_reset(size_t base) {
     b0->len = 0;
 }
 
-size_t cb_pc(void) { return code_buf.len; }
+size_t cb_pc(void) { return flushed_len + code_buf.len; }
 
 size_t cb_cur_addr(void) {
+    size_t pc = cb_pc();
     if (cfg_bank_size == 0 || cur_bank_id == 0) {
-        return base_addr + code_buf.len;
+        return base_addr + pc;
     }
-    return banks.data[cur_bank_id].base + (code_buf.len - banks.data[cur_bank_id].start_pc);
+    return banks.data[cur_bank_id].base + (pc - banks.data[cur_bank_id].start_pc);
 }
 
-const u8 *cb_data(void) { return code_buf.data; }
+u8 cb_read_u8(size_t offset) {
+    u8 b = 0;
+    cb_read_code(&b, offset, 1);
+    return b;
+}
+
+void cb_read_code(void *dst, size_t offset, size_t len) {
+    size_t total = cb_pc();
+    u8 *out = (u8 *)dst;
+    if (offset + len > total)
+        ir4_die("code read out of bounds");
+    if (len == 0)
+        return;
+    if (offset < flushed_len) {
+        size_t file_n = flushed_len - offset;
+        u8 buf[512];
+        if (file_n > len)
+            file_n = len;
+        if (fseek(spill_fp, (long)offset, SEEK_SET) != 0)
+            ir4_die("failed seeking code spill file");
+        len -= file_n;
+        offset += file_n;
+        while (file_n > 0) {
+            size_t chunk = (file_n > sizeof(buf)) ? sizeof(buf) : file_n;
+            if (fread(buf, 1, chunk, spill_fp) != chunk)
+                ir4_die("failed reading code spill file");
+            memcpy(out, buf, chunk);
+            out += chunk;
+            file_n -= chunk;
+        }
+    }
+    if (len > 0) {
+        memcpy(out, code_buf.data + (offset - flushed_len), len);
+    }
+}
+
+Bool cb_write_code(FILE *fp, size_t len) {
+    size_t total = cb_pc();
+    size_t rem;
+    if (len > total)
+        ir4_die("code write out of bounds");
+    rem = len;
+    if (rem > 0 && flushed_len > 0) {
+        size_t file_rem = (rem < flushed_len) ? rem : flushed_len;
+        u8 buf[512];
+        if (fseek(spill_fp, 0, SEEK_SET) != 0)
+            return false;
+        while (file_rem > 0) {
+            size_t chunk = (file_rem > sizeof(buf)) ? sizeof(buf) : file_rem;
+            if (fread(buf, 1, chunk, spill_fp) != chunk || fwrite(buf, 1, chunk, fp) != chunk)
+                return false;
+            file_rem -= chunk;
+            rem -= chunk;
+        }
+    }
+    if (rem > 0 && fwrite(code_buf.data, 1, rem, fp) != rem)
+        return false;
+    return true;
+}
+
+void cb_flush(void) {
+    if (!spill_fp) {
+        flush_watermark = code_buf.len;
+        return;
+    }
+    if (code_buf.len == 0)
+        return;
+    if (fseek(spill_fp, (long)flushed_len, SEEK_SET) != 0 ||
+        fwrite(code_buf.data, 1, code_buf.len, spill_fp) != code_buf.len) {
+        ir4_die("failed writing code spill file");
+    }
+    flushed_len += code_buf.len;
+    code_buf.len = 0;
+    flush_watermark = 0;
+}
 
 void cb_emit8(u8 b) { VEC_PUSH(code_buf, b); }
 
@@ -106,18 +196,20 @@ void cb_emit8_8_8(u8 a, u8 b, u8 c) {
 }
 
 void cb_rewind(size_t n) {
-    if (n > code_buf.len) {
+    size_t pc;
+    if (n > code_buf.len || code_buf.len - n < flush_watermark) {
         ir4_die("code buffer underflow");
     }
     code_buf.len -= n;
-    while (relocs.len > 0 && relocs.data[relocs.len - 1].off1 >= code_buf.len) {
+    pc = cb_pc();
+    while (relocs.len > 0 && relocs.data[relocs.len - 1].off1 >= pc) {
         relocs.len--;
     }
 }
 
 CbCheckpoint cb_checkpoint(void) {
     CbCheckpoint cp;
-    cp.code_len = code_buf.len;
+    cp.code_len = cb_pc();
     cp.data_len = data_buf.len;
     cp.relocs_len = relocs.len;
     cp.data_init_relocs_len = data_init_relocs.len;
@@ -126,40 +218,95 @@ CbCheckpoint cb_checkpoint(void) {
 }
 
 void cb_restore(CbCheckpoint cp) {
-    code_buf.len = cp.code_len;
+    if (cp.code_len < flushed_len + flush_watermark)
+        ir4_die("code restore before flush watermark");
+    code_buf.len = cp.code_len - flushed_len;
     data_buf.len = cp.data_len;
     relocs.len = cp.relocs_len;
     data_init_relocs.len = cp.data_init_relocs_len;
     ext_relocs.len = cp.ext_relocs_len;
 }
 
-void cb_patch8(size_t patch_offset, u8 val) {
-    if (patch_offset >= code_buf.len) {
+static void patch_global_bytes(size_t patch_offset, const u8 *bytes, size_t len) {
+    size_t total = cb_pc();
+    if (patch_offset + len > total)
         ir4_die("patch offset out of bounds");
+    if (patch_offset < flushed_len) {
+        size_t file_n = flushed_len - patch_offset;
+        if (file_n > len)
+            file_n = len;
+        if (fseek(spill_fp, (long)patch_offset, SEEK_SET) != 0 ||
+            fwrite(bytes, 1, file_n, spill_fp) != file_n) {
+            ir4_die("failed patching code spill file");
+        }
+        bytes += file_n;
+        patch_offset += file_n;
+        len -= file_n;
     }
-    code_buf.data[patch_offset] = val;
+    if (len > 0) {
+        memcpy(code_buf.data + (patch_offset - flushed_len), bytes, len);
+    }
 }
 
-void cb_patch16(size_t patch_offset, u16 target_addr) {
-    if (patch_offset + 1 >= code_buf.len) {
-        ir4_die("patch offset out of bounds");
-    }
-    code_buf.data[patch_offset] = (u8)(target_addr & 0xFF);
-    code_buf.data[patch_offset + 1] = (u8)((target_addr >> 8) & 0xFF);
+void cb_patch_globally8(size_t patch_offset, u8 val) {
+    patch_global_bytes(patch_offset, &val, 1);
 }
 
-void cb_patch24(size_t patch_offset, u32 target_addr) {
-    if (patch_offset + 2 >= code_buf.len) {
-        ir4_die("patch offset out of bounds");
-    }
-    code_buf.data[patch_offset] = (u8)(target_addr & 0xFFU);
-    code_buf.data[patch_offset + 1] = (u8)((target_addr >> 8) & 0xFFU);
-    code_buf.data[patch_offset + 2] = (u8)((target_addr >> 16) & 0xFFU);
+void cb_patch_globally16(size_t patch_offset, u16 target_addr) {
+    u8 b[2];
+    b[0] = (u8)(target_addr & 0xFFU);
+    b[1] = (u8)((target_addr >> 8) & 0xFFU);
+    patch_global_bytes(patch_offset, b, 2);
 }
 
-void cb_patch32(size_t patch_offset, u32 val) {
-    cb_patch16(patch_offset, (u16)(val & 0xFFFFU));
-    cb_patch16(patch_offset + 2, (u16)((val >> 16) & 0xFFFFU));
+void cb_patch_globally24(size_t patch_offset, u32 target_addr) {
+    u8 b[3];
+    b[0] = (u8)(target_addr & 0xFFU);
+    b[1] = (u8)((target_addr >> 8) & 0xFFU);
+    b[2] = (u8)((target_addr >> 16) & 0xFFU);
+    patch_global_bytes(patch_offset, b, 3);
+}
+
+void cb_patch_globally32(size_t patch_offset, u32 val) {
+    u8 b[4];
+    cb_put_le32(b, val);
+    patch_global_bytes(patch_offset, b, 4);
+}
+
+void cb_patch_locally8(size_t patch_offset, u8 val) {
+    size_t min_off = flushed_len + flush_watermark;
+    if (patch_offset < min_off || patch_offset - flushed_len >= code_buf.len) {
+        ir4_die("local patch offset out of bounds");
+    }
+    code_buf.data[patch_offset - flushed_len] = val;
+}
+
+void cb_patch_locally16(size_t patch_offset, u16 target_addr) {
+    size_t loc;
+    size_t min_off = flushed_len + flush_watermark;
+    if (patch_offset < min_off || patch_offset - flushed_len + 1 >= code_buf.len) {
+        ir4_die("local patch offset out of bounds");
+    }
+    loc = patch_offset - flushed_len;
+    code_buf.data[loc] = (u8)(target_addr & 0xFF);
+    code_buf.data[loc + 1] = (u8)((target_addr >> 8) & 0xFF);
+}
+
+void cb_patch_locally24(size_t patch_offset, u32 target_addr) {
+    size_t loc;
+    size_t min_off = flushed_len + flush_watermark;
+    if (patch_offset < min_off || patch_offset - flushed_len + 2 >= code_buf.len) {
+        ir4_die("local patch offset out of bounds");
+    }
+    loc = patch_offset - flushed_len;
+    code_buf.data[loc] = (u8)(target_addr & 0xFFU);
+    code_buf.data[loc + 1] = (u8)((target_addr >> 8) & 0xFFU);
+    code_buf.data[loc + 2] = (u8)((target_addr >> 16) & 0xFFU);
+}
+
+void cb_patch_locally32(size_t patch_offset, u32 val) {
+    cb_patch_locally16(patch_offset, (u16)(val & 0xFFFFU));
+    cb_patch_locally16(patch_offset + 2, (u16)((val >> 16) & 0xFFFFU));
 }
 
 void cb_put_le16(u8 *p, u16 v) {
@@ -175,7 +322,11 @@ void cb_put_le32(u8 *p, u32 v) {
 }
 
 Bool cb_write_raw(FILE *fp, Bool include_data) {
-    if (code_buf.len > 0 && fwrite(code_buf.data, 1, code_buf.len, fp) != code_buf.len) {
+    if (spill_fp && fp == spill_fp) {
+        cb_flush();
+        if (fseek(fp, (long)flushed_len, SEEK_SET) != 0)
+            return false;
+    } else if (!cb_write_code(fp, cb_pc())) {
         return false;
     }
     if (include_data && data_init_size > 0 &&
@@ -307,16 +458,16 @@ void cb_patch_data_relocs(size_t data_base) {
         size_t off = relocs.data[i].data_offset;
         size_t addr = data_base + (off == CB_HEAP_START_OFF ? heap_off : off);
         if (relocs.data[i].split) {
-            code_buf.data[relocs.data[i].off1] = (u8)(addr & 0xFF);
-            code_buf.data[relocs.data[i].off2] = (u8)((addr >> 8) & 0xFF);
+            cb_patch_globally8(relocs.data[i].off1, (u8)(addr & 0xFF));
+            cb_patch_globally8(relocs.data[i].off2, (u8)((addr >> 8) & 0xFF));
         } else if (relocs.data[i].width == 1) {
-            code_buf.data[relocs.data[i].off1] = (u8)((addr >> 16) & 0xFF);
+            cb_patch_globally8(relocs.data[i].off1, (u8)((addr >> 16) & 0xFF));
         } else if (relocs.data[i].width == 4) {
-            cb_patch32(relocs.data[i].off1, (u32)addr);
+            cb_patch_globally32(relocs.data[i].off1, (u32)addr);
         } else if (relocs.data[i].width == 3) {
-            cb_patch24(relocs.data[i].off1, (u32)addr);
+            cb_patch_globally24(relocs.data[i].off1, (u32)addr);
         } else {
-            cb_patch16(relocs.data[i].off1, (u16)addr);
+            cb_patch_globally16(relocs.data[i].off1, (u16)addr);
         }
     }
     cb_patch_data_init_relocs_base(0, (u32)data_base);
@@ -371,24 +522,25 @@ size_t cb_bank_base(void) { return cfg_bank_base; }
 size_t cb_bank_size(void) { return cfg_bank_size; }
 
 void cb_begin_bank(u16 bank_id) {
+    size_t pc = cb_pc();
     if (cur_bank_id < banks.len) {
-        banks.data[cur_bank_id].len = code_buf.len - banks.data[cur_bank_id].start_pc;
+        banks.data[cur_bank_id].len = pc - banks.data[cur_bank_id].start_pc;
     }
     while (banks.len <= bank_id) {
         BankDesc *b = VEC_ADD(banks);
         b->base = (banks.len == 1) ? base_addr : cfg_bank_base;
-        b->start_pc = code_buf.len;
+        b->start_pc = pc;
         b->len = 0;
     }
     cur_bank_id = bank_id;
     banks.data[bank_id].base = (bank_id == 0) ? base_addr : cfg_bank_base;
-    banks.data[bank_id].start_pc = code_buf.len;
+    banks.data[bank_id].start_pc = pc;
     banks.data[bank_id].len = 0;
 }
 
 void cb_end_banks(void) {
     if (cur_bank_id < banks.len) {
-        banks.data[cur_bank_id].len = code_buf.len - banks.data[cur_bank_id].start_pc;
+        banks.data[cur_bank_id].len = cb_pc() - banks.data[cur_bank_id].start_pc;
     }
 }
 
@@ -406,7 +558,7 @@ BankDesc cb_get_bank(u16 bank_id) {
     }
     d = banks.data[bank_id];
     if (bank_id == cur_bank_id) {
-        d.len = code_buf.len - d.start_pc;
+        d.len = cb_pc() - d.start_pc;
     }
     return d;
 }

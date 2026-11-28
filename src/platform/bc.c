@@ -66,7 +66,7 @@ static void bc_run_vm(int main_idx) {
 
     base = (u16)(cb_cur_addr() - code_sz);
     if (code_sz > 0)
-        memcpy(mem + base, cb_data(), code_sz);
+        cb_read_code(mem + base, 0, code_sz);
     data_addr = (u16)(base + code_sz);
     if (init_sz > 0)
         memcpy(mem + data_addr, cb_init_data(), init_sz);
@@ -805,7 +805,6 @@ static Bool bc32_build(U8Vec *out, size_t base) {
     u32 bss_sz = (total_data > init_sz) ? (total_data - init_sz) : 0;
     u16 ext_cnt = bc_extern_count();
     u16 i;
-    const u8 *code = cb_data();
     const u8 *init_d = cb_init_data();
 
     VEC_PUSH(*out, 'I'); VEC_PUSH(*out, 'R'); VEC_PUSH(*out, '4'); VEC_PUSH(*out, 'B');
@@ -823,8 +822,10 @@ static Bool bc32_build(U8Vec *out, size_t base) {
     }
     {
         u32 k;
-        for (k = 0; k < code_sz; k++)
-            VEC_PUSH(*out, code[k]);
+        size_t old_len = out->len;
+        VEC_ENSURE(*out, old_len + code_sz);
+        cb_read_code(out->data + old_len, 0, code_sz);
+        out->len = old_len + code_sz;
         for (k = 0; k < init_sz; k++)
             VEC_PUSH(*out, init_d[k]);
     }

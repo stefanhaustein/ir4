@@ -352,6 +352,16 @@ int main(int argc, char **argv) {
     }
 
     cb_reset(base);
+    if (!(plat && plat->write)) {
+        out_fp = fopen(out_path, "w+b");
+        if (!out_fp) {
+            fprintf(stderr, "ir4c: cannot open output %s\n", out_path);
+            if (in_fp != stdin)
+                fclose(in_fp);
+            return 1;
+        }
+        cb_set_spill_file(out_fp);
+    }
 #if IR4_ENABLE_ELF
     be_rv32_set_obj(plat == &plat_rv32_obj);
 #endif
@@ -366,6 +376,9 @@ int main(int argc, char **argv) {
         if (plat->needs_main && main_idx < 0) {
             ir4_status_clear();
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
+            if (out_fp)
+                fclose(out_fp);
+            cb_cleanup();
             return 1;
         }
         plat->end(main_idx);
@@ -386,11 +399,14 @@ int main(int argc, char **argv) {
     }
 
     ir4_status_file("Writing", out_path, 0);
-    out_fp = fopen(out_path, "wb");
     if (!out_fp) {
-        ir4_status_clear();
-        fprintf(stderr, "ir4c: cannot open output %s\n", out_path);
-        return 1;
+        out_fp = fopen(out_path, "wb");
+        if (!out_fp) {
+            ir4_status_clear();
+            fprintf(stderr, "ir4c: cannot open output %s\n", out_path);
+            cb_cleanup();
+            return 1;
+        }
     }
 
     if (plat && plat->write) {
@@ -415,7 +431,13 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
-    fclose(out_fp);
+    if (fflush(out_fp) != 0) {
+        ir4_status_clear();
+        fprintf(stderr, "ir4c: write failed: %s\n", out_path);
+        fclose(out_fp);
+        cb_cleanup();
+        return 1;
+    }
     ir4_status_clear();
 
     printf("Compiled %s -> %s (target: %s, base: 0x%04lX, size: %lu bytes)\n", in_path, out_path,
@@ -425,10 +447,14 @@ int main(int argc, char **argv) {
         int main_idx = ir4_find_fn("main");
         if (main_idx < 0) {
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
+            fclose(out_fp);
+            cb_cleanup();
             return 1;
         }
         plat->run(main_idx);
     }
 
+    fclose(out_fp);
+    cb_cleanup();
     return 0;
 }

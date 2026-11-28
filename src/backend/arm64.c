@@ -820,23 +820,23 @@ static size_t a64_emit_jtab(size_t count) {
 
 static void a64_patch_jtab(size_t patch_offset, size_t idx, size_t count, size_t target_addr) {
     (void)count;
-    cb_patch32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
+    cb_patch_locally32(patch_offset + idx * 4, (u32)((i32)target_addr - (i32)patch_offset));
 }
 
 static void a64_patch_fwd(size_t patch_offset) {
     i32 diff = (i32)cb_pc() - (i32)patch_offset;
-    u8 top = cb_data()[patch_offset + 3];
+    u8 top = cb_read_u8(patch_offset + 3);
     if (top == 0xB4) {
         u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
-        u32 rt = (u32)(cb_data()[patch_offset] & 0x1FUL);
-        cb_patch32(patch_offset, 0xB4000000UL | (imm19 << 5) | rt);
+        u32 rt = (u32)(cb_read_u8(patch_offset) & 0x1FUL);
+        cb_patch_locally32(patch_offset, 0xB4000000UL | (imm19 << 5) | rt);
     } else if (top == 0x54) {
         u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
-        u32 cond_bits = (u32)(cb_data()[patch_offset] & 0x0F);
-        cb_patch32(patch_offset, 0x54000000UL | (imm19 << 5) | cond_bits);
+        u32 cond_bits = (u32)(cb_read_u8(patch_offset) & 0x0F);
+        cb_patch_locally32(patch_offset, 0x54000000UL | (imm19 << 5) | cond_bits);
     } else {
         u32 imm26 = ((u32)(diff >> 2)) & 0x03FFFFFFUL;
-        cb_patch32(patch_offset, 0x14000000UL | imm26);
+        cb_patch_locally32(patch_offset, 0x14000000UL | imm26);
     }
 }
 
@@ -907,7 +907,7 @@ static int a64_shift_imm(IrOp op, u8 count) {
 
 static void a64_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     i32 diff = (i32)target_addr - (i32)call_addr;
-    cb_patch32(call_pc, 0x94000000UL | (((u32)(diff >> 2)) & 0x03FFFFFFUL));
+    cb_patch_globally32(call_pc, 0x94000000UL | (((u32)(diff >> 2)) & 0x03FFFFFFUL));
 }
 
 static size_t a64_push_fn(size_t target_addr) {
@@ -923,9 +923,9 @@ static size_t a64_push_fn(size_t target_addr) {
 static void a64_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     i32 diff = (i32)target_addr - (i32)patch_addr;
     u32 imm = (u32)diff;
-    u32 rd = (u32)(cb_data()[patch_pc] & 0x1FUL);
-    cb_patch32(patch_pc, 0x10000000UL | ((imm & 0x3UL) << 29) |
-                             (((imm >> 2) & 0x7FFFFUL) << 5) | rd);
+    u32 rd = (u32)(cb_read_u8(patch_pc) & 0x1FUL);
+    cb_patch_globally32(patch_pc, 0x10000000UL | ((imm & 0x3UL) << 29) |
+                                      (((imm >> 2) & 0x7FFFFUL) << 5) | rd);
 }
 
 static void a64_icall(void) {

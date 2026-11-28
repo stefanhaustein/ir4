@@ -34,7 +34,7 @@ static void agon_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch24(1, entry);
+    cb_patch_globally24(1, entry);
 
     /* Preserve MOS entry HL (cmd tail ptr), IX (argv), BC (C = argc) in header pad 0x37..0x3F */
     cb_emit8(EZ80_LD_NN_HL);
@@ -109,8 +109,8 @@ static void agon_end(int main_idx) {
     }
     {
         u32 exit_addr = (u32)cb_cur_addr();
-        cb_patch8(0x30, EZ80_JP);
-        cb_patch24(0x31, exit_addr);
+        cb_patch_globally8(0x30, EZ80_JP);
+        cb_patch_globally24(0x31, exit_addr);
     }
     cb_emit8(EZ80_LD_HL_NN);
     cb_emit24((u32)(agon_base + 0x34));

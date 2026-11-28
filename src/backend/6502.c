@@ -405,7 +405,7 @@ static void m6502_call_extern(const FnSig *sig) {
         m6502_call_extern(sig);
         m6502_compact = 1;
         cb_emit8(M6502_RTS);
-        cb_patch16(jmp_patch, cb_cur_addr());
+        cb_patch_locally16(jmp_patch, cb_cur_addr());
         cb_emit8_16(BC_CALL, stub_addr);
         return;
     }
@@ -1023,7 +1023,7 @@ static void ensure_mul16(void) {
     cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 1));
     m6502_adc_stk(3);
     cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
-    cb_patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
+    cb_patch_locally8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
 
     m6502_asl_stk(2);
     m6502_lda_stk(3);
@@ -1040,7 +1040,7 @@ static void ensure_mul16(void) {
     cb_emit8(M6502_INX);
     cb_emit8(M6502_RTS);
 
-    cb_patch16(skip_patch, cb_cur_addr());
+    cb_patch_locally16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_udivmod16(void) {
@@ -1079,13 +1079,13 @@ static void ensure_udivmod16(void) {
     cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 2));
     cb_emit8_8(M6502_STA_ZP, zp_scratch);
     emit_stack_op(0xFE, 2); /* INC stack+2,X */
-    cb_patch8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
+    cb_patch_locally8(bcc_patch, (u8)(cb_pc() - (bcc_patch + 1)));
 
     cb_emit8(M6502_DEY);
     cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
     cb_emit8(M6502_RTS);
 
-    cb_patch16(skip_patch, cb_cur_addr());
+    cb_patch_locally16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_sdivmod16(void) {
@@ -1110,7 +1110,7 @@ static void ensure_sdivmod16(void) {
     p1 = cb_pc();
     cb_emit8(0x00);
     emit_neg_stk(2);
-    cb_patch8(p1, (u8)(cb_pc() - (p1 + 1)));
+    cb_patch_locally8(p1, (u8)(cb_pc() - (p1 + 1)));
 
     /* If divisor < 0, negate stack+0/1,X */
     m6502_lda_stk(1);
@@ -1118,7 +1118,7 @@ static void ensure_sdivmod16(void) {
     p2 = cb_pc();
     cb_emit8(0x00);
     emit_neg_stk(0);
-    cb_patch8(p2, (u8)(cb_pc() - (p2 + 1)));
+    cb_patch_locally8(p2, (u8)(cb_pc() - (p2 + 1)));
 
     cb_emit8_8(M6502_LDA_ZP, (u8)(zp_scratch + 3));
     cb_emit8(M6502_PHA);
@@ -1130,7 +1130,7 @@ static void ensure_sdivmod16(void) {
     p3 = cb_pc();
     cb_emit8(0x00);
     emit_neg_zp(zp_scratch);
-    cb_patch8(p3, (u8)(cb_pc() - (p3 + 1)));
+    cb_patch_locally8(p3, (u8)(cb_pc() - (p3 + 1)));
 
     /* Apply quotient sign to quotient (stack+2/3,X) */
     cb_emit8(M6502_PLA);
@@ -1138,10 +1138,10 @@ static void ensure_sdivmod16(void) {
     p4 = cb_pc();
     cb_emit8(0x00);
     emit_neg_stk(2);
-    cb_patch8(p4, (u8)(cb_pc() - (p4 + 1)));
+    cb_patch_locally8(p4, (u8)(cb_pc() - (p4 + 1)));
 
     cb_emit8(M6502_RTS);
-    cb_patch16(skip_patch, cb_cur_addr());
+    cb_patch_locally16(skip_patch, cb_cur_addr());
 }
 
 static void ensure_rt_blob(u16 *addr, const u8 *code, u16 code_len, const u16 *relocs,
@@ -1163,9 +1163,9 @@ static void ensure_rt_blob(u16 *addr, const u8 *code, u16 code_len, const u16 *r
     for (i = 0; i < reloc_cnt; i++) {
         u16 r = relocs[i];
         u16 orig = (u16)code[r] | ((u16)code[r + 1] << 8);
-        cb_patch16((u16)(base_pc + r), (u16)(orig + *addr));
+        cb_patch_locally16((u16)(base_pc + r), (u16)(orig + *addr));
     }
-    cb_patch16(jmp_skip, cb_cur_addr());
+    cb_patch_locally16(jmp_skip, cb_cur_addr());
 }
 
 static void ensure_wozfp(void) {
@@ -1559,7 +1559,7 @@ static void m6502_op(IrOp op) {
             m6502_sta_stk(1);
             cb_emit8(M6502_DEY);
             cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_patch_locally8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         } else if (op == OP_RSHIFT) {
             u16 skip_br;
             u16 loop_pc;
@@ -1571,7 +1571,7 @@ static void m6502_op(IrOp op) {
             m6502_ror_stk(0);
             cb_emit8(M6502_DEY);
             cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_patch_locally8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         } else {
             u16 skip_br;
             u16 loop_pc;
@@ -1585,7 +1585,7 @@ static void m6502_op(IrOp op) {
             m6502_ror_stk(0);
             cb_emit8(M6502_DEY);
             cb_emit8_8(M6502_BNE, (u8)(loop_pc - (cb_pc() + 2)));
-            cb_patch8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
+            cb_patch_locally8(skip_br, (u8)(cb_pc() - (skip_br + 1)));
         }
         break;
     case OP_EQ:
@@ -1656,7 +1656,7 @@ static void m6502_op(IrOp op) {
         cb_emit8(M6502_SEC);
         cb_emit8_8(0xE9, 0x01); /* SBC #1 */
         cb_emit8_8(M6502_BNE, (u8)(page_loop - (cb_pc() + 2)));
-        cb_patch8(skip_pages, (u8)(cb_pc() - (skip_pages + 1)));
+        cb_patch_locally8(skip_pages, (u8)(cb_pc() - (skip_pages + 1)));
         cb_emit8(0x68); /* PLA len_lo */
         cb_emit8(M6502_BEQ);
         skip_tail = cb_pc();
@@ -1668,7 +1668,7 @@ static void m6502_op(IrOp op) {
         cb_emit8_8(0x91, (u8)(zp_scratch + 2)); /* STA (zp2),Y */
         cb_emit8(0x98);                         /* TYA */
         cb_emit8_8(M6502_BNE, (u8)(tail_loop - (cb_pc() + 2)));
-        cb_patch8(skip_tail, (u8)(cb_pc() - (skip_tail + 1)));
+        cb_patch_locally8(skip_tail, (u8)(cb_pc() - (skip_tail + 1)));
         break;
     }
     case OP_INV32: {
@@ -1951,7 +1951,7 @@ static void m6502_op(IrOp op) {
         skip_neg1 = cb_pc();
         cb_emit8(0x00); /* BPL skip_neg1 */
         wozfp_call_keep_x(RT_FP_NEG);
-        cb_patch8(skip_neg1, (u8)(cb_pc() - (skip_neg1 + 1)));
+        cb_patch_locally8(skip_neg1, (u8)(cb_pc() - (skip_neg1 + 1)));
         wozfp_call_keep_x(RT_FP_FTOI);
         cb_emit8(M6502_DEX);
         cb_emit8(M6502_DEX);
@@ -1964,7 +1964,7 @@ static void m6502_op(IrOp op) {
         skip_neg2 = cb_pc();
         cb_emit8(0x00); /* BPL skip_neg2 */
         emit_neg_stk(0);
-        cb_patch8(skip_neg2, (u8)(cb_pc() - (skip_neg2 + 1)));
+        cb_patch_locally8(skip_neg2, (u8)(cb_pc() - (skip_neg2 + 1)));
         break;
     }
     case OP_MUL32:
@@ -2073,8 +2073,8 @@ static size_t m6502_emit_jtab(size_t count) {
     cb_emit8_8(M6502_STA_ZP, (u8)(zp_scratch + 1));
     cb_emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
     tbl_addr = cb_cur_addr();
-    cb_patch16(lo_pc, tbl_addr);
-    cb_patch16(hi_pc, (u16)(tbl_addr + count));
+    cb_patch_locally16(lo_pc, tbl_addr);
+    cb_patch_locally16(hi_pc, (u16)(tbl_addr + count));
     tbl_off = cb_pc();
     for (k = 0; k < count * 2; k++)
         cb_emit8(0);
@@ -2086,13 +2086,13 @@ static void m6502_patch_jtab(size_t patch_offset, size_t idx, size_t count, size
         bc_patch_jtab_op(patch_offset, idx, target_addr, 2);
         return;
     }
-    cb_patch8(patch_offset + idx, (u8)(target_addr & 0xFF));
-    cb_patch8(patch_offset + count + idx, (u8)(target_addr >> 8));
+    cb_patch_locally8(patch_offset + idx, (u8)(target_addr & 0xFF));
+    cb_patch_locally8(patch_offset + count + idx, (u8)(target_addr >> 8));
 }
 
 static void m6502_patch_fwd(size_t patch_offset) {
     m6502_cmp_end_pc = 0;
-    cb_patch16(patch_offset, (u16)cb_cur_addr());
+    cb_patch_locally16(patch_offset, (u16)cb_cur_addr());
 }
 
 static int m6502_add_imm(int is_addr, i32 imm) {
@@ -2258,16 +2258,16 @@ static int m6502_shift_imm(IrOp op, u8 count) {
 static void m6502_patch_call(size_t call_pc, size_t call_addr, size_t target_addr) {
     (void)call_addr;
     if (cb_is_banked() && m6502_bank_call_addr != 0) {
-        const u8 *d = cb_data();
-        if (d[call_pc] == M6502_JSR) {
-            u16 jmp_t = (u16)d[call_pc + 1] | ((u16)d[call_pc + 2] << 8);
+        u8 op = cb_read_u8(call_pc);
+        if (op == M6502_JSR) {
+            u16 jmp_t = (u16)cb_read_u8(call_pc + 1) | ((u16)cb_read_u8(call_pc + 2) << 8);
             if (jmp_t == m6502_bank_call_addr) {
-                cb_patch16(call_pc + 4, (u16)target_addr);
+                cb_patch_globally16(call_pc + 4, (u16)target_addr);
                 return;
             }
         }
     }
-    cb_patch16(call_pc + 1, (u16)target_addr);
+    cb_patch_globally16(call_pc + 1, (u16)target_addr);
 }
 
 static size_t m6502_push_fn(size_t target_addr) {
@@ -2295,8 +2295,8 @@ static void m6502_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_add
         bc_patch_fn_op(patch_pc, target_addr, 2);
         return;
     }
-    cb_patch8((u16)(patch_pc + 1), (u8)(target_addr & 0xFF));
-    cb_patch8((u16)(patch_pc + 2 + sta_len + 1), (u8)((target_addr >> 8) & 0xFF));
+    cb_patch_globally8((u16)(patch_pc + 1), (u8)(target_addr & 0xFF));
+    cb_patch_globally8((u16)(patch_pc + 2 + sta_len + 1), (u8)((target_addr >> 8) & 0xFF));
 }
 
 static void m6502_icall(void) {
@@ -2317,7 +2317,7 @@ static void m6502_icall(void) {
         cb_emit16(0x0000);
         icall_addr = cb_cur_addr();
         cb_emit8_16(0x6C, (u16)zp_scratch); /* JMP (zp_scratch) */
-        cb_patch16(skip_jmp, cb_cur_addr());
+        cb_patch_locally16(skip_jmp, cb_cur_addr());
     }
     cb_emit8_16(M6502_JSR, icall_addr);
 }
@@ -2336,7 +2336,7 @@ void be_6502_ensure_helpers(int need_mul, int need_div, int need_icall, int need
         cb_emit16(0x0000);
         icall_addr = cb_cur_addr();
         cb_emit8_16(0x6C, (u16)zp_scratch);
-        cb_patch16(skip_jmp, cb_cur_addr());
+        cb_patch_locally16(skip_jmp, cb_cur_addr());
     }
     if (need_fp)
         ensure_wozfp();
@@ -2455,7 +2455,7 @@ static void ensure_6502_vm(void) {
     cb_emit8_16(0x6C, (u16)tmp_lo);
 
     /* push_imm7: A has 0x80..0xFF -> push (A & 0x7F) */
-    cb_patch8(bmi_imm7_pc, (u8)(cb_pc() - (bmi_imm7_pc + 1)));
+    cb_patch_locally8(bmi_imm7_pc, (u8)(cb_pc() - (bmi_imm7_pc + 1)));
     cb_emit8_8(M6502_AND_IMM, 0x7F);
     cb_emit8(M6502_DEX);
     cb_emit8(M6502_DEX);
@@ -2469,8 +2469,8 @@ static void ensure_6502_vm(void) {
     vm_tbl_addr = cb_cur_addr();
     for (i = 0; i <= BC_I322W; i++)
         cb_emit16(0x0000);
-    cb_patch16(tbl_lo_pc, vm_tbl_addr);
-    cb_patch16(tbl_hi_pc, (u16)(vm_tbl_addr + 1));
+    cb_patch_locally16(tbl_lo_pc, vm_tbl_addr);
+    cb_patch_locally16(tbl_hi_pc, (u16)(vm_tbl_addr + 1));
 
     /* BC_RET */
     handlers[BC_RET] = cb_cur_addr();
@@ -2788,7 +2788,7 @@ static void ensure_6502_vm(void) {
         cb_emit8_8(M6502_INC_ZP, ip_hi);
         cb_emit8_16(M6502_JMP, vm_next_addr);
         skip_len = (u16)(cb_pc() - (beq_pc + 1));
-        cb_patch8(beq_pc, (u8)skip_len);
+        cb_patch_locally8(beq_pc, (u8)skip_len);
         cb_emit8_16(M6502_JMP, handlers[BC_JMP]);
     }
 
@@ -2936,9 +2936,9 @@ static void ensure_6502_vm(void) {
 #undef VM_OP
 
     for (i = 0; i <= BC_I322W; i++) {
-        cb_patch16((u16)(vm_tbl_pc + i * 2), handlers[i] ? handlers[i] : handlers[BC_RET]);
+        cb_patch_locally16((u16)(vm_tbl_pc + i * 2), handlers[i] ? handlers[i] : handlers[BC_RET]);
     }
-    cb_patch16(skip_vm, cb_cur_addr());
+    cb_patch_locally16(skip_vm, cb_cur_addr());
     m6502_compact = 1;
 }
 

@@ -60,8 +60,8 @@ static void x16_cart_begin(size_t base) {
     cb_emit8(M6502_PLA);
     cb_emit8_8(M6502_STA_ZP, 0x01);
     cb_emit8(M6502_RTS);
-    cb_patch16(bc_patch_lo, (u16)(bc_jsr_addr + 1));
-    cb_patch16(bc_patch_hi, (u16)(bc_jsr_addr + 2));
+    cb_patch_globally16(bc_patch_lo, (u16)(bc_jsr_addr + 1));
+    cb_patch_globally16(bc_patch_hi, (u16)(bc_jsr_addr + 2));
 
     /* Low-RAM __kernal_call trampoline: JSR __kernal_call; .word ext_addr */
     cart_kernal_call_addr = (u16)cb_cur_addr();
@@ -112,8 +112,8 @@ static void x16_cart_begin(size_t base) {
     cb_emit8(M6502_PLA);
     cb_emit8_8(M6502_LDA_ZP, 0x02);
     cb_emit8(M6502_RTS);
-    cb_patch16(kc_patch_lo, (u16)(kc_jsr_addr + 1));
-    cb_patch16(kc_patch_hi, (u16)(kc_jsr_addr + 2));
+    cb_patch_globally16(kc_patch_lo, (u16)(kc_jsr_addr + 1));
+    cb_patch_globally16(kc_patch_hi, (u16)(kc_jsr_addr + 2));
 
     (void)base;
     be_6502_set_trampoline(cart_bank_call_addr, cart_kernal_call_addr);
@@ -423,7 +423,7 @@ static int x16_cart_write(FILE *fp, size_t base) {
     if (pos > 0x0100) {
         ir4_die("X16 cartridge boot stub exceeded 256 bytes");
     }
-    memcpy(bank_buf + 0x0100, cb_data() + b0.start_pc, b0.len);
+    cb_read_code(bank_buf + 0x0100, b0.start_pc, b0.len);
     if (init_sz > 0) {
         memcpy(bank_buf + 0x0100 + b0.len, cb_init_data(), init_sz);
     }
@@ -441,7 +441,7 @@ static int x16_cart_write(FILE *fp, size_t base) {
         }
         memset(bank_buf, 0, sizeof(bank_buf));
         if (bd.len > 0) {
-            memcpy(bank_buf, cb_data() + bd.start_pc, bd.len);
+            cb_read_code(bank_buf, bd.start_pc, bd.len);
         }
         if (fwrite(bank_buf, 1, sizeof(bank_buf), fp) != sizeof(bank_buf)) {
             return 0;

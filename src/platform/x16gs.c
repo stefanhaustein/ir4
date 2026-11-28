@@ -52,7 +52,7 @@ static void x16gs_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch24(1, (u32)entry_addr);
+    cb_patch_globally24(1, (u32)entry_addr);
 
     /* Entered in native 16-bit mode (E=0, M=0, X=0, I=1) from Bank-0 .prg loader */
     cb_emit8(M816_CLD);
@@ -131,7 +131,7 @@ static void x16gs_end(int main_idx) {
         cb_emit8(M816_EOR_IMM);
         cb_emit16(0xFFFF);
         cb_emit8(M816_INC_A);
-        cb_patch8(pos_br + 1, (u8)(cb_pc() - (pos_br + 2)));
+        cb_patch_globally8(pos_br + 1, (u8)(cb_pc() - (pos_br + 2)));
 
         cb_emit8(M816_JSL);
         print_call = cb_pc();
@@ -232,9 +232,9 @@ static void x16gs_end(int main_idx) {
         cb_emit8_8(M816_BNE, (u8)((i8)((i32)pr_lp - (i32)(cb_cur_addr() + 2))));
         cb_emit8(M816_RTL);
 
-        cb_patch24(putc_call1, (u32)putchar_addr);
-        cb_patch24(putc_call2, (u32)putchar_addr);
-        cb_patch24(print_call, (u32)print_u16_addr);
+        cb_patch_globally24(putc_call1, (u32)putchar_addr);
+        cb_patch_globally24(putc_call2, (u32)putchar_addr);
+        cb_patch_globally24(print_call, (u32)print_u16_addr);
     }
 }
 

@@ -23,7 +23,7 @@ static void cpm_end(int main_idx) {
         exit(1);
     }
 
-    cb_patch16(1, entry_addr);
+    cb_patch_globally16(1, entry_addr);
     be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
 
@@ -49,7 +49,7 @@ static void cpm_end(int main_idx) {
         cb_emit8(Z80_SUB_H);
         cb_emit8(Z80_LD_H_A);
 
-        cb_patch16(pos_patch, cb_cur_addr());
+        cb_patch_globally16(pos_patch, cb_cur_addr());
 
         cb_emit8(Z80_CALL);
         pos_patch = cb_pc();
@@ -69,7 +69,7 @@ static void cpm_end(int main_idx) {
 
     if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
-        cb_patch16(pos_patch, print_u16_addr);
+        cb_patch_globally16(pos_patch, print_u16_addr);
 
         /* div10 is placed right after print_u16 */
         cb_emit8(Z80_CALL);
@@ -87,7 +87,7 @@ static void cpm_end(int main_idx) {
         cb_emit8_16(Z80_JP, CPM_BDOS);
 
         div10_addr = cb_cur_addr();
-        cb_patch16(pos_patch, div10_addr);
+        cb_patch_globally16(pos_patch, div10_addr);
 
         /* div10: HL = HL / 10, A = HL % 10 */
         cb_emit8_8(Z80_LD_B_N, 16);
