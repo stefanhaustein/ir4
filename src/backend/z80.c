@@ -100,9 +100,9 @@ static size_t z80_cur_addr(void) { return cb_cur_addr(); }
 static U8Vec z80_is_static_slot;
 static u16 z80_static_base = 0;
 
-static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                         size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void z80_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                         int total_locals, Bool is_recursive) {
+    int i;
     u16 off = 0;
     (void)name;
     z80_peep_barrier();
@@ -114,8 +114,8 @@ static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
         rt_math48_addr = 0;
     }
 
-    VEC_ENSURE(z80_local_off, total_locals);
-    VEC_ENSURE(z80_is_static_slot, total_locals);
+    VEC_ENSURE(z80_local_off, (size_t)total_locals);
+    VEC_ENSURE(z80_is_static_slot, (size_t)total_locals);
     for (i = 0; i < total_locals; i++)
         z80_is_static_slot.data[i] = 0;
     z80_static_base = 0;
@@ -209,7 +209,7 @@ static void z80_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
     }
 }
 
-static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     size_t i;
     u16 param_bytes = 0;
     u16 out_bytes = 0;
@@ -286,7 +286,7 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_
 static void z80_call(size_t target_addr) { cb_emit8_16(Z80_CALL, (u16)target_addr); }
 
 static int z80_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
-                         const LocalVar *locals, size_t total_locals) {
+                         const LocalVar *locals, int total_locals) {
     (void)locals;
     if (sig->in_types.len != 0 || callee->in_types.len != 0 ||
         (sig->is_recursive && total_locals > 0))
@@ -608,7 +608,7 @@ static void z80_local_add(size_t slot, u16 stack_bytes) {
     cb_emit8(0x77); /* LD (HL), A */
 }
 
-static int z80_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i32 imm) {
+static int z80_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 imm) {
     i16 d = (i16)imm;
     (void)type;
     if (d == 0)
@@ -652,7 +652,7 @@ static int z80_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i3
     return 0;
 }
 
-static void z80_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void z80_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     if (op == LOCAL_GET)
         z80_local_get(slot, type, (u16)stack_bytes);
     else if (op == LOCAL_ADDR)
@@ -1570,7 +1570,7 @@ static void z80_op(IrOp op) {
     }
 }
 
-static int z80_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int z80_local_mem(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)stack_bytes;
     if (!z80_is_static_slot.data[slot])
         return 0;

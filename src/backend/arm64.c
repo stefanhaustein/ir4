@@ -35,15 +35,15 @@ static size_t a64_cur_addr(void) { return cb_cur_addr(); }
 VEC_OF(U32Vec, u32);
 static U32Vec a64_local_off;
 
-static void a64_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                         size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void a64_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                         int total_locals, Bool is_recursive) {
+    int i;
     u32 cur_off = 0;
     u32 frame_bytes;
     (void)is_recursive;
     (void)name;
 
-    VEC_ENSURE(a64_local_off, total_locals);
+    VEC_ENSURE(a64_local_off, (size_t)total_locals);
     for (i = 0; i < total_locals; i++) {
         u32 sz = (locals[i].size > 0) ? ((u32)(locals[i].size + 7) & ~7UL) : 8UL;
         cur_off += sz;
@@ -100,7 +100,7 @@ static void a64_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
 
 typedef char ir4_arm64_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
 
-static void a64_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void a64_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     size_t k;
     size_t param_cnt = sig->in_types.len;
     size_t out_count = sig->out_types.len;
@@ -209,7 +209,7 @@ static void a64_push_data(size_t offset) {
     push_x0();
 }
 
-static void a64_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void a64_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     u32 off = a64_local_off.data[slot];
     (void)type;
     (void)stack_bytes;

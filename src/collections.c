@@ -20,7 +20,9 @@ void *vec_calloc(size_t n, size_t elem_size) {
     return p;
 }
 
-/* String interning pool */
+/* String interning pool.
+ * ht_cap/ht_len stay size_t (32-bit on __IR4_16__) so load-factor math
+ * (ht_len * 10 >= ht_cap * 7) cannot overflow 16-bit unsigned int. */
 static char **ht_slots = NULL;
 static size_t ht_cap = 0;
 static size_t ht_len = 0;
@@ -36,9 +38,14 @@ static unsigned int hash_str_n(const char *s, size_t len) {
 }
 
 static void ht_grow(size_t new_cap) {
-    char **new_slots = (char **)vec_calloc(new_cap, sizeof(char *));
+    char **new_slots;
     size_t i;
-    size_t mask = new_cap - 1;
+    size_t mask;
+    /* Probe loops use unsigned int masks/slots for speed on 16/24-bit hosts. */
+    if (new_cap == 0 || new_cap - 1 > (size_t)UINT_MAX)
+        ir4_die("string intern table exceeds UINT_MAX");
+    new_slots = (char **)vec_calloc(new_cap, sizeof(char *));
+    mask = new_cap - 1;
     for (i = 0; i < ht_cap; i++) {
         char *p = ht_slots[i];
         if (p) {
@@ -124,15 +131,23 @@ const char *sb_intern(StrBuf *sb) { return intern_str_n(sb->data ? sb->data : ""
 
 /* Pointer-keyed symbol hash table */
 static unsigned int sym_ptr_hash(const char *p) {
-    unsigned int v = (unsigned int)(size_t)p;
+    size_t addr = (size_t)p;
+    /* Fold upper bank bits (>15) so 24-bit SuperRAM pointers on 16-bit hosts don't collide. */
+    unsigned int v = (unsigned int)addr ^ (unsigned int)(addr >> 16);
     return (v >> 2) ^ (v >> 9);
 }
 
 static void sym_ht_grow(SymHt *ht, size_t new_cap) {
-    const char **nkeys = (const char **)vec_calloc(new_cap, sizeof(const char *));
-    size_t *nvals = (size_t *)vec_calloc(new_cap, sizeof(size_t));
+    const char **nkeys;
+    size_t *nvals;
     size_t i;
-    unsigned int mask = (unsigned int)(new_cap - 1);
+    unsigned int mask;
+    /* Probe loops use unsigned int masks/slots; cap must fit UINT_MAX. */
+    if (new_cap == 0 || new_cap - 1 > (size_t)UINT_MAX)
+        ir4_die("symbol hash table exceeds UINT_MAX");
+    nkeys = (const char **)vec_calloc(new_cap, sizeof(const char *));
+    nvals = (size_t *)vec_calloc(new_cap, sizeof(size_t));
+    mask = (unsigned int)(new_cap - 1);
     for (i = 0; i < ht->cap; i++) {
         if (ht->keys[i]) {
             unsigned int slot = sym_ptr_hash(ht->keys[i]) & mask;

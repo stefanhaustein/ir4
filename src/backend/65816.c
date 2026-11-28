@@ -1149,11 +1149,11 @@ static size_t m816_frame_bytes = 0;
 static size_t m816_local_off[IR4_MAX_LOCALS];
 
 static int m816_emit_dp_mem_off(u8 dp, IrOp op, u16 uoff);
-static void m816_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes);
+static void m816_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes);
 
-static void m816_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                          size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void m816_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                          int total_locals, Bool is_recursive) {
+    int i;
     (void)name;
     ensure_rt_data();
     m816_peep_fence();
@@ -1197,7 +1197,7 @@ static void m816_fn_begin(const char *name, size_t param_cnt, const LocalVar *lo
     }
 }
 
-static void m816_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void m816_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     (void)locals;
     (void)total_locals;
     if (sig->is_recursive && m816_frame_bytes > 0) {
@@ -1216,7 +1216,7 @@ static void m816_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total
 static void m816_call(size_t target_addr) { emit8_24(M816_JSL, (u32)target_addr); }
 
 static int m816_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
-                          const LocalVar *locals, size_t total_locals) {
+                          const LocalVar *locals, int total_locals) {
     (void)callee;
     (void)locals;
     (void)total_locals;
@@ -1325,7 +1325,7 @@ static void m816_push_data(size_t data_offset) {
     emit_rep_m();
 }
 
-static void m816_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void m816_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     size_t l_off = m816_local_off[slot];
     (void)stack_bytes;
     if (!m816_cur_is_recursive) {
@@ -1479,7 +1479,7 @@ static void m816_local_op(LocalOp op, size_t slot, StackType type, size_t stack_
     }
 }
 
-static int m816_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i32 imm) {
+static int m816_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 imm) {
     i32 simm = (i32)(i16)(u16)imm;
     (void)stack_bytes;
     if (type != TY_W && type != TY_A)
@@ -2731,7 +2731,7 @@ static int m816_data_mem(IrOp op, size_t data_offset) {
     }
 }
 
-static int m816_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int m816_local_mem(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)stack_bytes;
     if (op < OP_I8FETCH || op > OP_I32STORE)
         return 0;
@@ -2749,7 +2749,7 @@ static int m816_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
     }
 }
 
-static int m816_local_deref(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int m816_local_deref(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)stack_bytes;
     if (off < 0 || off > 0x7FF0)
         return 0;

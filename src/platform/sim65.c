@@ -32,7 +32,7 @@ static int sim_write(FILE *fp, size_t base) {
 }
 
 static void sim_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
+    const FuncSig *sig = ir4_func_sig(main_idx);
     u16 entry_addr = cb_cur_addr();
     u16 putchar_call1 = 0;
     u16 putchar_call2 = 0;

@@ -12,7 +12,7 @@ static void cpm_begin(size_t base) {
 }
 
 static void cpm_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
+    const FuncSig *sig = ir4_func_sig(main_idx);
     u16 entry_addr = cb_cur_addr();
     u16 pos_patch;
     u16 print_u16_addr;

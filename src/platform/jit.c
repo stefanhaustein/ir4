@@ -38,7 +38,7 @@ static const char *jit_get_argv(long idx) {
  *   LDP X29, X30, [SP], #16
  *   RET
  */
-static void arm64_run_jit(size_t main_idx) {
+static void arm64_run_jit(int main_idx) {
     const FuncSig *sig = ir4_func_sig(main_idx);
     size_t main_addr = sig->addr;
     size_t entry_pc = cb_pc();
@@ -158,7 +158,7 @@ static void arm64_run_jit(size_t main_idx) {
     }
 }
 #else
-static void arm64_run_jit(size_t main_idx) {
+static void arm64_run_jit(int main_idx) {
     (void)main_idx;
     fprintf(stderr, "--run is only supported on Apple Silicon macOS\n");
     exit(1);

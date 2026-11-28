@@ -139,14 +139,14 @@ static size_t rv_cur_addr(void) { return cb_cur_addr(); }
 VEC_OF(I32Vec, i32);
 static I32Vec rv_local_off;
 
-static void rv_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                        size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void rv_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                        int total_locals, Bool is_recursive) {
+    int i;
     i32 cur_off = 0;
     (void)name;
     (void)is_recursive;
 
-    VEC_ENSURE(rv_local_off, total_locals);
+    VEC_ENSURE(rv_local_off, (size_t)total_locals);
     for (i = 0; i < total_locals; i++) {
         i32 sz = (locals[i].size > 0) ? (((i32)locals[i].size + 3) & ~3) : 4;
         cur_off += sz;
@@ -183,7 +183,7 @@ static void rv_fn_begin(const char *name, size_t param_cnt, const LocalVar *loca
     }
 }
 
-static void rv_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void rv_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     (void)sig;
     (void)locals;
     (void)total_locals;
@@ -201,7 +201,7 @@ static void rv_call(size_t target_addr) {
 }
 
 static int rv_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
-                        const LocalVar *locals, size_t total_locals) {
+                        const LocalVar *locals, int total_locals) {
     i32 diff;
     (void)sig;
     (void)callee;
@@ -271,7 +271,7 @@ static void rv_push_data(size_t offset) {
     push_reg(RV_T0);
 }
 
-static void rv_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void rv_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     i32 off = rv_local_off.data[slot];
     (void)type;
     (void)stack_bytes;

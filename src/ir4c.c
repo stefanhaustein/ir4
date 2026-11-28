@@ -427,7 +427,7 @@ int main(int argc, char **argv) {
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
             return 1;
         }
-        plat->run((size_t)main_idx);
+        plat->run(main_idx);
     }
 
     return 0;

@@ -45,7 +45,7 @@ void be_6502_set_trampoline(u16 bank_call_addr, u16 kernal_call_addr) {
 }
 
 static void ensure_6502_vm(void);
-static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type);
+static void m6502_bc_local_op(LocalOp op, int slot, StackType type);
 static void m6502_pop2(void);
 static void m6502_push2(void);
 
@@ -166,13 +166,13 @@ static void m6502_emit_local_store(u16 off) {
     }
 }
 
-static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                           size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void m6502_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                           int total_locals, Bool is_recursive) {
+    int i;
     (void)name;
 
-    VEC_ENSURE(m6502_local_off, total_locals);
-    VEC_ENSURE(m6502_local_is_big, total_locals);
+    VEC_ENSURE(m6502_local_off, (size_t)total_locals);
+    VEC_ENSURE(m6502_local_is_big, (size_t)total_locals);
     m6502_frame_bytes = 0;
     m6502_big_bytes = 0;
     for (i = 0; i < total_locals; i++) {
@@ -320,7 +320,7 @@ static void m6502_fn_begin(const char *name, size_t param_cnt, const LocalVar *l
     }
 }
 
-static void m6502_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void m6502_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     (void)sig;
     (void)locals;
     (void)total_locals;
@@ -373,7 +373,7 @@ static void m6502_call(size_t target_addr) {
 }
 
 static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
-                           const LocalVar *locals, size_t total_locals) {
+                           const LocalVar *locals, int total_locals) {
     u16 tbank = m6502_call_target_bank;
     m6502_call_target_bank = 0;
     (void)sig;
@@ -689,7 +689,7 @@ static void m6502_local_add(size_t slot) {
     m6502_pop2();
 }
 
-static int m6502_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i32 imm) {
+static int m6502_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 imm) {
     u16 off = m6502_local_off.data[slot];
     u16 k = (u16)(i16)imm;
     (void)type;
@@ -758,7 +758,7 @@ static int m6502_local_add_imm(size_t slot, StackType type, size_t stack_bytes, 
     return 1;
 }
 
-static void m6502_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void m6502_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     if (m6502_compact) {
         m6502_bc_local_op(op, slot, type);
         return;
@@ -1979,7 +1979,7 @@ static void m6502_op(IrOp op) {
     }
 }
 
-static int m6502_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int m6502_local_mem(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)stack_bytes;
     if (m6502_compact || !m6502_static_frame)
         return 0;
@@ -2342,7 +2342,7 @@ void be_6502_ensure_helpers(int need_mul, int need_div, int need_icall, int need
         ensure_wozfp();
 }
 
-static void m6502_bc_local_op(LocalOp op, size_t slot, StackType type) {
+static void m6502_bc_local_op(LocalOp op, int slot, StackType type) {
     u8 sz = (type == TY_F || type == TY_I32) ? 4 : 2;
     u16 off = m6502_local_off.data[slot];
     if (op == LOCAL_ADD) {

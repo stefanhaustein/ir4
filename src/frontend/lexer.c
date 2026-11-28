@@ -89,9 +89,9 @@ void ir4_status_file(const char *prefix, const char *path, u32 line_num) {
     ir4_status(buf);
 }
 
-void ir4_status_prog(const char *prefix, size_t done, size_t total) {
+void ir4_status_prog(const char *prefix, int done, int total) {
     char buf[72];
-    sprintf(buf, "%s (%lu/%lu)...", prefix, (unsigned long)done, (unsigned long)total);
+    sprintf(buf, "%s (%d/%d)...", prefix, done, total);
     ir4_status(buf);
 }
 
@@ -113,7 +113,7 @@ void ir4_status_file(const char *prefix, const char *path, u32 line_num) {
     (void)path;
     (void)line_num;
 }
-void ir4_status_prog(const char *prefix, size_t done, size_t total) {
+void ir4_status_prog(const char *prefix, int done, int total) {
     (void)prefix;
     (void)done;
     (void)total;

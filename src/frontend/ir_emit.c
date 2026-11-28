@@ -253,7 +253,7 @@ static void emit_local_instr(const WordIR *w, size_t *ip) {
     int is_deref = (ins->u.loc.op == LOCAL_GET && ins->u.loc.type == TY_A &&
                     be->local_deref != NULL);
     if (is_addr || is_deref) {
-        int (*fn)(size_t, i32, IrOp, size_t) = is_addr ? be->local_mem : be->local_deref;
+        int (*fn)(int, i32, IrOp, size_t) = is_addr ? be->local_mem : be->local_deref;
         if (ir_can_fuse(w, i, 3) && w->ir.data[i + 1].kind == IR_PUSH_W &&
             w->ir.data[i + 2].kind == IR_ALU_OP && w->ir.data[i + 3].kind == IR_ALU_OP) {
             IrOp aop = w->ir.data[i + 2].u.op;
@@ -300,7 +300,7 @@ static void emit_call_instr(const WordIR *w, const FuncSig *sig, size_t *ip) {
         }
 #endif
         if (be->tail_call(funcs.data[target]->addr, sig, funcs.data[target], w->locals.data,
-                          w->locals.len)) {
+                          (int)w->locals.len)) {
             *ip = i + 1;
             return;
         }
@@ -428,7 +428,7 @@ static void emit_word(size_t fidx) {
             size_t start_addr = be->cur_addr();
             sig->addr = start_addr;
             sig->has_addr = 1;
-            be->fn_begin(sig->name, w->param_cnt, w->locals.data, w->locals.len, sig->is_recursive);
+            be->fn_begin(sig->name, w->param_cnt, w->locals.data, (int)w->locals.len, sig->is_recursive);
 
     for (i = 0; i <= w->ir.len; i++) {
         if (be->peep_fence && ir_is_br_target(w, i))
@@ -459,7 +459,7 @@ static void emit_word(size_t fidx) {
             const IrInstr *ins = &w->ir.data[i];
             switch (ins->kind) {
             case IR_FN_END:
-                be->fn_end(sig, w->locals.data, w->locals.len);
+                be->fn_end(sig, w->locals.data, (int)w->locals.len);
                 break;
             case IR_PUSH_W:
                 emit_push_w_instr(w, &i, &pending, &ir_addr);
@@ -939,8 +939,8 @@ void emit_program(void) {
         }
         cb_end_banks();
     } else {
-        size_t reach_total = 0;
-        size_t reach_done = 0;
+        int reach_total = 0;
+        int reach_done = 0;
         for (f = 0; f < funcs.len; f++) {
             if (!funcs.data[f]->is_extern && words.data[f]->reachable)
                 reach_total++;

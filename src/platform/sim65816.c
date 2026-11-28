@@ -30,7 +30,7 @@ static void sim816_emit_dp_data_addr(u8 dp, size_t data_off) {
 }
 
 static void sim816_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
+    const FuncSig *sig = ir4_func_sig(main_idx);
     size_t entry_addr = cb_cur_addr();
     size_t putchar_addr, print_u16_addr;
     size_t putc_call1 = 0, putc_call2 = 0, print_call = 0;
@@ -574,7 +574,7 @@ static void sim816_step(Cpu816 *c) {
     }
 }
 
-static void sim816_run(size_t main_idx) {
+static void sim816_run(int main_idx) {
     Cpu816 cpu;
     const u8 *code = cb_data();
     const u8 *idata = cb_init_data();

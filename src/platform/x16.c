@@ -120,7 +120,7 @@ static void x16_cart_begin(size_t base) {
 }
 
 static void x16_cart_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
+    const FuncSig *sig = ir4_func_sig(main_idx);
     if (sig->in_types.len != 0 || sig->out_types.len > 1) {
         fprintf(stderr, "--x16-cart requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
@@ -140,7 +140,7 @@ static int x16_cart_write(FILE *fp, size_t base) {
     size_t bss_addr = data_addr + init_sz;
     size_t num_banks = cb_bank_count();
     size_t num_rom_banks = 1 + (num_banks > 1 ? num_banks - 1 : 0);
-    const FuncSig *sig = ir4_func_sig((size_t)cart_main_idx);
+    const FuncSig *sig = ir4_func_sig(cart_main_idx);
     size_t i;
     u16 p_print1 = 0, p_print2 = 0, print_addr, loop_pc;
 

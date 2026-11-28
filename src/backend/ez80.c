@@ -231,7 +231,7 @@ static U8Vec ez_is_static;
 static size_t ez_frame_bytes = 0;
 static size_t ez_static_base = 0;
 
-static int ez_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i32 imm) {
+static int ez_local_add_imm(int slot, StackType type, size_t stack_bytes, i32 imm) {
     (void)type;
     (void)stack_bytes;
     if (imm == 0)
@@ -273,7 +273,7 @@ static int ez_local_add_imm(size_t slot, StackType type, size_t stack_bytes, i32
     return 0;
 }
 
-static void ez_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void ez_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     size_t off;
     int is4 = (type == TY_F || type == TY_I32);
 
@@ -407,9 +407,9 @@ static void ez_local_op(LocalOp op, size_t slot, StackType type, size_t stack_by
     }
 }
 
-static void ez_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                        size_t total_locals, Bool is_recursive) {
-    size_t i;
+static void ez_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                        int total_locals, Bool is_recursive) {
+    int i;
     (void)name;
     ez_ensure_rt_data();
 
@@ -427,8 +427,8 @@ static void ez_fn_begin(const char *name, size_t param_cnt, const LocalVar *loca
         cb_emit8_8(EZ80_ED, EZ80_ED_LD_MHL_DE);
     }
 
-    VEC_ENSURE(ez_local_off, total_locals);
-    VEC_ENSURE(ez_is_static, total_locals);
+    VEC_ENSURE(ez_local_off, (size_t)total_locals);
+    VEC_ENSURE(ez_is_static, (size_t)total_locals);
     ez_frame_bytes = 0;
 
     if (!is_recursive) {
@@ -513,7 +513,7 @@ static void ez_fn_begin(const char *name, size_t param_cnt, const LocalVar *loca
     }
 }
 
-static void ez_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void ez_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     typedef char ir4_ez80_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
     (void)sizeof(ir4_ez80_max_outs_check);
     (void)locals;
@@ -1816,7 +1816,7 @@ static int ez_data_mem(IrOp op, size_t data_offset) {
     return 0;
 }
 
-static int ez_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int ez_local_mem(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)slot;
     (void)off;
     (void)op;

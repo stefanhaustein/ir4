@@ -60,69 +60,73 @@ $(BUILD)/platform/elf.o: src/codebuf.h src/frontend.h src/backend/rv32.h
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) -lm
 
+define run_jit_check
+	@out=$$($(1)) && printf '%s\n' "$$out" | grep -q "^JIT main() returned: 0$$" || { printf '%s\n' "$$out"; echo "FAIL: $(1)"; exit 1; }
+endef
+
 test: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t z80   -o $(BUILD)/fib_z80.bin      tests/test_fib.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/fib_6502.bin     tests/test_fib.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/fib_arm64.bin    --run tests/test_fib.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/fib_arm64.bin    --run tests/test_fib.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/core_z80.bin     tests/test_core.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/core_6502.bin    tests/test_core.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/core_arm64.bin   --run tests/test_core.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/core_arm64.bin   --run tests/test_core.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/muldiv_z80.bin   tests/test_muldiv.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/muldiv_6502.bin  tests/test_muldiv.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/muldiv_arm64.bin --run tests/test_muldiv.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/muldiv_arm64.bin --run tests/test_muldiv.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/mem_z80.bin      tests/test_mem.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/mem_6502.bin     tests/test_mem.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/mem_arm64.bin    --run tests/test_mem.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/mem_arm64.bin    --run tests/test_mem.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/float_z80.bin     tests/test_float.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/float_6502.bin    tests/test_float.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/float_arm64.bin --run tests/test_float.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/float_arm64.bin --run tests/test_float.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/req_z80.bin       tests/test_req.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/req_6502.bin      tests/test_req.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/req_arm64.bin   --run tests/test_req.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/req_arm64.bin   --run tests/test_req.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/data_z80.bin      tests/test_data.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/data_6502.bin     tests/test_data.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/data_arm64.bin  --run tests/test_data.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/ext_arm64.bin   --run tests/test_ext.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/data_arm64.bin  --run tests/test_data.ir4)
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/ext_arm64.bin   --run tests/test_ext.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/math_z80.bin     tests/test_math.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/math_6502.bin    tests/test_math.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/math_arm64.bin   --run tests/test_math.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/math_arm64.bin   --run tests/test_math.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/i32_z80.bin      tests/test_i32.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/i32_6502.bin     tests/test_i32.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/i32_arm64.bin    --run tests/test_i32.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/i32_arm64.bin    --run tests/test_i32.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/fnptr_z80.bin    tests/test_fnptr.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/fnptr_6502.bin   tests/test_fnptr.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/fnptr_arm64.bin  --run tests/test_fnptr.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/fnptr_arm64.bin  --run tests/test_fnptr.ir4)
 	./$(TARGET) -t z80   -o $(BUILD)/peephole_z80.bin   tests/test_peephole.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/peephole_6502.bin  tests/test_peephole.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/peephole_arm64.bin --run tests/test_peephole.ir4
-	./$(TARGET) -O0 -t arm64 -o $(BUILD)/peephole_o0_arm64.bin --run tests/test_peephole.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/peephole_arm64.bin --run tests/test_peephole.ir4)
+	$(call run_jit_check,./$(TARGET) -O0 -t arm64 -o $(BUILD)/peephole_o0_arm64.bin --run tests/test_peephole.ir4)
 	./$(TARGET) -t cpm   -o $(BUILD)/file_cpm.com     tests/test_file.ir4
-	cd $(BUILD) && ../$(TARGET) -t arm64 -o file_arm64.bin --run ../tests/test_file.ir4 && rm -f IR4TEST.TMP
+	$(call run_jit_check,cd $(BUILD) && ../$(TARGET) -t arm64 -o file_arm64.bin --run ../tests/test_file.ir4 && rm -f IR4TEST.TMP)
 	./$(TARGET) -t c64   -o $(BUILD)/system_c64.prg     tests/test_system.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/system_x16.prg     tests/test_system.ir4
 	./$(TARGET) -t cpm   -o $(BUILD)/system_cpm.com     tests/test_system.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/system_arm64.bin   --run tests/test_system.ir4 -- ALPHA BETA
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/system_arm64.bin   --run tests/test_system.ir4 -- ALPHA BETA)
 	./$(TARGET) -t c64   -o $(BUILD)/rtl_c64.prg        tests/test_rtl.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/rtl_x16.prg        tests/test_rtl.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/rtl_arm64.bin      --run tests/test_rtl.ir4 >/dev/null
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/rtl_arm64.bin      --run tests/test_rtl.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/stdio_c64.prg      tests/test_stdio.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/stdio_x16.prg      tests/test_stdio.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/stdio_arm64.bin    --run tests/test_stdio.ir4 >/dev/null
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/stdio_arm64.bin    --run tests/test_stdio.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/terminal_c64.prg   tests/test_terminal.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/terminal_x16.prg   tests/test_terminal.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/terminal_arm64.bin --run tests/test_terminal.ir4 >/dev/null
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/terminal_arm64.bin --run tests/test_terminal.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/graphics_c64.prg   tests/test_graphics.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/graphics_x16.prg   tests/test_graphics.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/graphics_arm64.bin --run tests/test_graphics.ir4 >/dev/null
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/graphics_arm64.bin --run tests/test_graphics.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/joystick_c64.prg   tests/test_joystick.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/joystick_x16.prg   tests/test_joystick.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/joystick_arm64.bin --run tests/test_joystick.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/joystick_arm64.bin --run tests/test_joystick.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/sound_c64.prg      tests/test_sound.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/sound_x16.prg      tests/test_sound.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/sound_arm64.bin    --run tests/test_sound.ir4
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/sound_arm64.bin    --run tests/test_sound.ir4)
 	./$(TARGET) -t c64   -o $(BUILD)/sprite_c64.prg     tests/test_sprite.ir4
 	./$(TARGET) -t x16   -o $(BUILD)/sprite_x16.prg     tests/test_sprite.ir4
-	./$(TARGET) -t arm64 -o $(BUILD)/sprite_arm64.bin   --run tests/test_sprite.ir4 >/dev/null
+	$(call run_jit_check,./$(TARGET) -t arm64 -o $(BUILD)/sprite_arm64.bin   --run tests/test_sprite.ir4)
 	$(MAKE) test-err
 	$(MAKE) test-examples
 

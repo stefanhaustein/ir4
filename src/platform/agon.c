@@ -24,7 +24,7 @@ static void agon_begin(size_t base) {
 }
 
 static void agon_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig((size_t)main_idx);
+    const FuncSig *sig = ir4_func_sig(main_idx);
     u32 entry = (u32)cb_cur_addr();
     size_t rsp_off = be_ez80_rsp_off();
     size_t rtop_off = be_ez80_rstack_top_off();

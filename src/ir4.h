@@ -207,7 +207,7 @@ typedef enum {
 typedef struct {
     const char *name;
     StackType type;
-    size_t slot;
+    int slot;
     size_t size;
 } LocalVar;
 
@@ -240,12 +240,12 @@ typedef struct {
     u8 float_bytes;
 
     size_t (*cur_addr)(void);
-    void (*fn_begin)(const char *name, size_t param_cnt, const LocalVar *locals,
-                     size_t total_locals, Bool is_recursive);
-    void (*fn_end)(const FuncSig *sig, const LocalVar *locals, size_t total_locals);
+    void (*fn_begin)(const char *name, int param_cnt, const LocalVar *locals,
+                     int total_locals, Bool is_recursive);
+    void (*fn_end)(const FuncSig *sig, const LocalVar *locals, int total_locals);
     void (*call)(size_t target_addr);
     int (*tail_call)(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
-                     const LocalVar *locals, size_t total_locals);
+                     const LocalVar *locals, int total_locals);
     void (*call_extern)(const FuncSig *sig);
 
     void (*push_w)(i32 val);
@@ -253,8 +253,8 @@ typedef struct {
     void (*push_f)(double val);
     void (*push_i32)(i32 val);
     void (*push_data)(size_t data_offset);
-    void (*local_op)(LocalOp op, size_t slot, StackType type, size_t stack_bytes);
-    int (*local_add_imm)(size_t slot, StackType type, size_t stack_bytes, i32 imm);
+    void (*local_op)(LocalOp op, int slot, StackType type, size_t stack_bytes);
+    int (*local_add_imm)(int slot, StackType type, size_t stack_bytes, i32 imm);
 
     void (*stack_op)(StackOp op, StackType t1, StackType t2);
     void (*op)(IrOp op);
@@ -264,8 +264,8 @@ typedef struct {
     int (*bit_imm)(IrOp op, i32 imm);
     int (*mem_imm)(IrOp op, i32 off);
     int (*data_mem)(IrOp op, size_t data_offset);
-    int (*local_mem)(size_t slot, i32 off, IrOp op, size_t stack_bytes);
-    int (*local_deref)(size_t slot, i32 off, IrOp op, size_t stack_bytes);
+    int (*local_mem)(int slot, i32 off, IrOp op, size_t stack_bytes);
+    int (*local_deref)(int slot, i32 off, IrOp op, size_t stack_bytes);
 
     size_t (*emit_br_fwd)(BranchCond cond);
     void (*emit_br_back)(BranchCond cond, size_t target_addr);
@@ -292,7 +292,7 @@ typedef struct {
 void ir4_die(const char *msg);
 void ir4_status(const char *msg);
 void ir4_status_file(const char *prefix, const char *path, u32 line_num);
-void ir4_status_prog(const char *prefix, size_t done, size_t total);
+void ir4_status_prog(const char *prefix, int done, int total);
 void ir4_status_clear(void);
 
 /* Optimization control (implemented in frontend/frontend.c) */
@@ -310,7 +310,7 @@ typedef struct {
     void (*begin)(size_t base);
     void (*end)(int main_idx);
     int (*write)(FILE *fp, size_t base);
-    void (*run)(size_t main_idx);
+    void (*run)(int main_idx);
     const char *default_ext;
 } Platform;
 

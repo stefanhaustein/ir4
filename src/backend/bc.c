@@ -27,7 +27,7 @@ static u8 type_size_w(StackType t, u8 word_bytes) {
 
 static u8 type_size(StackType t) { return type_size_w(t, 2); }
 
-static void bc_local_op_w(LocalOp op, size_t slot, StackType type, size_t stack_bytes,
+static void bc_local_op_w(LocalOp op, int slot, StackType type, size_t stack_bytes,
                           u8 word_bytes) {
     u8 sz = type_size_w(type, word_bytes);
     size_t off = bc_local_off.data[slot];
@@ -59,13 +59,13 @@ static void bc_local_op_w(LocalOp op, size_t slot, StackType type, size_t stack_
     }
 }
 
-static void bc_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void bc_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     bc_local_op_w(op, slot, type, stack_bytes, 2);
 }
 
-static void bc_fn_begin_w(const char *name, size_t param_cnt, const LocalVar *locals,
-                          size_t total_locals, Bool is_recursive, u8 word_bytes) {
-    size_t i;
+static void bc_fn_begin_w(const char *name, int param_cnt, const LocalVar *locals,
+                          int total_locals, Bool is_recursive, u8 word_bytes) {
+    int i;
     u8 align = (word_bytes == 4) ? 4 : 2;
     (void)name;
     bc_local_off.len = 0;
@@ -93,17 +93,17 @@ static void bc_fn_begin_w(const char *name, size_t param_cnt, const LocalVar *lo
     }
 
     for (i = param_cnt; i > 0; i--) {
-        size_t p = i - 1;
+        int p = i - 1;
         bc_local_op_w(LOCAL_SET, p, locals[p].type, 0, word_bytes);
     }
 }
 
-static void bc_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                        size_t total_locals, Bool is_recursive) {
+static void bc_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                        int total_locals, Bool is_recursive) {
     bc_fn_begin_w(name, param_cnt, locals, total_locals, is_recursive, 2);
 }
 
-static void bc_fn_end_w(const FuncSig *sig, const LocalVar *locals, size_t total_locals,
+static void bc_fn_end_w(const FuncSig *sig, const LocalVar *locals, int total_locals,
                         u8 word_bytes) {
     (void)sig;
     (void)locals;
@@ -115,7 +115,7 @@ static void bc_fn_end_w(const FuncSig *sig, const LocalVar *locals, size_t total
     cb_emit8(BC_RET);
 }
 
-static void bc_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void bc_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     bc_fn_end_w(sig, locals, total_locals, 2);
 }
 
@@ -586,7 +586,7 @@ static int bc_data_mem(IrOp op, size_t data_offset) {
     return 0;
 }
 
-static int bc_local_mem(size_t slot, i32 off, IrOp op, size_t stack_bytes) {
+static int bc_local_mem(int slot, i32 off, IrOp op, size_t stack_bytes) {
     (void)slot;
     (void)off;
     (void)op;
@@ -662,17 +662,17 @@ static void bc_icall(void) { cb_emit8(BC_ICALL); }
 
 static size_t bc_stack_data_off(void) { return 0; }
 
-static void bc32_fn_begin(const char *name, size_t param_cnt, const LocalVar *locals,
-                          size_t total_locals, Bool is_recursive) {
+static void bc32_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
+                          int total_locals, Bool is_recursive) {
     bc_fn_begin_w(name, param_cnt, locals, total_locals, is_recursive, 4);
 }
-static void bc32_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+static void bc32_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
     bc_fn_end_w(sig, locals, total_locals, 4);
 }
 static void bc32_push_w(i32 val) { bc_emit_push_w(val, 4); }
 static void bc32_push_a(u32 val) { bc_emit_push_a(val, 4); }
 static void bc32_push_data(size_t data_offset) { bc_emit_push_data(data_offset, 4); }
-static void bc32_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes) {
+static void bc32_local_op(LocalOp op, int slot, StackType type, size_t stack_bytes) {
     bc_local_op_w(op, slot, type, stack_bytes, 4);
 }
 static void bc32_op(IrOp op) { bc_emit_op(op, 4); }

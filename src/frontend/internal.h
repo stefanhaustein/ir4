@@ -81,7 +81,7 @@ typedef struct {
     size_t raw_len;
     size_t reloc_start;
     size_t reloc_cnt;
-    size_t param_cnt;
+    int param_cnt;
     LocalVec locals;
     Bool reachable;
     Bool is_code;

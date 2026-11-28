@@ -11,7 +11,7 @@
 void ir4_add_lib_root(const char *path);
 void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be, const char *platform);
 int ir4_find_func(const char *name);
-size_t ir4_func_addr(size_t idx);
-const FuncSig *ir4_func_sig(size_t idx);
+size_t ir4_func_addr(int idx);
+const FuncSig *ir4_func_sig(int idx);
 
 #endif /* FRONTEND_H */

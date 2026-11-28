@@ -252,14 +252,14 @@ static void emit_const_fn_body(WordIR *w, const ConstSym *cs) {
     emit_ir(IR_FN_END, w);
 }
 
-size_t ir4_func_addr(size_t idx) {
-    if (idx >= funcs.len)
+size_t ir4_func_addr(int idx) {
+    if (idx < 0 || (size_t)idx >= funcs.len)
         ir4_die("function index out of bounds");
     return funcs.data[idx]->addr;
 }
 
-const FuncSig *ir4_func_sig(size_t idx) {
-    if (idx >= funcs.len)
+const FuncSig *ir4_func_sig(int idx) {
+    if (idx < 0 || (size_t)idx >= funcs.len)
         ir4_die("function index out of bounds");
     return funcs.data[idx];
 }
@@ -824,8 +824,8 @@ static int handle_builtin(const char *tok, WordIR *w) {
 }
 
 typedef struct {
-    size_t src_slot;
-    size_t dst_slot;
+    int src_slot;
+    int dst_slot;
     size_t size;
     const char *name;
 } BytesParamCopy;
@@ -1371,7 +1371,7 @@ typedef struct {
 
 typedef struct {
     size_t ir_idx;
-    size_t label_idx;
+    int label_idx;
 } LabelRef;
 
 VEC_OF(LabelVec, LabelInfo);
@@ -1625,7 +1625,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
                 IrInstr *p1 = &w->ir.data[w->ir.len - 2];
                 IrInstr *p2 = &w->ir.data[w->ir.len - 1];
                 if (p0->kind == IR_LOCAL_OP && p0->u.loc.op == LOCAL_GET &&
-                    (size_t)p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
+                    (int)p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
                     p2->kind == IR_ALU_OP &&
                     (p2->u.op == OP_ADD || p2->u.op == OP_SUB ||
                      p2->u.op == OP_AADD || p2->u.op == OP_ASUB)) {
