@@ -228,6 +228,8 @@ static int const_matches_fn(StackType ty, const FnSig *fn) {
            fn->out_types.len == 1 && fn->out_types.data[0] == ty;
 }
 
+static IrVec cur_ir = {NULL, 0, 0};
+
 static void reset_word_ir(FnIR *w) {
     free(w->ir.data);
     free(w->locals.data);
@@ -237,6 +239,10 @@ static void reset_word_ir(FnIR *w) {
 static void emit_const_fn_body(FnIR *w, const ConstSym *cs) {
     IrInstr *ins;
     reset_word_ir(w);
+    w->ir.data = (IrInstr *)malloc(2 * sizeof(IrInstr));
+    if (!w->ir.data)
+        ir4_die("out of memory");
+    w->ir.cap = 2;
     ins = emit_ir(
         (cs->type == TY_A) ? IR_PUSH_A
         : (cs->type == TY_I32) ? IR_PUSH_I32
@@ -1185,11 +1191,30 @@ static void compile_fn(int is_default, int is_hot) {
         }
     }
 
-    w->param_cnt = param_cnt;
-    emit_bytes_param_copies(w);
-    compile_body(w);
-    if (discard_body) {
-        reset_word_ir(&discard_w);
+    {
+        FnIR build_fn;
+        memset(&build_fn, 0, sizeof(build_fn));
+        cur_ir.len = 0;
+        build_fn.ir = cur_ir;
+        build_fn.param_cnt = (int)param_cnt;
+        emit_bytes_param_copies(&build_fn);
+        compile_body(&build_fn);
+        cur_ir = build_fn.ir;
+        if (!discard_body) {
+            w->param_cnt = (int)param_cnt;
+            if (build_fn.ir.len > 0) {
+                w->ir.data = (IrInstr *)malloc(build_fn.ir.len * sizeof(IrInstr));
+                if (!w->ir.data)
+                    ir4_die("out of memory");
+                memcpy(w->ir.data, build_fn.ir.data, build_fn.ir.len * sizeof(IrInstr));
+                w->ir.len = build_fn.ir.len;
+                w->ir.cap = build_fn.ir.len;
+            }
+            w->locals = build_fn.locals;
+        } else {
+            free(build_fn.locals.data);
+            reset_word_ir(&discard_w);
+        }
     }
 }
 
@@ -1924,9 +1949,12 @@ static void compile_body(FnIR *w) {
             }
             free_local_names();
             if (locals.len > 0) {
-                VEC_ENSURE(w->locals, locals.len);
+                w->locals.data = (LocalVar *)malloc(locals.len * sizeof(LocalVar));
+                if (!w->locals.data)
+                    ir4_die("out of memory");
                 memcpy(w->locals.data, locals.data, locals.len * sizeof(LocalVar));
                 w->locals.len = locals.len;
+                w->locals.cap = locals.len;
             }
             return;
         }
@@ -2255,15 +2283,19 @@ static void compile_const(int is_default) {
     int ex_idx;
     ConstSym cs;
 
+    char val_buf[IR4_MAX_TOK];
+
     name = next_tok_intern();
     if (!name)
         ir4_die("expected constant name after 'const'");
     if (find_buffer(name) >= 0)
         ir4_die("constant name conflicts with existing global");
 
-    val_tok = next_tok_intern();
+    val_tok = next_tok();
     if (!val_tok)
         ir4_die("expected literal value after constant name");
+    memcpy(val_buf, val_tok, (size_t)lex_tok_len() + 1);
+    val_tok = val_buf;
     ty_tok = next_tok();
     if (!ty_tok)
         ir4_die("expected type token (:i, :i32, :a, :f) after constant value");
@@ -2595,6 +2627,10 @@ void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
                         const char *platform) {
     init_frontend(in, path, target_be, platform);
     parse_toplevel();
+    free(cur_ir.data);
+    cur_ir.data = NULL;
+    cur_ir.len = 0;
+    cur_ir.cap = 0;
     run_reachability_dce();
     emit_program();
 }
