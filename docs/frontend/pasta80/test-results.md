@@ -4,7 +4,7 @@ Automated results from running the PASTA/80 v1.00 test suites across IR4(th) tar
 
 ## Results Matrix (Passed Assertions)
 
-|  | Target | core | heap | files | more | prm | snd | ovl | Total | Time |
+|  | Target | core | heap | files | more | params | sound | overlays | Total | Time |
 | :---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 |  | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
 | 🟦 | [Agon](#agon) | ²⁾1551 | 26 | 194 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.10s |
