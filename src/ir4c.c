@@ -334,7 +334,7 @@ int main(int argc, char **argv) {
         plat->begin(base);
     }
     ir4_compile_stream(in_fp, in_path, be, platform);
-    fclose(in_fp);
+    /* lexer.c closes sf->fp on EOF to conserve file handles on 8-slot targets */
 
     if (plat && plat->end) {
         int main_idx = ir4_find_func("main");

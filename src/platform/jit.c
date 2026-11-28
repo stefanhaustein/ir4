@@ -66,8 +66,10 @@ static void arm64_run_jit(size_t main_idx) {
     cb_emit16((u16)((0x94000000UL | imm26) & 0xFFFFU));
     cb_emit16((u16)(((0x94000000UL | imm26) >> 16) & 0xFFFFU));
     if (sig->out_types.len == 1) {
-        cb_emit16(0x07E0);
-        cb_emit16(0xF841); /* LDR X0, [SP], #16 */
+        if (ir4_get_opt_level() == 0) {
+            cb_emit16(0x07E0);
+            cb_emit16(0xF841); /* LDR X0, [SP], #16 */
+        }
     } else {
         cb_emit16(0x0000);
         cb_emit16(0xD280); /* MOV X0, #0 */

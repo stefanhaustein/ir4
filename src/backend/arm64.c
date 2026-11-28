@@ -5,6 +5,7 @@
  *   - Frame pointer: X29 (locals at [X29, #-8], [X29, #-16], ...)
  */
 #include "codebuf.h"
+#include "backend/reg_lower.h"
 #include "vec.h"
 
 /* --- Native Hardware-SP Push/Pop (16-byte aligned slots) --- */
@@ -823,7 +824,8 @@ static void a64_patch_fwd(size_t patch_offset) {
     u8 top = cb_data()[patch_offset + 3];
     if (top == 0xB4) {
         u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
-        cb_patch32(patch_offset, 0xB4000000UL | (imm19 << 5));
+        u32 rt = (u32)(cb_data()[patch_offset] & 0x1FUL);
+        cb_patch32(patch_offset, 0xB4000000UL | (imm19 << 5) | rt);
     } else if (top == 0x54) {
         u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
         u32 cond_bits = (u32)(cb_data()[patch_offset] & 0x0F);
@@ -917,7 +919,9 @@ static size_t a64_push_fn(size_t target_addr) {
 static void a64_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) {
     i32 diff = (i32)target_addr - (i32)patch_addr;
     u32 imm = (u32)diff;
-    cb_patch32(patch_pc, 0x10000000UL | ((imm & 0x3UL) << 29) | (((imm >> 2) & 0x7FFFFUL) << 5));
+    u32 rd = (u32)(cb_data()[patch_pc] & 0x1FUL);
+    cb_patch32(patch_pc, 0x10000000UL | ((imm & 0x3UL) << 29) |
+                             (((imm >> 2) & 0x7FFFFUL) << 5) | rd);
 }
 
 static void a64_icall(void) {
@@ -965,3 +969,555 @@ const Backend be_arm64 = {"arm64",
                           a64_icall,
                           NULL,
                           NULL};
+
+/* --- Direct Register-Stack Backend (reg_be_arm64) --- */
+static const u8 a64_stk_regs[12] = {0, 1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13};
+static const u8 a64_fp_stk_regs[12] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+static const u8 a64_loc_regs[9] = {19, 20, 21, 22, 23, 24, 25, 26, 27};
+
+static void a64r_mov_u64(u8 dst, u32 lo, u32 hi) {
+    cb_emit32(0xD2800000UL | ((lo & 0xFFFFUL) << 5) | (u32)dst);
+    if ((lo >> 16) != 0 || hi != 0)
+        cb_emit32(0xF2A00000UL | (((lo >> 16) & 0xFFFFUL) << 5) | (u32)dst);
+    if (hi != 0) {
+        cb_emit32(0xF2C00000UL | ((hi & 0xFFFFUL) << 5) | (u32)dst);
+        cb_emit32(0xF2E00000UL | (((hi >> 16) & 0xFFFFUL) << 5) | (u32)dst);
+    }
+}
+
+static void a64r_mov_imm(u8 dst, i32 val) {
+    a64r_mov_u64(dst, (u32)val, (val < 0) ? 0xFFFFFFFFUL : 0x00000000UL);
+}
+
+static void a64r_mov_uimm32(u8 dst, u32 val) { a64r_mov_u64(dst, val, 0); }
+
+static void a64r_mov_fconst(u8 dst, double val) {
+    u8 bytes[8];
+    u32 lo, hi;
+    memcpy(bytes, &val, 8);
+    lo = (u32)bytes[0] | ((u32)bytes[1] << 8) | ((u32)bytes[2] << 16) | ((u32)bytes[3] << 24);
+    hi = (u32)bytes[4] | ((u32)bytes[5] << 8) | ((u32)bytes[6] << 16) | ((u32)bytes[7] << 24);
+    a64r_mov_u64(15, lo, hi);
+    cb_emit32(0x9E670000UL | (15UL << 5) | (u32)dst); /* FMOV Dd, X15 */
+}
+
+static void a64r_mov_reg(u8 dst, u8 src, StackType type) {
+    if (dst == src)
+        return;
+    if (type == TY_F)
+        cb_emit32(0x1E604000UL | ((u32)src << 5) | (u32)dst); /* FMOV Dd, Dn */
+    else
+        cb_emit32(0xAA0003E0UL | ((u32)src << 16) | (u32)dst); /* MOV Xd, Xm */
+}
+
+static void a64r_spill_store(u8 reg, StackType type, i32 frame_off) {
+    u32 op_unscaled = (type == TY_F) ? 0xFC0003A0UL : 0xF80003A0UL;
+    u32 op_zero = (type == TY_F) ? 0xFD000000UL : 0xF9000000UL;
+    if (frame_off <= 255) {
+        cb_emit32(op_unscaled | (((0UL - (u32)frame_off) & 0x1FFUL) << 12) | (u32)reg);
+    } else {
+        a64r_mov_u64(15, (u32)frame_off, 0);
+        cb_emit32(0xCB0F03AFUL); /* SUB X15, X29, X15 */
+        cb_emit32(op_zero | (15UL << 5) | (u32)reg);
+    }
+}
+
+static void a64r_spill_load(u8 reg, StackType type, i32 frame_off) {
+    u32 op_unscaled = (type == TY_F) ? 0xFC4003A0UL : 0xF84003A0UL;
+    u32 op_zero = (type == TY_F) ? 0xFD400000UL : 0xF9400000UL;
+    if (frame_off <= 255) {
+        cb_emit32(op_unscaled | (((0UL - (u32)frame_off) & 0x1FFUL) << 12) | (u32)reg);
+    } else {
+        a64r_mov_u64(15, (u32)frame_off, 0);
+        cb_emit32(0xCB0F03AFUL); /* SUB X15, X29, X15 */
+        cb_emit32(op_zero | (15UL << 5) | (u32)reg);
+    }
+}
+
+static void a64r_local_addr(u8 dst, i32 frame_off) {
+    if (frame_off <= 4095) {
+        cb_emit32(0xD10003A0UL | (((u32)frame_off & 0xFFFUL) << 10) | (u32)dst);
+    } else {
+        a64r_mov_u64(15, (u32)frame_off, 0);
+        cb_emit32(0xCB0F03A0UL | (u32)dst); /* SUB Xd, X29, X15 */
+    }
+}
+
+static void a64r_load_data_addr(u8 dst, size_t offset) {
+    if (offset <= 4095) {
+        cb_emit32(0x91000380UL | (((u32)offset & 0xFFFUL) << 10) | (u32)dst);
+    } else {
+        a64r_mov_u64(15, (u32)offset, 0);
+        cb_emit32(0x8B0F0380UL | (u32)dst); /* ADD Xd, X28, X15 */
+    }
+}
+
+static size_t a64r_load_fn_addr(u8 dst, size_t target_addr) {
+    size_t pc = cb_pc();
+    i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+    u32 imm = (u32)diff;
+    cb_emit32(0x10000000UL | ((imm & 0x3UL) << 29) |
+              (((imm >> 2) & 0x7FFFFUL) << 5) | (u32)dst);
+    return pc;
+}
+
+static void a64r_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, size_t param_cnt,
+                          const LocalVar *locals, const u8 *loc_is_reg, const u8 *loc_reg,
+                          const i32 *loc_off, size_t total_locals) {
+    u32 save_bytes = ((u32)(used_loc_regs + 1U) & ~1U) * 8U;
+    u32 total_frame = frame_bytes + save_bytes;
+    size_t i;
+    (void)name;
+
+    cb_emit32(0xA9BF7BFDUL); /* STP X29, X30, [SP, #-16]! */
+    cb_emit32(0x910003FDUL); /* MOV X29, SP */
+
+    if (total_frame > 0) {
+        if (total_frame <= 4095) {
+            cb_emit32(0xD10003FFUL | ((total_frame & 0xFFFUL) << 10));
+        } else {
+            a64r_mov_u64(15, total_frame, 0);
+            cb_emit32(0xCB2F63FFUL); /* SUB SP, SP, X15 */
+        }
+    }
+
+    for (i = 0; i < used_loc_regs; i++) {
+        a64r_spill_store(a64_loc_regs[i], TY_W, (i32)(frame_bytes + (i + 1) * 8));
+    }
+
+    for (i = 0; i < param_cnt; i++) {
+        StackType ty = locals[i].type;
+        if (i < 12) {
+            u8 src = (ty == TY_F) ? a64_fp_stk_regs[i] : a64_stk_regs[i];
+            if (loc_is_reg[i]) {
+                a64r_mov_reg(loc_reg[i], src, ty);
+            } else {
+                a64r_spill_store(src, ty, loc_off[i]);
+            }
+        } else {
+            i32 caller_off = (i32)(total_frame); /* unreachable for normal funcs; handled by spill */
+            (void)caller_off;
+        }
+    }
+
+    for (i = param_cnt; i < total_locals; i++) {
+        if (locals[i].size > 0)
+            continue;
+        if (loc_is_reg[i]) {
+            cb_emit32(0xD2800000UL | (u32)loc_reg[i]);
+        } else if (locals[i].type == TY_F) {
+            a64r_spill_store(31, TY_W, loc_off[i]); /* XZR via STUR XZR */
+        } else {
+            a64r_spill_store(31, TY_W, loc_off[i]);
+        }
+    }
+}
+
+static void a64r_fn_end(u8 used_loc_regs, u32 frame_bytes) {
+    u8 i;
+    for (i = 0; i < used_loc_regs; i++) {
+        a64r_spill_load(a64_loc_regs[i], TY_W, (i32)(frame_bytes + (i + 1) * 8));
+    }
+    cb_emit32(0x910003BFUL); /* MOV SP, X29 */
+    cb_emit32(0xA8C17BFDUL); /* LDP X29, X30, [SP], #16 */
+    cb_emit32(0xD65F03C0UL); /* RET */
+}
+
+static void a64r_alu_reg(IrOp op, u8 dst, u8 lhs, u8 rhs) {
+    if (op >= OP_EQ && op <= OP_UGE32) {
+        int is32 = (op >= OP_EQ32 && op <= OP_UGE32);
+        u32 cond = a64_cmp_cond(op);
+        cb_emit32((is32 ? 0x6B00001FUL : 0xEB00001FUL) | ((u32)rhs << 16) | ((u32)lhs << 5));
+        cb_emit32(0xDA9F03E0UL | ((cond ^ 1UL) << 12) | (u32)dst);
+        return;
+    }
+    switch (op) {
+    case OP_ADD:
+    case OP_AADD:
+        cb_emit32(0x8B000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_ADD32:
+        cb_emit32(0x0B000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_SUB:
+    case OP_ASUB:
+    case OP_ADIFF:
+        cb_emit32(0xCB000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_SUB32:
+        cb_emit32(0x4B000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_MUL:
+        cb_emit32(0x9B007C00UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_MUL32:
+        cb_emit32(0x1B007C00UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_DIV:
+        cb_emit32(0x9AC00C00UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_DIV32:
+        cb_emit32(0x1AC00C00UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_UDIV:
+        cb_emit32(0x9AC00800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_UDIV32:
+        cb_emit32(0x1AC00800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_MOD:
+        cb_emit32(0x9AC00C0FUL | ((u32)rhs << 16) | ((u32)lhs << 5)); /* SDIV X15, lhs, rhs */
+        cb_emit32(0x9B0081E0UL | ((u32)rhs << 16) | ((u32)lhs << 10) | (u32)dst); /* MSUB dst, X15, rhs, lhs */
+        break;
+    case OP_MOD32:
+        cb_emit32(0x1AC00C0FUL | ((u32)rhs << 16) | ((u32)lhs << 5));
+        cb_emit32(0x1B0081E0UL | ((u32)rhs << 16) | ((u32)lhs << 10) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_UMOD:
+        cb_emit32(0x9AC0080FUL | ((u32)rhs << 16) | ((u32)lhs << 5));
+        cb_emit32(0x9B0081E0UL | ((u32)rhs << 16) | ((u32)lhs << 10) | (u32)dst);
+        break;
+    case OP_UMOD32:
+        cb_emit32(0x1AC0080FUL | ((u32)rhs << 16) | ((u32)lhs << 5));
+        cb_emit32(0x1B0081E0UL | ((u32)rhs << 16) | ((u32)lhs << 10) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_AND:
+        cb_emit32(0x8A000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_AND32:
+        cb_emit32(0x0A000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_OR:
+        cb_emit32(0xAA000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_OR32:
+        cb_emit32(0x2A000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_XOR:
+        cb_emit32(0xCA000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_XOR32:
+        cb_emit32(0x4A000000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_LSHIFT:
+        cb_emit32(0x9AC02000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_SHL32:
+        cb_emit32(0x1AC02000UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_RSHIFT:
+        cb_emit32(0x9AC02400UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_RSHR32:
+        cb_emit32(0x1AC02400UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_ARSHIFT:
+        cb_emit32(0x9AC02800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_ASHR32:
+        cb_emit32(0x1AC02800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_INVERT:
+        cb_emit32(0xAA2003E0UL | ((u32)lhs << 16) | (u32)dst);
+        break;
+    case OP_INV32:
+        cb_emit32(0x2A2003E0UL | ((u32)lhs << 16) | (u32)dst);
+        cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+        break;
+    case OP_SEXT:
+        cb_emit32(0x93401C00UL | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_W2A:
+    case OP_A2W:
+        a64r_mov_reg(dst, lhs, TY_W);
+        break;
+    case OP_W2I32:
+    case OP_I322W:
+        cb_emit32(0x93407C00UL | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_U2I32:
+        cb_emit32(0x2A0003E0UL | ((u32)lhs << 16) | (u32)dst);
+        break;
+    default:
+        ir4_die("unimplemented ARM64 reg ALU op");
+    }
+}
+
+static int a64r_alu_imm(IrOp op, u8 dst, u8 lhs, i32 imm) {
+    if (op == OP_ADD || op == OP_AADD || op == OP_SUB || op == OP_ASUB) {
+        i32 delta = (op == OP_SUB || op == OP_ASUB) ? -imm : imm;
+        if (delta == 0) {
+            a64r_mov_reg(dst, lhs, TY_W);
+            return 1;
+        }
+        if (delta > 0 && delta <= 4095) {
+            cb_emit32(0x91000000UL | ((u32)delta << 10) | ((u32)lhs << 5) | (u32)dst);
+            return 1;
+        }
+        if (delta < 0 && delta >= -4095) {
+            cb_emit32(0xD1000000UL | ((u32)(-delta) << 10) | ((u32)lhs << 5) | (u32)dst);
+            return 1;
+        }
+        return 0;
+    }
+    if (op >= OP_EQ && op <= OP_AGT && imm >= 0 && imm <= 4095) {
+        u32 cond = a64_cmp_cond(op);
+        cb_emit32(0xF100001FUL | ((u32)imm << 10) | ((u32)lhs << 5));
+        cb_emit32(0xDA9F03E0UL | ((cond ^ 1UL) << 12) | (u32)dst);
+        return 1;
+    }
+    if (op == OP_LSHIFT || op == OP_RSHIFT || op == OP_ARSHIFT ||
+        op == OP_SHL32 || op == OP_RSHR32 || op == OP_ASHR32) {
+        u32 max_sh = (op >= OP_SHL32) ? 31U : 63U;
+        u32 c;
+        if (imm < 0 || (u32)imm > max_sh)
+            return 0;
+        c = (u32)imm;
+        if (c == 0) {
+            if (op >= OP_SHL32)
+                cb_emit32(0x93407C00UL | ((u32)lhs << 5) | (u32)dst);
+            else
+                a64r_mov_reg(dst, lhs, TY_W);
+            return 1;
+        }
+        switch (op) {
+        case OP_LSHIFT:
+            cb_emit32(0xD3400000UL | ((64 - c) << 16) | ((63 - c) << 10) | ((u32)lhs << 5) | (u32)dst);
+            break;
+        case OP_RSHIFT:
+            cb_emit32(0xD340FC00UL | (c << 16) | ((u32)lhs << 5) | (u32)dst);
+            break;
+        case OP_ARSHIFT:
+            cb_emit32(0x9340FC00UL | (c << 16) | ((u32)lhs << 5) | (u32)dst);
+            break;
+        case OP_SHL32:
+            cb_emit32(0x53000000UL | ((32 - c) << 16) | ((31 - c) << 10) | ((u32)lhs << 5) | (u32)dst);
+            cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+            break;
+        case OP_RSHR32:
+            cb_emit32(0x53007C00UL | (c << 16) | ((u32)lhs << 5) | (u32)dst);
+            cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+            break;
+        case OP_ASHR32:
+            cb_emit32(0x13007C00UL | (c << 16) | ((u32)lhs << 5) | (u32)dst);
+            cb_emit32(0x93407C00UL | ((u32)dst << 5) | (u32)dst);
+            break;
+        default:
+            return 0;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+static void a64r_fp_op(IrOp op, u8 dst, u8 lhs, u8 rhs) {
+    switch (op) {
+    case OP_FNEG:
+        cb_emit32(0x1E614000UL | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_FADD:
+        cb_emit32(0x1E602800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_FSUB:
+        cb_emit32(0x1E603800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_FMUL:
+        cb_emit32(0x1E600800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_FDIV:
+        cb_emit32(0x1E601800UL | ((u32)rhs << 16) | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_FEQ:
+    case OP_FNE:
+    case OP_FLT:
+    case OP_FGT: {
+        u32 cond = (op == OP_FEQ) ? 0x0 : (op == OP_FNE) ? 0x1 : (op == OP_FLT) ? 0x4 : 0xC;
+        cb_emit32(0x1E602000UL | ((u32)rhs << 16) | ((u32)lhs << 5));
+        cb_emit32(0xDA9F03E0UL | ((cond ^ 1UL) << 12) | (u32)dst);
+        break;
+    }
+    case OP_W2F:
+        cb_emit32(0x9E620000UL | ((u32)lhs << 5) | (u32)dst);
+        break;
+    case OP_F2W:
+        cb_emit32(0x9E780000UL | ((u32)lhs << 5) | (u32)dst);
+        break;
+    default:
+        ir4_die("unimplemented ARM64 FP op");
+    }
+}
+
+static void a64r_mem_op(IrOp op, u8 val_reg, u8 base, i32 off, int is_store) {
+    u32 sz, unscaled_op, scaled_op;
+    switch (op) {
+    case OP_U8FETCH:
+        sz = 1; unscaled_op = 0x38400000UL; scaled_op = 0x39400000UL; break;
+    case OP_I8FETCH:
+        sz = 1; unscaled_op = 0x38800000UL; scaled_op = 0x39800000UL; break;
+    case OP_SI8STORE:
+    case OP_I8STORE:
+        sz = 1; unscaled_op = 0x38000000UL; scaled_op = 0x39000000UL; break;
+    case OP_U16FETCH:
+        sz = 2; unscaled_op = 0x78400000UL; scaled_op = 0x79400000UL; break;
+    case OP_I16FETCH:
+        sz = 2; unscaled_op = 0x78800000UL; scaled_op = 0x79800000UL; break;
+    case OP_SI16STORE:
+    case OP_I16STORE:
+        sz = 2; unscaled_op = 0x78000000UL; scaled_op = 0x79000000UL; break;
+    case OP_I32FETCH:
+        sz = 4; unscaled_op = 0xB8800000UL; scaled_op = 0xB9800000UL; break;
+    case OP_I32STORE:
+        sz = 4; unscaled_op = 0xB8000000UL; scaled_op = 0xB9000000UL; break;
+    case OP_FFETCH:
+        sz = 8; unscaled_op = 0xFC400000UL; scaled_op = 0xFD400000UL; break;
+    case OP_SFSTORE:
+    case OP_FSTORE:
+        sz = 8; unscaled_op = 0xFC000000UL; scaled_op = 0xFD000000UL; break;
+    case OP_FETCH:
+    case OP_AFETCH:
+        sz = 8; unscaled_op = 0xF8400000UL; scaled_op = 0xF9400000UL; break;
+    default:
+        sz = 8; unscaled_op = 0xF8000000UL; scaled_op = 0xF9000000UL; break;
+    }
+    (void)is_store;
+    if (off >= 0 && ((u32)off & (sz - 1)) == 0 && ((u32)off / sz) <= 4095) {
+        cb_emit32(scaled_op | (((u32)off / sz) << 10) | ((u32)base << 5) | (u32)val_reg);
+    } else if (off >= -256 && off <= 255) {
+        cb_emit32(unscaled_op | (((u32)off & 0x1FFUL) << 12) | ((u32)base << 5) | (u32)val_reg);
+    } else {
+        a64r_mov_imm(15, off);
+        cb_emit32(0x8B0F000FUL | ((u32)base << 5)); /* ADD X15, base, X15 */
+        cb_emit32(scaled_op | (15UL << 5) | (u32)val_reg);
+    }
+}
+
+static void a64r_load_mem(IrOp op, u8 dst, u8 base, i32 off) { a64r_mem_op(op, dst, base, off, 0); }
+static void a64r_store_mem(IrOp op, u8 src, u8 base, i32 off) { a64r_mem_op(op, src, base, off, 1); }
+
+static void a64r_bcopy(u8 dst, u8 src, u8 len) {
+    u8 l = len;
+    if (l != 15) {
+        a64r_mov_reg(15, l, TY_W);
+        l = 15;
+    }
+    cb_emit32(0xB40000A0UL | (u32)l);                          /* CBZ Xl, +20 */
+    cb_emit32(0x38401410UL | ((u32)src << 5));                 /* LDRB W16, [Xsrc], #1 */
+    cb_emit32(0x38001410UL | ((u32)dst << 5));                 /* STRB W16, [Xdst], #1 */
+    cb_emit32(0xF1000400UL | ((u32)l << 5) | (u32)l);          /* SUBS Xl, Xl, #1 */
+    cb_emit32(0x54FFFFA1UL);                                   /* B.NE -12 */
+}
+
+static size_t a64r_br_fwd(BranchCond cond, u8 reg) {
+    size_t pos = cb_pc();
+    if (cond == BR_JZ)
+        cb_emit32(0xB4000000UL | (u32)reg); /* CBZ Xr, rel19 */
+    else
+        cb_emit32(0x14000000UL);            /* B rel26 */
+    return pos;
+}
+
+static void a64r_br_back(BranchCond cond, u8 reg, size_t target_addr) {
+    i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+    if (cond == BR_JZ) {
+        u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
+        cb_emit32(0xB4000000UL | (imm19 << 5) | (u32)reg);
+    } else {
+        cb_emit32(0x14000000UL | (((u32)(diff >> 2)) & 0x03FFFFFFUL));
+    }
+}
+
+static int a64r_cmp_br_emit(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, int is_fwd,
+                            size_t target_addr, size_t *patch_off) {
+    u32 cond;
+    if (op < OP_EQ || op > OP_AGT)
+        return 0;
+    if (has_imm && (imm < 0 || imm > 4095))
+        return 0;
+    cond = a64_cmp_cond(op);
+    if (has_imm)
+        cb_emit32(0xF100001FUL | ((u32)imm << 10) | ((u32)lhs << 5));
+    else
+        cb_emit32(0xEB00001FUL | ((u32)rhs << 16) | ((u32)lhs << 5));
+    if (is_fwd) {
+        *patch_off = cb_pc();
+        cb_emit32(0x54000000UL | (cond ^ 1UL));
+    } else {
+        i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+        u32 imm19 = ((u32)(diff >> 2)) & 0x0007FFFFUL;
+        cb_emit32(0x54000000UL | (imm19 << 5) | (cond ^ 1UL));
+    }
+    return 1;
+}
+
+static int a64r_cmp_br_fwd(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, size_t *patch_off) {
+    return a64r_cmp_br_emit(op, has_imm, imm, lhs, rhs, 1, 0, patch_off);
+}
+
+static int a64r_cmp_br_back(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, size_t target_addr) {
+    return a64r_cmp_br_emit(op, has_imm, imm, lhs, rhs, 0, target_addr, NULL);
+}
+
+static size_t a64r_emit_jtab(u8 reg, size_t count) {
+    size_t tbl_off, k;
+    cb_emit32(0x1000008FUL);                                /* ADR X15, +16 */
+    cb_emit32(0xB8A079EFUL | ((u32)reg << 16));             /* LDRSW X15?, wait: LDRSW X8, [X15, Xr, LSL #2] */
+    /* Correct: LDRSW X14, [X15, Xreg, LSL #2] -> 0xB8A079EE */
+    cb_rewind(4);
+    cb_emit32(0xB8A079EEUL | ((u32)reg << 16));             /* LDRSW X14, [X15, Xreg, LSL #2] */
+    cb_emit32(0x8B0E01EEUL);                                /* ADD X14, X15, X14 */
+    cb_emit32(0xD61F01C0UL);                                /* BR X14 */
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        cb_emit32(0);
+    return tbl_off;
+}
+
+static void a64r_icall(u8 reg) { cb_emit32(0xD63F0000UL | ((u32)reg << 5)); }
+
+static void a64r_call_extern(const FuncSig *sig, const u8 *arg_regs) {
+    u8 int_idx = 0, flt_idx = 0;
+    size_t i;
+    if (sig->has_addr)
+        ir4_die("ARM64 extern does not take a fixed address");
+    for (i = 0; i < sig->in_types.len; i++) {
+        if (sig->in_types.data[i] == TY_F) {
+            if (flt_idx >= 8)
+                ir4_die("ARM64 extern supports at most 8 float args");
+            a64r_mov_reg(flt_idx, arg_regs[i], TY_F);
+            flt_idx++;
+        } else {
+            if (int_idx >= 8)
+                ir4_die("ARM64 extern supports at most 8 int args");
+            a64r_mov_reg(int_idx, arg_regs[i], TY_W);
+            int_idx++;
+        }
+    }
+    cb_add_extern_reloc(cb_pc(), sig->name);
+    cb_emit32(0xD2800009UL); /* MOVZ X9, #0 */
+    cb_emit32(0xF2A00009UL); /* MOVK X9, #0, LSL #16 */
+    cb_emit32(0xF2C00009UL); /* MOVK X9, #0, LSL #32 */
+    cb_emit32(0xF2E00009UL); /* MOVK X9, #0, LSL #48 */
+    cb_emit32(0xD63F0120UL); /* BLR X9 */
+}
+
+const RegBackend reg_be_arm64 = {
+    8, 1, 12, a64_stk_regs, a64_fp_stk_regs, 9, a64_loc_regs, 8, 9, 14, 16, 17,
+    a64_cur_addr, a64r_fn_begin, a64r_fn_end, a64r_spill_store, a64r_spill_load,
+    a64r_local_addr, a64r_mov_reg, a64r_mov_imm, a64r_mov_uimm32, a64r_mov_fconst,
+    a64r_load_data_addr, a64r_load_fn_addr, a64r_alu_reg, a64r_alu_imm, a64r_fp_op,
+    a64r_load_mem, a64r_store_mem, a64r_bcopy, a64r_br_fwd, a64r_br_back,
+    a64r_cmp_br_fwd, a64r_cmp_br_back, a64_patch_fwd, a64r_emit_jtab, a64_patch_jtab,
+    a64_call, a64r_icall, a64r_call_extern};

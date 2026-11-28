@@ -1939,8 +1939,16 @@ static void compile_body(WordIR *w) {
             for (k = 0; k < icall_sig.out_types.len; k++) {
                 tpush(icall_sig.out_types.data[k]);
             }
+            if (icall_sig.in_types.len > 255 || icall_sig.out_types.len > 12)
+                ir4_die("too many arguments or return values in indirect call");
+            {
+                IrInstr *ins = emit_ir(IR_ICALL, w);
+                ins->u.icall.in_cnt = (u8)icall_sig.in_types.len;
+                ins->u.icall.out_cnt = (u8)icall_sig.out_types.len;
+                for (k = 0; k < icall_sig.out_types.len; k++)
+                    ins->u.icall.out_types[k] = (u8)icall_sig.out_types.data[k];
+            }
             free_sig_vecs(&icall_sig);
-            emit_ir(IR_ICALL, w);
             continue;
         }
 

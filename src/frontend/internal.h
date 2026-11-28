@@ -58,6 +58,11 @@ typedef struct {
             size_t start;
             size_t count;
         } jtab;
+        struct {
+            u8 in_cnt;
+            u8 out_cnt;
+            u8 out_types[12];
+        } icall;
     } u;
 } IrInstr;
 

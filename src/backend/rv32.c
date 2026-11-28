@@ -9,6 +9,7 @@
  *   - a0..a7 (x10..x17): Extern call arguments & return value
  */
 #include "codebuf.h"
+#include "backend/reg_lower.h"
 #include "backend/rv32.h"
 #include "vec.h"
 #include "backend/rv32_fp.h"
@@ -998,8 +999,9 @@ static void rv_patch_fn(size_t patch_pc, size_t patch_addr, size_t target_addr) 
     i32 diff = (i32)target_addr - (i32)patch_addr;
     u32 hi = (u32)((diff + 0x800) & 0xFFFFF000L);
     i32 lo = diff - (i32)hi;
-    cb_patch32(patch_pc, enc_u(hi, RV_T0, 0x17UL));
-    cb_patch32(patch_pc + 4, enc_i(lo, RV_T0, 0, RV_T0, 0x13UL));
+    u32 rd = (read32(patch_pc) >> 7) & 0x1FUL;
+    cb_patch32(patch_pc, enc_u(hi, rd, 0x17UL));
+    cb_patch32(patch_pc + 4, enc_i(lo, rd, 0, rd, 0x13UL));
 }
 
 static void rv_icall(void) {
@@ -1047,3 +1049,602 @@ const Backend be_rv32 = {"rv32",
                          rv_icall,
                          NULL,
                          NULL};
+
+/* --- Direct Register-Stack Backend (reg_be_rv32) --- */
+static const u8 rvr_stk_regs[12] = {10, 11, 12, 13, 14, 15, 16, 17, 28, 29, 30, 31};
+static const u8 rvr_loc_regs[9] = {19, 20, 21, 22, 23, 24, 25, 26, 27};
+
+static void rvr_mov_reg(u8 dst, u8 src, StackType type) {
+    (void)type;
+    if (dst != src)
+        rv_addi(dst, src, 0);
+}
+
+static void rvr_mov_imm(u8 dst, i32 val) { rv_li(dst, (u32)val); }
+static void rvr_mov_uimm32(u8 dst, u32 val) { rv_li(dst, val); }
+
+static void rvr_mov_fconst(u8 dst, double val) {
+    float f = (float)val;
+    u32 bits;
+    memcpy(&bits, &f, 4);
+    rv_li(dst, bits);
+}
+
+static void rvr_spill_store(u8 reg, StackType type, i32 frame_off) {
+    i32 off = -frame_off;
+    (void)type;
+    if (off >= -2048 && off <= 2047) {
+        rv_sw(reg, off, RV_FP);
+    } else {
+        u32 tmp = (reg != RV_T2) ? RV_T2 : RV_T1;
+        rv_li(tmp, (u32)off);
+        cb_emit32(enc_r(0x00, tmp, RV_FP, 0, tmp, 0x33UL));
+        rv_sw(reg, 0, tmp);
+    }
+}
+
+static void rvr_spill_load(u8 reg, StackType type, i32 frame_off) {
+    i32 off = -frame_off;
+    (void)type;
+    if (off >= -2048 && off <= 2047) {
+        rv_lw(reg, off, RV_FP);
+    } else {
+        u32 tmp = (reg != RV_T2) ? RV_T2 : RV_T1;
+        rv_li(tmp, (u32)off);
+        cb_emit32(enc_r(0x00, tmp, RV_FP, 0, tmp, 0x33UL));
+        rv_lw(reg, 0, tmp);
+    }
+}
+
+static void rvr_local_addr(u8 dst, i32 frame_off) {
+    i32 off = -frame_off;
+    if (off >= -2048 && off <= 2047) {
+        rv_addi(dst, RV_FP, off);
+    } else {
+        rv_li(dst, (u32)off);
+        cb_emit32(enc_r(0x00, dst, RV_FP, 0, dst, 0x33UL));
+    }
+}
+
+static void rvr_load_data_addr(u8 dst, size_t offset) {
+    if (offset <= 2047) {
+        rv_addi(dst, RV_DB, (i32)offset);
+    } else {
+        rv_li(dst, (u32)offset);
+        cb_emit32(enc_r(0x00, dst, RV_DB, 0, dst, 0x33UL));
+    }
+}
+
+static size_t rvr_load_fn_addr(u8 dst, size_t target_addr) {
+    size_t pc = cb_pc();
+    i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+    u32 hi = (u32)((diff + 0x800) & 0xFFFFF000L);
+    i32 lo = diff - (i32)hi;
+    cb_emit32(enc_u(hi, dst, 0x17UL));
+    cb_emit32(enc_i(lo, dst, 0, dst, 0x13UL));
+    return pc;
+}
+
+static void rvr_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, size_t param_cnt,
+                         const LocalVar *locals, const u8 *loc_is_reg, const u8 *loc_reg,
+                         const i32 *loc_off, size_t total_locals) {
+    u32 save_bytes = (u32)used_loc_regs * 4U;
+    u32 total_frame = frame_bytes + save_bytes;
+    size_t i;
+    (void)name;
+
+    rv_addi(RV_SP, RV_SP, -8);
+    rv_sw(RV_RA, 4, RV_SP);
+    rv_sw(RV_FP, 0, RV_SP);
+    rv_addi(RV_FP, RV_SP, 0);
+
+    if (total_frame > 0) {
+        if (total_frame <= 2047) {
+            rv_addi(RV_SP, RV_SP, -(i32)total_frame);
+        } else {
+            rv_li(RV_T0, (u32)(-(i32)total_frame));
+            cb_emit32(enc_r(0x00, RV_T0, RV_SP, 0, RV_SP, 0x33UL));
+        }
+    }
+
+    for (i = 0; i < used_loc_regs; i++) {
+        rvr_spill_store(rvr_loc_regs[i], TY_W, (i32)(frame_bytes + (i + 1) * 4));
+    }
+
+    for (i = 0; i < param_cnt; i++) {
+        if (i < 12) {
+            u8 src = rvr_stk_regs[i];
+            if (loc_is_reg[i])
+                rvr_mov_reg(loc_reg[i], src, locals[i].type);
+            else
+                rvr_spill_store(src, locals[i].type, loc_off[i]);
+        }
+    }
+
+    for (i = param_cnt; i < total_locals; i++) {
+        if (locals[i].size > 0)
+            continue;
+        if (loc_is_reg[i])
+            rv_addi(loc_reg[i], RV_ZERO, 0);
+        else
+            rvr_spill_store(RV_ZERO, locals[i].type, loc_off[i]);
+    }
+}
+
+static void rvr_fn_end(u8 used_loc_regs, u32 frame_bytes) {
+    u8 i;
+    for (i = 0; i < used_loc_regs; i++) {
+        rvr_spill_load(rvr_loc_regs[i], TY_W, (i32)(frame_bytes + (i + 1) * 4));
+    }
+    rv_addi(RV_SP, RV_FP, 0);
+    rv_lw(RV_FP, 0, RV_SP);
+    rv_lw(RV_RA, 4, RV_SP);
+    rv_addi(RV_SP, RV_SP, 8);
+    cb_emit32(enc_i(0, RV_RA, 0, RV_ZERO, 0x67UL));
+}
+
+static void rvr_alu_reg(IrOp op, u8 dst, u8 lhs, u8 rhs) {
+    op = rv_norm32(op);
+    switch (op) {
+    case OP_ADD:
+    case OP_AADD:
+        cb_emit32(enc_r(0x00, rhs, lhs, 0, dst, 0x33UL));
+        break;
+    case OP_SUB:
+    case OP_ASUB:
+    case OP_ADIFF:
+        cb_emit32(enc_r(0x20, rhs, lhs, 0, dst, 0x33UL));
+        break;
+    case OP_MUL:
+        cb_emit32(enc_r(0x01, rhs, lhs, 0, dst, 0x33UL));
+        break;
+    case OP_DIV:
+        cb_emit32(enc_r(0x01, rhs, lhs, 4, dst, 0x33UL));
+        break;
+    case OP_UDIV:
+        cb_emit32(enc_r(0x01, rhs, lhs, 5, dst, 0x33UL));
+        break;
+    case OP_MOD:
+        cb_emit32(enc_r(0x01, rhs, lhs, 6, dst, 0x33UL));
+        break;
+    case OP_UMOD:
+        cb_emit32(enc_r(0x01, rhs, lhs, 7, dst, 0x33UL));
+        break;
+    case OP_AND:
+        cb_emit32(enc_r(0x00, rhs, lhs, 7, dst, 0x33UL));
+        break;
+    case OP_OR:
+        cb_emit32(enc_r(0x00, rhs, lhs, 6, dst, 0x33UL));
+        break;
+    case OP_XOR:
+        cb_emit32(enc_r(0x00, rhs, lhs, 4, dst, 0x33UL));
+        break;
+    case OP_LSHIFT:
+        cb_emit32(enc_r(0x00, rhs, lhs, 1, dst, 0x33UL));
+        break;
+    case OP_RSHIFT:
+        cb_emit32(enc_r(0x00, rhs, lhs, 5, dst, 0x33UL));
+        break;
+    case OP_ARSHIFT:
+        cb_emit32(enc_r(0x20, rhs, lhs, 5, dst, 0x33UL));
+        break;
+    case OP_INVERT:
+    case OP_INV32:
+        cb_emit32(enc_i(-1, lhs, 4, dst, 0x13UL));
+        break;
+    case OP_SEXT:
+        cb_emit32(enc_i(24, lhs, 1, dst, 0x13UL));
+        cb_emit32(enc_i(0x400 | 24, dst, 5, dst, 0x13UL));
+        break;
+    case OP_W2A:
+    case OP_A2W:
+    case OP_W2I32:
+    case OP_U2I32:
+    case OP_I322W:
+        rvr_mov_reg(dst, lhs, TY_W);
+        break;
+    case OP_EQ:
+    case OP_AEQ:
+        cb_emit32(enc_r(0x00, rhs, lhs, 4, dst, 0x33UL));
+        cb_emit32(enc_i(1, dst, 3, dst, 0x13UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_NE:
+    case OP_ANE:
+        cb_emit32(enc_r(0x00, rhs, lhs, 4, dst, 0x33UL));
+        cb_emit32(enc_r(0x00, dst, RV_ZERO, 3, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_LT:
+        cb_emit32(enc_r(0x00, rhs, lhs, 2, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_GT:
+        cb_emit32(enc_r(0x00, lhs, rhs, 2, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_LE:
+        cb_emit32(enc_r(0x00, lhs, rhs, 2, dst, 0x33UL));
+        cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_GE:
+        cb_emit32(enc_r(0x00, rhs, lhs, 2, dst, 0x33UL));
+        cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_ULT:
+    case OP_ALT:
+        cb_emit32(enc_r(0x00, rhs, lhs, 3, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_UGT:
+    case OP_AGT:
+        cb_emit32(enc_r(0x00, lhs, rhs, 3, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_ULE:
+        cb_emit32(enc_r(0x00, lhs, rhs, 3, dst, 0x33UL));
+        cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    case OP_UGE:
+        cb_emit32(enc_r(0x00, rhs, lhs, 3, dst, 0x33UL));
+        cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+        break;
+    default:
+        ir4_die("unimplemented RV32 reg ALU op");
+    }
+}
+
+static int rvr_alu_imm(IrOp op, u8 dst, u8 lhs, i32 imm) {
+    op = rv_norm32(op);
+    if (op == OP_ADD || op == OP_AADD || op == OP_SUB || op == OP_ASUB) {
+        i32 delta = (op == OP_SUB || op == OP_ASUB) ? -imm : imm;
+        if (delta == 0) {
+            rvr_mov_reg(dst, lhs, TY_W);
+            return 1;
+        }
+        if (delta < -2048 || delta > 2047)
+            return 0;
+        rv_addi(dst, lhs, delta);
+        return 1;
+    }
+    if (op == OP_AND || op == OP_OR || op == OP_XOR) {
+        u32 f3 = (op == OP_AND) ? 7 : (op == OP_OR) ? 6 : 4;
+        if (imm < -2048 || imm > 2047)
+            return 0;
+        cb_emit32(enc_i(imm, lhs, f3, dst, 0x13UL));
+        return 1;
+    }
+    if (op == OP_LSHIFT || op == OP_RSHIFT || op == OP_ARSHIFT) {
+        u32 c;
+        if (imm < 0 || imm > 31)
+            return 0;
+        c = (u32)imm;
+        if (c == 0) {
+            rvr_mov_reg(dst, lhs, TY_W);
+            return 1;
+        }
+        if (op == OP_LSHIFT)
+            cb_emit32(enc_i((i32)c, lhs, 1, dst, 0x13UL));
+        else if (op == OP_RSHIFT)
+            cb_emit32(enc_i((i32)c, lhs, 5, dst, 0x13UL));
+        else
+            cb_emit32(enc_i((i32)(0x400U | c), lhs, 5, dst, 0x13UL));
+        return 1;
+    }
+    if (imm >= -2048 && imm <= 2047) {
+        if ((op == OP_ULT || op == OP_UGE) && imm < 0)
+            return 0;
+        switch (op) {
+        case OP_EQ:
+        case OP_NE:
+            if (imm == -2048)
+                return 0;
+            if (imm != 0)
+                rv_addi(dst, lhs, -imm);
+            else
+                rvr_mov_reg(dst, lhs, TY_W);
+            if (op == OP_EQ)
+                cb_emit32(enc_i(1, dst, 3, dst, 0x13UL));
+            else
+                cb_emit32(enc_r(0x00, dst, RV_ZERO, 3, dst, 0x33UL));
+            cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+            return 1;
+        case OP_LT:
+        case OP_GE:
+            cb_emit32(enc_i(imm, lhs, 2, dst, 0x13UL));
+            if (op == OP_GE)
+                cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+            cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+            return 1;
+        case OP_ULT:
+        case OP_UGE:
+            cb_emit32(enc_i(imm, lhs, 3, dst, 0x13UL));
+            if (op == OP_UGE)
+                cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+            cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+            return 1;
+        case OP_LE:
+        case OP_GT:
+            if (imm == 2047)
+                return 0;
+            cb_emit32(enc_i(imm + 1, lhs, 2, dst, 0x13UL));
+            if (op == OP_GT)
+                cb_emit32(enc_i(1, dst, 4, dst, 0x13UL));
+            cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+            return 1;
+        default:
+            break;
+        }
+    }
+    return 0;
+}
+
+static void rvr_fp_op(IrOp op, u8 dst, u8 lhs, u8 rhs) {
+    if (op == OP_FNEG) {
+        cb_emit32(enc_u(0x80000000UL, RV_T2, 0x37UL));
+        cb_emit32(enc_r(0x00, RV_T2, lhs, 4, dst, 0x33UL));
+        return;
+    }
+    if (lhs == RV_A1 && rhs == RV_A0) {
+        rvr_mov_reg(RV_T2, lhs, TY_W);
+        rvr_mov_reg(RV_A1, rhs, TY_W);
+        rvr_mov_reg(RV_A0, RV_T2, TY_W);
+    } else if (rhs == RV_A0 && op != OP_W2F && op != OP_F2W) {
+        rvr_mov_reg(RV_A1, rhs, TY_W);
+        rvr_mov_reg(RV_A0, lhs, TY_W);
+    } else {
+        rvr_mov_reg(RV_A0, lhs, TY_W);
+        if (op != OP_W2F && op != OP_F2W)
+            rvr_mov_reg(RV_A1, rhs, TY_W);
+    }
+
+    if (op >= OP_FADD && op <= OP_FDIV) {
+        if (rv_obj_mode) {
+            const char *fn = (op == OP_FADD)   ? "__addsf3"
+                             : (op == OP_FSUB) ? "__subsf3"
+                             : (op == OP_FMUL) ? "__mulsf3"
+                                               : "__divsf3";
+            rv_emit_extern_call(fn);
+        } else {
+            u16 entry = (op == OP_FADD)   ? RT_FP_ADD
+                        : (op == OP_FSUB) ? RT_FP_SUB
+                        : (op == OP_FMUL) ? RT_FP_MUL
+                                          : RT_FP_DIV;
+            ensure_rv32_fp();
+            cb_emit32(enc_j((i32)(rv_fp_addr + entry) - (i32)cb_cur_addr(), RV_RA));
+        }
+        rvr_mov_reg(dst, RV_A0, TY_W);
+    } else if (op >= OP_FEQ && op <= OP_FGT) {
+        if (rv_obj_mode) {
+            const char *fn = (op == OP_FEQ)   ? "__eqsf2"
+                             : (op == OP_FNE) ? "__nesf2"
+                             : (op == OP_FLT) ? "__ltsf2"
+                                              : "__gtsf2";
+            rv_emit_extern_call(fn);
+        } else {
+            ensure_rv32_fp();
+            cb_emit32(enc_j((i32)(rv_fp_addr + RT_FP_CMP) - (i32)cb_cur_addr(), RV_RA));
+        }
+        if (op == OP_FEQ)
+            cb_emit32(enc_i(1, RV_A0, 3, dst, 0x13UL));
+        else if (op == OP_FNE)
+            cb_emit32(enc_r(0x00, RV_A0, RV_ZERO, 3, dst, 0x33UL));
+        else if (op == OP_FLT)
+            cb_emit32(enc_r(0x00, RV_ZERO, RV_A0, 2, dst, 0x33UL));
+        else
+            cb_emit32(enc_r(0x00, RV_A0, RV_ZERO, 2, dst, 0x33UL));
+        cb_emit32(enc_r(0x20, dst, RV_ZERO, 0, dst, 0x33UL));
+    } else if (op == OP_W2F) {
+        if (rv_obj_mode) {
+            rv_emit_extern_call("__floatsisf");
+        } else {
+            ensure_rv32_fp();
+            cb_emit32(enc_j((i32)(rv_fp_addr + RT_FP_ITOF) - (i32)cb_cur_addr(), RV_RA));
+        }
+        rvr_mov_reg(dst, RV_A0, TY_W);
+    } else if (op == OP_F2W) {
+        if (rv_obj_mode) {
+            rv_emit_extern_call("__fixsfsi");
+        } else {
+            ensure_rv32_fp();
+            cb_emit32(enc_j((i32)(rv_fp_addr + RT_FP_FTOI) - (i32)cb_cur_addr(), RV_RA));
+        }
+        rvr_mov_reg(dst, RV_A0, TY_W);
+    }
+}
+
+static u32 rvr_mem_f3(IrOp op) {
+    switch (op) {
+    case OP_I8FETCH:
+    case OP_I8STORE:
+    case OP_SI8STORE:
+        return 0;
+    case OP_U8FETCH:
+        return 4;
+    case OP_I16FETCH:
+    case OP_I16STORE:
+    case OP_SI16STORE:
+        return 1;
+    case OP_U16FETCH:
+        return 5;
+    default:
+        return 2;
+    }
+}
+
+static void rvr_load_mem(IrOp op, u8 dst, u8 base, i32 off) {
+    u32 f3 = rvr_mem_f3(op);
+    if (off >= -2048 && off <= 2047) {
+        cb_emit32(enc_i(off, base, f3, dst, 0x03UL));
+    } else {
+        rv_li(RV_T2, (u32)off);
+        cb_emit32(enc_r(0x00, RV_T2, base, 0, RV_T2, 0x33UL));
+        cb_emit32(enc_i(0, RV_T2, f3, dst, 0x03UL));
+    }
+}
+
+static void rvr_store_mem(IrOp op, u8 src, u8 base, i32 off) {
+    u32 f3 = rvr_mem_f3(op);
+    if (off >= -2048 && off <= 2047) {
+        cb_emit32(enc_s(off, src, base, f3));
+    } else {
+        rv_li(RV_T2, (u32)off);
+        cb_emit32(enc_r(0x00, RV_T2, base, 0, RV_T2, 0x33UL));
+        cb_emit32(enc_s(0, src, RV_T2, f3));
+    }
+}
+
+static void rvr_bcopy(u8 dst, u8 src, u8 len) {
+    rvr_mov_reg(RV_T0, dst, TY_W);
+    rvr_mov_reg(RV_T1, src, TY_W);
+    rvr_mov_reg(RV_T2, len, TY_W);
+    cb_emit32(enc_b(24, RV_ZERO, RV_T2, 0));
+    cb_emit32(enc_i(0, RV_T1, 4, RV_A0, 0x03UL));
+    cb_emit32(enc_s(0, RV_A0, RV_T0, 0));
+    cb_emit32(enc_i(1, RV_T1, 0, RV_T1, 0x13UL));
+    cb_emit32(enc_i(1, RV_T0, 0, RV_T0, 0x13UL));
+    cb_emit32(enc_i(-1, RV_T2, 0, RV_T2, 0x13UL));
+    cb_emit32(enc_b(-20, RV_ZERO, RV_T2, 1));
+}
+
+static size_t rvr_br_fwd(BranchCond cond, u8 reg) {
+    size_t pos;
+    if (cond == BR_JZ)
+        cb_emit32(enc_b(8, RV_ZERO, reg, 1));
+    pos = cb_pc();
+    cb_emit32(enc_j(0, RV_ZERO));
+    return pos;
+}
+
+static void rvr_br_back(BranchCond cond, u8 reg, size_t target_addr) {
+    i32 diff;
+    if (cond == BR_JZ) {
+        diff = (i32)target_addr - (i32)cb_cur_addr();
+        if (diff >= -4096 && diff <= 4094) {
+            cb_emit32(enc_b(diff, RV_ZERO, reg, 0));
+        } else {
+            cb_emit32(enc_b(8, RV_ZERO, reg, 1));
+            diff = (i32)target_addr - (i32)cb_cur_addr();
+            cb_emit32(enc_j(diff, RV_ZERO));
+        }
+    } else {
+        diff = (i32)target_addr - (i32)cb_cur_addr();
+        cb_emit32(enc_j(diff, RV_ZERO));
+    }
+}
+
+static int rvr_cmp_br_emit(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, int is_fwd,
+                           size_t target_addr, size_t *patch_off) {
+    u32 rs1 = lhs;
+    u32 rs2 = rhs;
+    u32 f3_true, f3_false;
+    int swap_ops = 0;
+
+    switch (op) {
+    case OP_EQ:
+    case OP_AEQ:
+        f3_true = 0; f3_false = 1; break;
+    case OP_NE:
+    case OP_ANE:
+        f3_true = 1; f3_false = 0; break;
+    case OP_LT:
+        f3_true = 4; f3_false = 5; break;
+    case OP_GE:
+        f3_true = 5; f3_false = 4; break;
+    case OP_GT:
+        swap_ops = 1; f3_true = 4; f3_false = 5; break;
+    case OP_LE:
+        swap_ops = 1; f3_true = 5; f3_false = 4; break;
+    case OP_ULT:
+    case OP_ALT:
+        f3_true = 6; f3_false = 7; break;
+    case OP_UGE:
+        f3_true = 7; f3_false = 6; break;
+    case OP_UGT:
+    case OP_AGT:
+        swap_ops = 1; f3_true = 6; f3_false = 7; break;
+    case OP_ULE:
+        swap_ops = 1; f3_true = 7; f3_false = 6; break;
+    default:
+        return 0;
+    }
+
+    if (has_imm) {
+        if (imm == 0) {
+            rs2 = RV_ZERO;
+        } else {
+            rv_li(RV_T2, (u32)imm);
+            rs2 = RV_T2;
+        }
+    }
+    if (swap_ops) {
+        u32 tmp = rs1;
+        rs1 = rs2;
+        rs2 = tmp;
+    }
+    if (is_fwd) {
+        cb_emit32(enc_b(8, rs2, rs1, f3_true));
+        *patch_off = cb_pc();
+        cb_emit32(enc_j(0, RV_ZERO));
+    } else {
+        i32 diff = (i32)target_addr - (i32)cb_cur_addr();
+        if (diff >= -4096 && diff <= 4094) {
+            cb_emit32(enc_b(diff, rs2, rs1, f3_false));
+        } else {
+            cb_emit32(enc_b(8, rs2, rs1, f3_true));
+            diff = (i32)target_addr - (i32)cb_cur_addr();
+            cb_emit32(enc_j(diff, RV_ZERO));
+        }
+    }
+    return 1;
+}
+
+static int rvr_cmp_br_fwd(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, size_t *patch_off) {
+    return rvr_cmp_br_emit(op, has_imm, imm, lhs, rhs, 1, 0, patch_off);
+}
+
+static int rvr_cmp_br_back(IrOp op, int has_imm, i32 imm, u8 lhs, u8 rhs, size_t target_addr) {
+    return rvr_cmp_br_emit(op, has_imm, imm, lhs, rhs, 0, target_addr, NULL);
+}
+
+static size_t rvr_emit_jtab(u8 reg, size_t count) {
+    size_t tbl_off, k;
+    cb_emit32(enc_i(2, reg, 1, RV_T0, 0x13UL));
+    cb_emit32(0x00000317UL); /* AUIPC t1, 0 */
+    cb_emit32(enc_i(24, RV_T1, 0, RV_T1, 0x13UL));
+    cb_emit32(enc_r(0x00, RV_T0, RV_T1, 0, RV_T2, 0x33UL));
+    rv_lw(RV_T0, 0, RV_T2);
+    cb_emit32(enc_r(0x00, RV_T0, RV_T1, 0, RV_T0, 0x33UL));
+    cb_emit32(enc_i(0, RV_T0, 0, RV_ZERO, 0x67UL));
+    tbl_off = cb_pc();
+    for (k = 0; k < count; k++)
+        cb_emit32(0);
+    return tbl_off;
+}
+
+static void rvr_icall(u8 reg) { cb_emit32(enc_i(0, reg, 0, RV_RA, 0x67UL)); }
+
+static void rvr_call_extern(const FuncSig *sig, const u8 *arg_regs) {
+    (void)arg_regs; /* stk_regs[0..7] are already a0..a7 */
+    if (sig->in_types.len > 8 || sig->out_types.len > 1)
+        ir4_die("RV32 extern supports at most 8 args and 1 return");
+    if (sig->has_addr) {
+        rv_li(RV_T0, (u32)sig->addr);
+        cb_emit32(enc_i(0, RV_T0, 0, RV_RA, 0x67UL));
+    } else {
+        rv_emit_extern_call(sig->name);
+    }
+}
+
+const RegBackend reg_be_rv32 = {
+    4, 0, 12, rvr_stk_regs, NULL, 9, rvr_loc_regs, 5, 6, 7, 5, 6,
+    rv_cur_addr, rvr_fn_begin, rvr_fn_end, rvr_spill_store, rvr_spill_load,
+    rvr_local_addr, rvr_mov_reg, rvr_mov_imm, rvr_mov_uimm32, rvr_mov_fconst,
+    rvr_load_data_addr, rvr_load_fn_addr, rvr_alu_reg, rvr_alu_imm, rvr_fp_op,
+    rvr_load_mem, rvr_store_mem, rvr_bcopy, rvr_br_fwd, rvr_br_back,
+    rvr_cmp_br_fwd, rvr_cmp_br_back, rv_patch_fwd, rvr_emit_jtab, rv_patch_jtab,
+    rv_call, rvr_icall, rvr_call_extern};

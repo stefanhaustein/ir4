@@ -3,6 +3,9 @@
 #if IR4_ENABLE_65816
 #include "backend/65816.h"
 #endif
+#if IR4_ENABLE_ARM64 || IR4_ENABLE_RV32
+#include "backend/reg_lower.h"
+#endif
 #include "codebuf.h"
 #include "strpool.h"
 
@@ -371,6 +374,38 @@ static void emit_word(size_t fidx) {
             ir4_die("'code' is not supported on this backend");
         return;
     }
+
+#if IR4_ENABLE_ARM64 || IR4_ENABLE_RV32
+    {
+        const RegBackend *rbe = NULL;
+#if IR4_ENABLE_ARM64
+        if (strcmp(be->name, "arm64") == 0)
+            rbe = &reg_be_arm64;
+#endif
+#if IR4_ENABLE_RV32
+        if (strcmp(be->name, "rv32") == 0)
+            rbe = &reg_be_rv32;
+#endif
+        if (rbe && ir4_get_opt_level() > 0) {
+            RegFwdCallVec reg_fwd;
+            size_t rf;
+            reg_fwd.data = NULL;
+            reg_fwd.len = 0;
+            reg_fwd.cap = 0;
+            reg_lower_word(rbe, sig, w, &funcs, &words, &jtab_targets, heap_start_off, &reg_fwd);
+            for (rf = 0; rf < reg_fwd.len; rf++) {
+                FwdCall fc;
+                fc.call_pc = reg_fwd.data[rf].call_pc;
+                fc.call_addr = reg_fwd.data[rf].call_addr;
+                fc.func_idx = reg_fwd.data[rf].func_idx;
+                fc.is_fn_ptr = reg_fwd.data[rf].is_fn_ptr;
+                VEC_PUSH(fwd_calls, fc);
+            }
+            free(reg_fwd.data);
+            return;
+        }
+    }
+#endif
 
     VEC_ENSURE(ir_addr, w->ir.len + 1);
     {
