@@ -4,25 +4,25 @@ Automated results from running the PASTA/80 v1.00 test suites across IR4(th) tar
 
 ## Results Matrix (Passed Assertions)
 
-| ⁉️ | Target | core | heap | files | more | prm | snd | ovl | Total | Time |
+|  | Target | core | heap | files | more | prm | snd | ovl | Total | Time |
 | :---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| ℹ️ | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
-| 🅾️ | [Agon](#agon) | 1553 | 26 | 192 | 45 | 6 | 4 | 32 | 1858 | 16.12s |
-| 🅾️ | [ARM64](#arm64) | 1549 | 26 | 194 | 45 | 5 | 4 | 32 | 1855 | 4.70s |
-| 🅾️ | [C64](#c64) | n/a | 26 | ??? | 49 | n/a | 4 | 32 | \*111 | 99.73s |
-| 🅾️ | [CP/M](#cpm) | n/a | 17 | \*180 | 49 | 6 | 4 | 32 | \*288 | 0.95s |
-| 🅾️ | [RV32](#rv32) | 1538 | 26 | n/a | 45 | n/a | 4 | 32 | \*1645 | 0.51s |
-| 🅾️ | [Web](#web) | 1550 | 26 | n/a | 45 | n/a | 4 | 32 | \*1657 | 0.99s |
-| ✅ | [X16](#x16) | n/a | 26 | n/a | 49 | n/a | 4 | 32 | \*111 | 5.74s |
-| ✅ | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 10.98s |
-| 🅾️ | [ZX81](#zx81) | n/a | ??? | n/a | ??? | n/a | 4 | ??? | \*4 | 44.53s |
+|  | Expected | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 |  |
+| 🟥 | [Agon](#agon) | ²⁾1553 | 26 | 192 | ²⁾45 | 6 | 4 | 32 | 1858 | 16.12s |
+| 🟥 | [ARM64](#arm64) | ²⁾1549 | 26 | 194 | ²⁾45 | ²⁾5 | 4 | 32 | 1855 | 4.70s |
+| 🟥 | [C64](#c64) | ¹⁾n/a | 26 | ⁴⁾??? | 49 | ³⁾n/a | 4 | 32 | 111 | 99.73s |
+| 🟥 | [CP/M](#cpm) | ¹⁾n/a | 17 | ⁴⁾180 | 49 | 6 | 4 | 32 | 288 | 0.95s |
+| 🟥 | [RV32](#rv32) | ²⁾1538 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1645 | 0.51s |
+| 🟥 | [Web](#web) | ²⁾1550 | 26 | ³⁾n/a | ²⁾45 | ³⁾n/a | 4 | 32 | 1657 | 0.99s |
+| 🟩 | [X16](#x16) | ¹⁾n/a | 26 | ³⁾n/a | 49 | ³⁾n/a | 4 | 32 | 111 | 5.74s |
+| 🟩 | [X16GS](#x16gs) | 1572 | 26 | 194 | 49 | 6 | 4 | 32 | 1883 | 10.98s |
+| 🟥 | [ZX81](#zx81) | ¹⁾n/a | ⁴⁾??? | ³⁾n/a | ⁴⁾??? | ³⁾n/a | 4 | ⁴⁾??? | 4 | 44.53s |
 
 ## Notes
 
-- 16-bit integer targets (C64, CP/M, X16, X16GS, ZX81): Match Turbo Pascal 3's 16-bit Integer width (SizeOf(Integer) = 2 and 16-bit signed overflow wraparound).
-- 64 KB RAM targets (C64, CP/M, X16, ZX81): core exceeds the 64 KB address space without bank switching or disk overlays.
-- 24/32/64-bit integer targets (Agon, ARM64, RV32, Web): The IR4(th) backend currently maps Pascal Integer to IR4(th)'s native :i cell (3, 4, or 8 bytes), which accounts for the core and more assertions that test SizeOf(Integer) = 2 or 16-bit overflow wraparound (plus ParamStr(0) = '' on POSIX ARM64).
-- Sandbox / bare-metal targets (RV32, Web): files and params are marked n/a where no host filesystem or CLI argument vector is exposed.
+1. 64 KB RAM targets (C64, CP/M, X16, ZX81): core exceeds the 64 KB address space without bank switching or disk overlays.
+2. 24/32/64-bit integer targets (Agon, ARM64, RV32, Web): Pascal Integer maps to IR4(th)'s native :i cell (3, 4, or 8 bytes), which accounts for the core and more assertions checking SizeOf(Integer) = 2 or 16-bit overflow wraparound (plus ParamStr(0) = '' on POSIX ARM64).
+3. No host filesystem or CLI argument vector exposed for these targets/suites.
+4. Incomplete or mismatched suite assertion counts (including CP/M files 180/195 and timed-out ??? suites).
 
 ## Reproducing
 

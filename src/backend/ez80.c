@@ -32,6 +32,97 @@ static size_t ez_shl24_addr = 0;
 static size_t ez_shr24_addr = 0;
 static size_t ez_ashr24_addr = 0;
 static size_t ez_rt_addr = 0;
+static size_t ez_fcmp_addr = 0;
+
+static void ez_ensure_fcmp(void) {
+    size_t skip;
+    size_t jnz1, jnz2, jnz3, jp_diff, jnz_c, jz_eq, jz_pos1, jnc_pos, jz_pos2;
+    size_t not_both_zero, got_c, ret_eq, ret_c, ret_pos, diff_sign, ret_pos1;
+    if (ez_fcmp_addr != 0)
+        return;
+    cb_emit8(EZ80_JP);
+    skip = cb_pc();
+    cb_emit24(0);
+    ez_fcmp_addr = cb_cur_addr();
+    /* Inputs: E:HL = a, A:BC = b. Output: Z=1,S=0 (eq); Z=0,S=1 (lt); Z=0,S=0 (gt) */
+    cb_emit8(0x57); /* LD D, A */
+    cb_emit8(0x7B); /* LD A, E */
+    cb_emit8(0xB2); /* OR D */
+    cb_emit8_8(0xE6, 0x7F); /* AND 0x7F */
+    cb_emit8(0x20); jnz1 = cb_pc(); cb_emit8(0); /* JR NZ, not_both_zero */
+    /* Check BC == 0 */
+    cb_emit8(0xE5); /* PUSH HL */
+    cb_emit8(0xC5); /* PUSH BC */
+    cb_emit8(0xB7); /* OR A */
+    cb_emit8(EZ80_LD_HL_N24); cb_emit24(0);
+    cb_emit8_8(0xED, 0x4A); /* ADC HL, BC */
+    cb_emit8(0xC1); /* POP BC */
+    cb_emit8(0xE1); /* POP HL */
+    cb_emit8(0x20); jnz2 = cb_pc(); cb_emit8(0); /* JR NZ, not_both_zero */
+    /* Check HL == 0 */
+    cb_emit8(0xE5); /* PUSH HL */
+    cb_emit8(0xC5); /* PUSH BC */
+    cb_emit8(0x01); cb_emit24(0); /* LD BC, 0 */
+    cb_emit8(0xB7); /* OR A */
+    cb_emit8_8(0xED, 0x4A); /* ADC HL, BC */
+    cb_emit8(0xC1); /* POP BC */
+    cb_emit8(0xE1); /* POP HL */
+    cb_emit8(0x20); jnz3 = cb_pc(); cb_emit8(0); /* JR NZ, not_both_zero */
+    cb_emit8(0xAF); /* XOR A -> Z=1, S=0 */
+    cb_emit8(0xC9); /* RET */
+
+    not_both_zero = cb_cur_addr();
+    cb_patch8(jnz1, (u8)(not_both_zero - (jnz1 + 1)));
+    cb_patch8(jnz2, (u8)(not_both_zero - (jnz2 + 1)));
+    cb_patch8(jnz3, (u8)(not_both_zero - (jnz3 + 1)));
+    cb_emit8(0x7B); /* LD A, E */
+    cb_emit8(0xAA); /* XOR D */
+    cb_emit8(EZ80_JP_M); jp_diff = cb_pc(); cb_emit24(0); /* JP M, diff_sign */
+    cb_emit8(0x7B); /* LD A, E */
+    cb_emit8(0xBA); /* CP D */
+    cb_emit8(0x20); jnz_c = cb_pc(); cb_emit8(0); /* JR NZ, got_c */
+    cb_emit8(0xB7); /* OR A */
+    cb_emit8_8(0xED, 0x42); /* SBC HL, BC */
+    cb_emit8(0x28); jz_eq = cb_pc(); cb_emit8(0); /* JR Z, ret_eq */
+
+    got_c = cb_cur_addr();
+    cb_patch8(jnz_c, (u8)(got_c - (jnz_c + 1)));
+    cb_emit8_8(0xCB, 0x7B); /* BIT 7, E */
+    cb_emit8(0x28); jz_pos1 = cb_pc(); cb_emit8(0); /* JR Z, ret_c */
+    cb_emit8(0x3F); /* CCF */
+
+    ret_c = cb_cur_addr();
+    cb_patch8(jz_pos1, (u8)(ret_c - (jz_pos1 + 1)));
+    cb_emit8_8(0x3E, 0x01); /* LD A, 1 */
+    cb_emit8(0x30); jnc_pos = cb_pc(); cb_emit8(0); /* JR NC, ret_pos */
+    cb_emit8_8(0x3E, 0xFF); /* LD A, 0xFF */
+
+    ret_pos = cb_cur_addr();
+    cb_patch8(jnc_pos, (u8)(ret_pos - (jnc_pos + 1)));
+    cb_emit8(0xB7); /* OR A -> S=bit7(A), Z=0 */
+    cb_emit8(0xC9); /* RET */
+
+    ret_eq = cb_cur_addr();
+    cb_patch8(jz_eq, (u8)(ret_eq - (jz_eq + 1)));
+    cb_emit8(0xAF); /* XOR A -> Z=1, S=0 */
+    cb_emit8(0xC9); /* RET */
+
+    diff_sign = cb_cur_addr();
+    cb_patch24(jp_diff, (u32)diff_sign);
+    cb_emit8_8(0xCB, 0x7B); /* BIT 7, E */
+    cb_emit8(0x28); jz_pos2 = cb_pc(); cb_emit8(0); /* JR Z, ret_pos1 */
+    cb_emit8_8(0x3E, 0xFF); /* LD A, 0xFF */
+    cb_emit8(0xB7); /* OR A -> S=1, Z=0 */
+    cb_emit8(0xC9); /* RET */
+
+    ret_pos1 = cb_cur_addr();
+    cb_patch8(jz_pos2, (u8)(ret_pos1 - (jz_pos2 + 1)));
+    cb_emit8_8(0x3E, 0x01); /* LD A, 1 */
+    cb_emit8(0xB7); /* OR A -> S=0, Z=0 */
+    cb_emit8(0xC9); /* RET */
+
+    cb_patch24(skip, (u32)cb_cur_addr());
+}
 
 static void ez_ensure_rt(void) {
     size_t skip;
@@ -1519,9 +1610,9 @@ static void ez_op(IrOp op) {
     case OP_FGT: {
         size_t skip_t;
         u8 jcc = (op == OP_FEQ) ? EZ80_JP_Z : ((op == OP_FNE) ? EZ80_JP_NZ : EZ80_JP_M);
-        ez_ensure_rt();
+        ez_ensure_fcmp();
         if (op == OP_FLT) {
-            /* __fcmp computes E:HL - A:BC; for FLT we want E:HL=a, A:BC=b */
+            /* ez_fcmp compares E:HL vs A:BC; for FLT we want E:HL=a, A:BC=b */
             cb_emit8(EZ80_POP_BC); /* BC = b_lo */
             cb_emit8(EZ80_POP_HL); /* L = b_hi */
             cb_emit8(EZ80_LD_A_L); /* A = b_hi */
@@ -1537,7 +1628,7 @@ static void ez_op(IrOp op) {
             cb_emit8(EZ80_LD_A_L);
             cb_emit8(EZ80_POP_HL);
         }
-        emit8_24(EZ80_CALL, (u32)(ez_rt_addr + EZ80_RT_FCMP));
+        emit8_24(EZ80_CALL, (u32)ez_fcmp_addr);
         emit8_24(EZ80_LD_HL_N24, 0xFFFFFFUL);
         cb_emit8(jcc);
         skip_t = cb_pc();

@@ -364,7 +364,7 @@ rt-rv32:
 	python3 tools/rv32/gen_rv32_fp.py --input tools/rv32/rv32_fp.c --output src/be_rv32_fp.h
 
 AGON_SRCS = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
-            src/backend/ez80.c src/platform/agon.c
+            src/backend/ez80.c src/backend/bc.c src/platform/agon.c
 
 agon: $(AGON_SRCS)
 	@PATH="$(HOME)/opt/agondev/bin:$$PATH"; \
@@ -380,8 +380,8 @@ agon: $(AGON_SRCS)
 		echo "include $$(agondev-config --makefile)"; \
 		echo "CFLAGS += -I$(CURDIR)/src -I$(CURDIR)/src/frontend -DIR4_MINIMAL -DIR4_ENABLE_EZ80=1 -DIR4_ENABLE_AGON=1"; \
 	} > $(BUILD)/agon-build/Makefile; \
-	$(MAKE) -C $(BUILD)/agon-build; \
-	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin; \
+	$(MAKE) -C $(BUILD)/agon-build && \
+	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin && \
 	echo "Built $(BUILD)/ir4c_agon.bin"
 
 X16GS_SRCS = src/vec.c src/strpool.c src/path.c src/codebuf.c \
