@@ -31,6 +31,8 @@ typedef struct {
     void (*spill_store)(u8 reg, StackType type, i32 frame_off);
     void (*spill_load)(u8 reg, StackType type, i32 frame_off);
     void (*local_addr)(u8 dst_reg, i32 frame_off);
+    void (*sp_adj)(i32 delta);
+    void (*store_out_arg)(u8 src_reg, StackType type, u32 sp_off);
 
     void (*mov_reg)(u8 dst, u8 src, StackType type);
     void (*mov_imm)(u8 dst, i32 val);

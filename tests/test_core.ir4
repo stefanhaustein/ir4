@@ -243,6 +243,53 @@ fn test_jtab ( x :i -> :i )
   res
 end
 
+fn ret4 ( a :i b :i c :i d :i -> :i :i :i :i )
+  var sum :i
+  a b + c + d + -> sum
+  d c b sum
+end
+
+fn test_params_128 ( p0 :i p1 :i p2 :i p3 :i p4 :i p5 :i p6 :i p7 :i p8 :i p9 :i p10 :i p11 :i p12 :i p13 :i p14 :i p15 :i p16 :i p17 :i p18 :i p19 :i p20 :i p21 :i p22 :i p23 :i p24 :i p25 :i p26 :i p27 :i p28 :i p29 :i p30 :i p31 :i p32 :i p33 :i p34 :i p35 :i p36 :i p37 :i p38 :i p39 :i p40 :i p41 :i p42 :i p43 :i p44 :i p45 :i p46 :i p47 :i p48 :i p49 :i p50 :i p51 :i p52 :i p53 :i p54 :i p55 :i p56 :i p57 :i p58 :i p59 :i p60 :i p61 :i p62 :i p63 :i p64 :i p65 :i p66 :i p67 :i p68 :i p69 :i p70 :i p71 :i p72 :i p73 :i p74 :i p75 :i p76 :i p77 :i p78 :i p79 :i p80 :i p81 :i p82 :i p83 :i p84 :i p85 :i p86 :i p87 :i p88 :i p89 :i p90 :i p91 :i p92 :i p93 :i p94 :i p95 :i p96 :i p97 :i p98 :i p99 :i p100 :i p101 :i p102 :i p103 :i p104 :i p105 :i p106 :i p107 :i p108 :i p109 :i p110 :i p111 :i p112 :i p113 :i p114 :i p115 :i p116 :i p117 :i p118 :i p119 :i p120 :i p121 :i p122 :i p123 :i p124 :i p125 :i p126 :i p127 :i -> :i )
+  p0 p1 + p63 + p126 + p127 +
+end
+
+fn test_locals_128 ( -> :i )
+  var l0 :i var l1 :i var l2 :i var l3 :i var l4 :i var l5 :i var l6 :i var l7 :i
+  var l8 :i var l9 :i var l10 :i var l11 :i var l12 :i var l13 :i var l14 :i var l15 :i
+  var l16 :i var l17 :i var l18 :i var l19 :i var l20 :i var l21 :i var l22 :i var l23 :i
+  var l24 :i var l25 :i var l26 :i var l27 :i var l28 :i var l29 :i var l30 :i var l31 :i
+  var l32 :i var l33 :i var l34 :i var l35 :i var l36 :i var l37 :i var l38 :i var l39 :i
+  var l40 :i var l41 :i var l42 :i var l43 :i var l44 :i var l45 :i var l46 :i var l47 :i
+  var l48 :i var l49 :i var l50 :i var l51 :i var l52 :i var l53 :i var l54 :i var l55 :i
+  var l56 :i var l57 :i var l58 :i var l59 :i var l60 :i var l61 :i var l62 :i var l63 :i
+  var l64 :i var l65 :i var l66 :i var l67 :i var l68 :i var l69 :i var l70 :i var l71 :i
+  var l72 :i var l73 :i var l74 :i var l75 :i var l76 :i var l77 :i var l78 :i var l79 :i
+  var l80 :i var l81 :i var l82 :i var l83 :i var l84 :i var l85 :i var l86 :i var l87 :i
+  var l88 :i var l89 :i var l90 :i var l91 :i var l92 :i var l93 :i var l94 :i var l95 :i
+  var l96 :i var l97 :i var l98 :i var l99 :i var l100 :i var l101 :i var l102 :i var l103 :i
+  var l104 :i var l105 :i var l106 :i var l107 :i var l108 :i var l109 :i var l110 :i var l111 :i
+  var l112 :i var l113 :i var l114 :i var l115 :i var l116 :i var l117 :i var l118 :i var l119 :i
+  var l120 :i var l121 :i var l122 :i var l123 :i var l124 :i var l125 :i var l126 :i var l127 :i
+  11 -> l0
+  22 -> l64
+  33 -> l127
+  l0 l64 + l127 +
+end
+
+fn test_locals_64_64 ( p0 :i p1 :i p2 :i p3 :i p4 :i p5 :i p6 :i p7 :i p8 :i p9 :i p10 :i p11 :i p12 :i p13 :i p14 :i p15 :i p16 :i p17 :i p18 :i p19 :i p20 :i p21 :i p22 :i p23 :i p24 :i p25 :i p26 :i p27 :i p28 :i p29 :i p30 :i p31 :i p32 :i p33 :i p34 :i p35 :i p36 :i p37 :i p38 :i p39 :i p40 :i p41 :i p42 :i p43 :i p44 :i p45 :i p46 :i p47 :i p48 :i p49 :i p50 :i p51 :i p52 :i p53 :i p54 :i p55 :i p56 :i p57 :i p58 :i p59 :i p60 :i p61 :i p62 :i p63 :i -> :i )
+  var l0 :i var l1 :i var l2 :i var l3 :i var l4 :i var l5 :i var l6 :i var l7 :i
+  var l8 :i var l9 :i var l10 :i var l11 :i var l12 :i var l13 :i var l14 :i var l15 :i
+  var l16 :i var l17 :i var l18 :i var l19 :i var l20 :i var l21 :i var l22 :i var l23 :i
+  var l24 :i var l25 :i var l26 :i var l27 :i var l28 :i var l29 :i var l30 :i var l31 :i
+  var l32 :i var l33 :i var l34 :i var l35 :i var l36 :i var l37 :i var l38 :i var l39 :i
+  var l40 :i var l41 :i var l42 :i var l43 :i var l44 :i var l45 :i var l46 :i var l47 :i
+  var l48 :i var l49 :i var l50 :i var l51 :i var l52 :i var l53 :i var l54 :i var l55 :i
+  var l56 :i var l57 :i var l58 :i var l59 :i var l60 :i var l61 :i var l62 :i var l63 :i
+  p0 -> l0
+  p63 -> l63
+  l0 l63 + p31 +
+end
+
 fn main ( -> :i )
   test_stack
   dup 0 <> if return then drop
@@ -306,4 +353,20 @@ fn main ( -> :i )
   CORE_I32 100000 i>i32 i32= true 65 assert_eq
   dup 0 <> if return then drop
   CORE_F1 CORE_F2 f* 5.0 f= true 66 assert_eq
+  dup 0 <> if return then drop
+  1 2 3 4 ret4 + + + 19 67 assert_eq
+  dup 0 <> if return then drop
+  1 2 3 4 & ret4 ( :i :i :i :i -> :i :i :i :i ) + + + 19 68 assert_eq
+  dup 0 <> if return then drop
+  1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3 4
+  test_params_128 10 69 assert_eq
+  dup 0 <> if return then drop
+  test_locals_128 66 70 assert_eq
+  dup 0 <> if return then drop
+  5 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 6
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 7
+  test_locals_64_64 18 71 assert_eq
 end

@@ -831,9 +831,9 @@ static Bool bc32_build(U8Vec *out, size_t base) {
     return true;
 }
 
-static Bool bc32_write(FILE *fp, size_t base) {
+static int bc32_write(FILE *fp, size_t base) {
     U8Vec bin = {NULL, 0, 0};
-    Bool ok;
+    int ok;
     bc32_build(&bin, base);
     ok = (bin.len == 0 || fwrite(bin.data, 1, bin.len, fp) == bin.len) && ferror(fp) == 0;
     free(bin.data);
@@ -854,7 +854,7 @@ static void write_base64(FILE *fp, const u8 *d, size_t len) {
     }
 }
 
-static Bool web_write(FILE *fp, size_t base) {
+static int web_write(FILE *fp, size_t base) {
     U8Vec bin = {NULL, 0, 0};
     bc32_build(&bin, base);
     fprintf(fp,
@@ -870,7 +870,7 @@ static Bool web_write(FILE *fp, size_t base) {
     return ferror(fp) == 0;
 }
 
-static Bool web_js_write(FILE *fp, size_t base) {
+static int web_js_write(FILE *fp, size_t base) {
     U8Vec bin = {NULL, 0, 0};
     bc32_build(&bin, base);
     fprintf(fp,

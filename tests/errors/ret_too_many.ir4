@@ -1,0 +1,8 @@
+\ Error test: more than IR4_MAX_OUTS (4) return values in signature
+fn f ( -> :i :i :i :i :i )
+  1 2 3 4 5
+end
+
+fn main ( -> :i )
+  0
+end

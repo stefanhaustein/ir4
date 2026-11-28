@@ -1124,6 +1124,29 @@ static size_t rvr_load_fn_addr(u8 dst, size_t target_addr) {
     return pc;
 }
 
+static void rvr_sp_adj(i32 delta) {
+    if (delta == 0)
+        return;
+    if (delta >= -2048 && delta <= 2047) {
+        rv_addi(RV_SP, RV_SP, delta);
+    } else {
+        rv_li(RV_T2, (u32)delta);
+        cb_emit32(enc_r(0x00, RV_T2, RV_SP, 0, RV_SP, 0x33UL));
+    }
+}
+
+static void rvr_store_out_arg(u8 src_reg, StackType type, u32 sp_off) {
+    (void)type;
+    if (sp_off <= 2047) {
+        rv_sw(src_reg, (i32)sp_off, RV_SP);
+    } else {
+        u32 tmp = (src_reg != RV_T2) ? RV_T2 : RV_T1;
+        rv_li(tmp, sp_off);
+        cb_emit32(enc_r(0x00, tmp, RV_SP, 0, tmp, 0x33UL));
+        rv_sw(src_reg, 0, tmp);
+    }
+}
+
 static void rvr_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, size_t param_cnt,
                          const LocalVar *locals, const u8 *loc_is_reg, const u8 *loc_reg,
                          const i32 *loc_off, size_t total_locals) {
@@ -1157,6 +1180,14 @@ static void rvr_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, si
                 rvr_mov_reg(loc_reg[i], src, locals[i].type);
             else
                 rvr_spill_store(src, locals[i].type, loc_off[i]);
+        } else {
+            i32 caller_frame_off = -(i32)(8 + (i - 12) * 4);
+            if (loc_is_reg[i]) {
+                rvr_spill_load(loc_reg[i], locals[i].type, caller_frame_off);
+            } else {
+                rvr_spill_load(RV_T0, locals[i].type, caller_frame_off);
+                rvr_spill_store(RV_T0, locals[i].type, loc_off[i]);
+            }
         }
     }
 
@@ -1642,8 +1673,8 @@ static void rvr_call_extern(const FuncSig *sig, const u8 *arg_regs) {
 const RegBackend reg_be_rv32 = {
     4, 0, 12, rvr_stk_regs, NULL, 9, rvr_loc_regs, 5, 6, 7, 5, 6,
     rv_cur_addr, rvr_fn_begin, rvr_fn_end, rvr_spill_store, rvr_spill_load,
-    rvr_local_addr, rvr_mov_reg, rvr_mov_imm, rvr_mov_uimm32, rvr_mov_fconst,
-    rvr_load_data_addr, rvr_load_fn_addr, rvr_alu_reg, rvr_alu_imm, rvr_fp_op,
-    rvr_load_mem, rvr_store_mem, rvr_bcopy, rvr_br_fwd, rvr_br_back,
-    rvr_cmp_br_fwd, rvr_cmp_br_back, rv_patch_fwd, rvr_emit_jtab, rv_patch_jtab,
-    rv_call, rvr_icall, rvr_call_extern};
+    rvr_local_addr, rvr_sp_adj, rvr_store_out_arg, rvr_mov_reg, rvr_mov_imm,
+    rvr_mov_uimm32, rvr_mov_fconst, rvr_load_data_addr, rvr_load_fn_addr,
+    rvr_alu_reg, rvr_alu_imm, rvr_fp_op, rvr_load_mem, rvr_store_mem, rvr_bcopy,
+    rvr_br_fwd, rvr_br_back, rvr_cmp_br_fwd, rvr_cmp_br_back, rv_patch_fwd,
+    rvr_emit_jtab, rv_patch_jtab, rv_call, rvr_icall, rvr_call_extern};

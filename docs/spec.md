@@ -252,4 +252,20 @@ Fixed-width memory operations (`u8@`, `i8@`, `i8!`, `u16@`, `i16@`, `i16!`) wide
 * **Jump Tables (`<idx :i> jtab <l0> <l1> ... <ln> end`):** Pops `:i` index `idx` and jumps to function-local label `l[idx]`. The remaining type stack must be empty (matching `jmp` and `::`). Bounds checking is the caller's responsibility; out-of-range indices are unchecked. At least one label is required.
 * **Calls & Early Return (`<word_name>`, `( <inputs> -> <outputs> )`, `return`):** Direct calls (`<word_name>`) validate the caller stack against callee inputs and push outputs. Indirect calls (`<args...> <fn :a> ( <inputs> -> <outputs> )`, where `<inputs>` and `<outputs>` are nameless type tokens) pop the `:a` target address and declared input types, call the address, and push the declared output types. `return` verifies the stack matches the word's declared output types after `->`.
 
+## 6. Minimum Implementation Limits
+
+A conforming IR4th implementation must support at least the following limits:
+
+| Construct | Minimum Limit | Notes |
+| :--- | :--- | :--- |
+| Token length | 255 bytes | Identifiers, keywords, numeric literals, and `require` paths (`data` string literals excluded) |
+| Locals per function | 128 | Includes parameters, `:bytes` parameter copies, and body `var` declarations |
+| Return values | 4 | Per `fn`, `fwd`, `code`, or indirect call signature (`extern` supports at most 1) |
+| Indirect call inputs | 255 | Subject to target virtual-stack / register limits |
+| Virtual stack depth | 128 | Maximum expression/call stack depth in register-based backends |
+
+Target `extern` calls are additionally bounded by each backend's register-passing convention (for example, up to 3 registers on 6502, 8 on RV32, and 16 on ARM64).
+
+Compiler-internal tables and indexable buffers (such as total functions, constants, labels, jump-table entries, per-word IR instructions, and `data` offsets) are additionally bounded by the host platform's unsigned integer range (`unsigned int`, at least 65,535 entries on 16-bit hosts) and available host memory.
+
 For complete runnable programs, see [examples/](../examples/) and [tests/](../tests/).

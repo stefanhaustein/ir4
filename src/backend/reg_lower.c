@@ -37,13 +37,18 @@ typedef struct {
 VEC_OF(RegPendingBrVec, RegPendingBr);
 VEC_OF(RegPendingJtabVec, RegPendingJtab);
 
-#define MAX_VSTACK 128
+#define MAX_VSTACK 256
 
 typedef struct {
     u8 valid;
     size_t depth;
     StackType types[MAX_VSTACK];
 } SavedStack;
+
+static void check_vstack_push(size_t depth) {
+    if (depth >= MAX_VSTACK)
+        ir4_die("expression stack depth exceeds register backend limit");
+}
 
 static StackType alu_result_type(IrOp op) {
     if (op >= OP_FADD && op <= OP_FNEG)
@@ -346,30 +351,38 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
                 dead = 1;
                 break;
             case IR_PUSH_W:
+                check_vstack_push(depth);
                 types[depth++] = TY_W;
                 break;
             case IR_PUSH_A:
             case IR_PUSH_DATA:
             case IR_PUSH_HEAP_START:
             case IR_PUSH_FN:
+                check_vstack_push(depth);
                 types[depth++] = TY_A;
                 break;
             case IR_PUSH_F:
+                check_vstack_push(depth);
                 types[depth++] = TY_F;
                 break;
             case IR_PUSH_I32:
+                check_vstack_push(depth);
                 types[depth++] = TY_I32;
                 break;
             case IR_LOCAL_OP:
-                if (ins->u.loc.op == LOCAL_GET)
+                if (ins->u.loc.op == LOCAL_GET) {
+                    check_vstack_push(depth);
                     types[depth++] = ins->u.loc.type;
-                else if (ins->u.loc.op == LOCAL_ADDR)
+                } else if (ins->u.loc.op == LOCAL_ADDR) {
+                    check_vstack_push(depth);
                     types[depth++] = TY_A;
-                else
+                } else {
                     depth--;
+                }
                 break;
             case IR_STACK_OP:
                 if (ins->u.stk.op == OP_DUP) {
+                    check_vstack_push(depth);
                     types[depth] = types[depth - 1];
                     depth++;
                 } else if (ins->u.stk.op == OP_DROP) {
@@ -388,6 +401,7 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
                 } else {
                     int ar = op_arity(ins->u.op);
                     depth -= (size_t)ar;
+                    check_vstack_push(depth);
                     types[depth++] = alu_result_type(ins->u.op);
                 }
                 break;
@@ -396,14 +410,17 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
                 const FuncSig *csig = funcs->data[ins->u.func_idx];
                 size_t k;
                 depth -= csig->in_types.len;
-                for (k = 0; k < csig->out_types.len; k++)
+                for (k = 0; k < csig->out_types.len; k++) {
+                    check_vstack_push(depth);
                     types[depth++] = csig->out_types.data[k];
+                }
                 break;
             }
             case IR_ICALL: {
                 size_t k;
                 depth -= (size_t)ins->u.icall.in_cnt + 1;
                 for (k = 0; k < ins->u.icall.out_cnt; k++) {
+                    check_vstack_push(depth);
                     types[depth] = (StackType)ins->u.icall.out_types[k];
                     depth++;
                     if (depth > max_depth)
@@ -414,7 +431,7 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
             case IR_BR_FWD:
                 if (ins->u.br.cond == BR_JZ)
                     depth--;
-                if (ins->u.br.target <= w->ir.len) {
+                if ((size_t)ins->u.br.target <= w->ir.len) {
                     size_t k;
                     saved[ins->u.br.target].valid = 1;
                     saved[ins->u.br.target].depth = depth;
@@ -450,11 +467,11 @@ static int is_br_target(const WordIR *w, size_t ir_idx, const SizeVec *jtab_targ
     size_t j;
     for (j = 0; j < w->ir.len; j++) {
         const IrInstr *bi = &w->ir.data[j];
-        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target == ir_idx)
+        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && (size_t)bi->u.br.target == ir_idx)
             return 1;
         if (bi->kind == IR_JTAB) {
             size_t k;
-            for (k = 0; k < bi->u.jtab.count; k++) {
+            for (k = 0; k < (size_t)bi->u.jtab.count; k++) {
                 if (jtab_targets->data[bi->u.jtab.start + k] == ir_idx)
                     return 1;
             }
@@ -580,6 +597,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_W:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_W;
                 st.stk[st.depth].kind = VK_CONST;
                 st.stk[st.depth].imm = ins->u.w;
@@ -587,6 +605,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_A:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_A;
                 st.stk[st.depth].kind = VK_UCONST;
                 st.stk[st.depth].uimm = ins->u.a;
@@ -594,6 +613,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_F:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_F;
                 st.stk[st.depth].kind = VK_FCONST;
                 st.stk[st.depth].fval = ins->u.f;
@@ -601,6 +621,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_I32:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_I32;
                 st.stk[st.depth].kind = VK_CONST;
                 st.stk[st.depth].imm = ins->u.w;
@@ -608,6 +629,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_DATA:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_A;
                 st.stk[st.depth].kind = VK_DATA;
                 st.stk[st.depth].idx = ins->u.offset;
@@ -615,6 +637,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_HEAP_START:
+                check_vstack_push(st.depth);
                 st.stk[st.depth].type = TY_A;
                 st.stk[st.depth].kind = VK_DATA;
                 st.stk[st.depth].idx = heap_start_off;
@@ -624,8 +647,11 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
             case IR_PUSH_FN: {
                 size_t target = ins->u.func_idx;
                 size_t fn_addr = rbe->cur_addr();
-                u8 dst = dst_reg_for(&st, st.depth, TY_A);
-                size_t fn_pc = rbe->load_fn_addr(dst, funcs->data[target]->addr);
+                u8 dst;
+                size_t fn_pc;
+                check_vstack_push(st.depth);
+                dst = dst_reg_for(&st, st.depth, TY_A);
+                fn_pc = rbe->load_fn_addr(dst, funcs->data[target]->addr);
                 commit_dst(&st, st.depth, TY_A, dst);
                 st.depth++;
                 if (!funcs->data[target]->has_addr) {
@@ -641,11 +667,13 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
             case IR_LOCAL_OP: {
                 size_t slot = ins->u.loc.slot;
                 if (ins->u.loc.op == LOCAL_GET) {
+                    check_vstack_push(st.depth);
                     st.stk[st.depth].type = ins->u.loc.type;
                     st.stk[st.depth].kind = VK_LOCAL;
                     st.stk[st.depth].idx = slot;
                     st.depth++;
                 } else if (ins->u.loc.op == LOCAL_ADDR) {
+                    check_vstack_push(st.depth);
                     st.stk[st.depth].type = TY_A;
                     st.stk[st.depth].kind = VK_LADDR;
                     st.stk[st.depth].idx = slot;
@@ -688,6 +716,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                     st.depth--;
                 } else if (ins->u.stk.op == OP_DUP) {
                     const VSlot *top = &st.stk[st.depth - 1];
+                    check_vstack_push(st.depth);
                     if (top->kind != VK_REG) {
                         st.stk[st.depth] = *top;
                     } else {
@@ -888,6 +917,9 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 size_t in_cnt = csig->in_types.len;
                 size_t out_cnt = csig->out_types.len;
                 size_t base_d = st.depth - in_cnt;
+                size_t reg_cnt = in_cnt < rbe->num_stk_regs ? in_cnt : rbe->num_stk_regs;
+                size_t stk_cnt = in_cnt > rbe->num_stk_regs ? (in_cnt - rbe->num_stk_regs) : 0;
+                u32 out_arg_bytes = (u32)((stk_cnt * rbe->word_bytes + 15U) & ~15U);
                 size_t k, call_addr, call_pc;
 
                 if (words->data[target]->is_code)
@@ -896,7 +928,17 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 save_live_below(&st, base_d);
                 for (k = 0; k < in_cnt; k++)
                     materialize_slot(&st, base_d + k);
-                for (k = 0; k < in_cnt; k++)
+                if (out_arg_bytes > 0) {
+                    rbe->sp_adj(-(i32)out_arg_bytes);
+                    for (k = rbe->num_stk_regs; k < in_cnt; k++) {
+                        StackType aty = csig->in_types.data[k];
+                        u8 tmp = (rbe->has_fp_regs && aty == TY_F) ? rbe->fp_scratch : rbe->scratch0;
+                        load_from_slot(&st, base_d + k, tmp, aty);
+                        rbe->store_out_arg(tmp, aty,
+                                           (u32)((k - rbe->num_stk_regs) * rbe->word_bytes));
+                    }
+                }
+                for (k = 0; k < reg_cnt; k++)
                     load_from_slot(&st, base_d + k, slot_reg(&st, k, csig->in_types.data[k]),
                                    csig->in_types.data[k]);
 
@@ -910,11 +952,15 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                     fc->func_idx = target;
                     fc->is_fn_ptr = 0;
                 }
+                if (out_arg_bytes > 0)
+                    rbe->sp_adj((i32)out_arg_bytes);
 
                 for (k = out_cnt; k > 0; k--) {
                     size_t idx = k - 1;
                     StackType ot = csig->out_types.data[idx];
-                    u8 src = slot_reg(&st, idx, ot);
+                    u8 src;
+                    check_vstack_push(base_d + idx);
+                    src = slot_reg(&st, idx, ot);
                     store_to_slot(&st, base_d + idx, src, ot);
                     st.stk[base_d + idx].type = ot;
                     st.stk[base_d + idx].kind = VK_REG;
@@ -928,24 +974,39 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 size_t in_cnt = ins->u.icall.in_cnt;
                 size_t out_cnt = ins->u.icall.out_cnt;
                 size_t base_d = st.depth - 1 - in_cnt;
-                u8 fn_reg;
+                size_t reg_cnt = in_cnt < rbe->num_stk_regs ? in_cnt : rbe->num_stk_regs;
+                size_t stk_cnt = in_cnt > rbe->num_stk_regs ? (in_cnt - rbe->num_stk_regs) : 0;
+                u32 out_arg_bytes = (u32)((stk_cnt * rbe->word_bytes + 15U) & ~15U);
                 size_t k;
 
                 save_live_below(&st, base_d);
-                fn_reg = read_slot_to_reg(&st, st.depth - 1, rbe->scratch0);
-                if (fn_reg != rbe->scratch0)
-                    rbe->mov_reg(rbe->scratch0, fn_reg, TY_W);
                 for (k = 0; k < in_cnt; k++)
                     materialize_slot(&st, base_d + k);
-                for (k = 0; k < in_cnt; k++)
+                materialize_slot(&st, st.depth - 1);
+                if (out_arg_bytes > 0) {
+                    rbe->sp_adj(-(i32)out_arg_bytes);
+                    for (k = rbe->num_stk_regs; k < in_cnt; k++) {
+                        StackType aty = st.stk[base_d + k].type;
+                        u8 tmp = (rbe->has_fp_regs && aty == TY_F) ? rbe->fp_scratch : rbe->scratch0;
+                        load_from_slot(&st, base_d + k, tmp, aty);
+                        rbe->store_out_arg(tmp, aty,
+                                           (u32)((k - rbe->num_stk_regs) * rbe->word_bytes));
+                    }
+                }
+                for (k = 0; k < reg_cnt; k++)
                     load_from_slot(&st, base_d + k, slot_reg(&st, k, st.stk[base_d + k].type),
                                    st.stk[base_d + k].type);
+                load_from_slot(&st, st.depth - 1, rbe->scratch0, TY_A);
                 rbe->icall(rbe->scratch0);
+                if (out_arg_bytes > 0)
+                    rbe->sp_adj((i32)out_arg_bytes);
 
                 for (k = out_cnt; k > 0; k--) {
                     size_t idx = k - 1;
                     StackType ot = (StackType)ins->u.icall.out_types[idx];
-                    u8 src = slot_reg(&st, idx, ot);
+                    u8 src;
+                    check_vstack_push(base_d + idx);
+                    src = slot_reg(&st, idx, ot);
                     store_to_slot(&st, base_d + idx, src, ot);
                     st.stk[base_d + idx].type = ot;
                     st.stk[base_d + idx].kind = VK_REG;
@@ -961,23 +1022,41 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 size_t out_cnt = csig->out_types.len;
                 size_t base_d = st.depth - in_cnt;
                 u8 arg_regs[16];
+                size_t int_idx = 0, flt_idx = 0;
                 size_t k;
 
-                save_live_below(&st, base_d);
+                if (out_cnt > 1)
+                    ir4_die("extern supports at most 1 return value in register backend");
                 for (k = 0; k < in_cnt; k++) {
-                    arg_regs[k] = read_slot_to_reg(&st, base_d + k, rbe->stk_regs[k]);
-                    /* Materialize into stk_regs[0..7] for C ABI */
-                    materialize_slot(&st, base_d + k);
+                    if (rbe->has_fp_regs && csig->in_types.data[k] == TY_F) {
+                        if (flt_idx >= 8)
+                            ir4_die("extern supports at most 8 float args in register backend");
+                        flt_idx++;
+                    } else {
+                        if (int_idx >= 8)
+                            ir4_die("extern supports at most 8 integer args in register backend");
+                        int_idx++;
+                    }
                 }
+
+                save_live_below(&st, base_d);
+                for (k = 0; k < in_cnt; k++)
+                    materialize_slot(&st, base_d + k);
+                int_idx = 0;
+                flt_idx = 0;
                 for (k = 0; k < in_cnt; k++) {
-                    load_from_slot(&st, base_d + k, slot_reg(&st, k, csig->in_types.data[k]),
-                                   csig->in_types.data[k]);
-                    arg_regs[k] = slot_reg(&st, k, csig->in_types.data[k]);
+                    StackType aty = csig->in_types.data[k];
+                    u8 dst = (rbe->has_fp_regs && aty == TY_F) ? rbe->fp_stk_regs[flt_idx++]
+                                                               : rbe->stk_regs[int_idx++];
+                    load_from_slot(&st, base_d + k, dst, aty);
+                    arg_regs[k] = dst;
                 }
                 rbe->call_extern(csig, arg_regs);
                 if (out_cnt == 1) {
                     StackType ot = csig->out_types.data[0];
-                    u8 ret_reg = slot_reg(&st, 0, ot);
+                    u8 ret_reg;
+                    check_vstack_push(base_d);
+                    ret_reg = slot_reg(&st, 0, ot);
                     store_to_slot(&st, base_d, ret_reg, ot);
                     st.stk[base_d].type = ot;
                     st.stk[base_d].kind = VK_REG;
@@ -1023,7 +1102,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 st.depth--;
                 flush_all(&st);
                 tbl_off = rbe->emit_jtab(idx_reg, ins->u.jtab.count);
-                for (k = 0; k < ins->u.jtab.count; k++) {
+                for (k = 0; k < (size_t)ins->u.jtab.count; k++) {
                     size_t tir = jtab_targets->data[ins->u.jtab.start + k];
                     if (tir <= i) {
                         rbe->patch_jtab(tbl_off, k, ins->u.jtab.count, ir_addr[tir]);

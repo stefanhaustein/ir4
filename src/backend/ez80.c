@@ -514,6 +514,8 @@ static void ez_fn_begin(const char *name, size_t param_cnt, const LocalVar *loca
 }
 
 static void ez_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
+    typedef char ir4_ez80_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
+    (void)sizeof(ir4_ez80_max_outs_check);
     (void)locals;
     (void)total_locals;
     if (ez_compact) {

@@ -40,7 +40,7 @@ typedef struct {
             u8 op;   /* LocalOp */
             u8 type; /* StackType */
             u16 stack_bytes;
-            size_t slot;
+            unsigned int slot;
         } loc;
         struct {
             u8 op; /* StackOp */
@@ -48,19 +48,19 @@ typedef struct {
             u8 t2; /* StackType */
         } stk;
         u8 op; /* IrOp */
-        size_t func_idx;
+        unsigned int func_idx;
         struct {
             u8 cond; /* BranchCond */
-            size_t target;
+            unsigned int target;
         } br;
         struct {
-            size_t start;
-            size_t count;
+            unsigned int start;
+            unsigned int count;
         } jtab;
         struct {
             u8 in_cnt;
             u8 out_cnt;
-            u8 out_types[12];
+            u8 out_types[IR4_MAX_OUTS];
         } icall;
     } u;
 } IrInstr;

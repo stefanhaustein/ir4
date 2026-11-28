@@ -98,12 +98,17 @@ static void a64_fn_begin(const char *name, size_t param_cnt, const LocalVar *loc
     }
 }
 
+typedef char ir4_arm64_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
+
 static void a64_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_locals) {
     size_t k;
     size_t param_cnt = sig->in_types.len;
     size_t out_count = sig->out_types.len;
     (void)locals;
     (void)total_locals;
+
+    if (out_count > 4)
+        ir4_die("ARM64 return values exceed 4");
 
     /* Save return values from evaluation SP into scratch X9..X12 */
     for (k = out_count; k > 0; k--) {
@@ -1060,6 +1065,50 @@ static size_t a64r_load_fn_addr(u8 dst, size_t target_addr) {
     return pc;
 }
 
+static void a64r_load_frame_arg(u8 dst, StackType type, u32 pos_off) {
+    u32 scaled_op = (type == TY_F) ? 0xFD400000UL : 0xF9400000UL;
+    if ((pos_off / 8) <= 4095) {
+        cb_emit32(scaled_op | ((pos_off / 8) << 10) | (29UL << 5) | (u32)dst);
+    } else {
+        a64r_mov_u64(15, pos_off, 0);
+        cb_emit32(0x8B0F03AFUL); /* ADD X15, X29, X15 */
+        cb_emit32(scaled_op | (15UL << 5) | (u32)dst);
+    }
+}
+
+static void a64r_sp_adj(i32 delta) {
+    if (delta == 0)
+        return;
+    if (delta < 0) {
+        u32 mag = (u32)(-delta);
+        if (mag <= 4095) {
+            cb_emit32(0xD10003FFUL | ((mag & 0xFFFUL) << 10)); /* SUB SP, SP, #mag */
+        } else {
+            a64r_mov_u64(15, mag, 0);
+            cb_emit32(0xCB2F63FFUL); /* SUB SP, SP, X15 */
+        }
+    } else {
+        u32 mag = (u32)delta;
+        if (mag <= 4095) {
+            cb_emit32(0x910003FFUL | ((mag & 0xFFFUL) << 10)); /* ADD SP, SP, #mag */
+        } else {
+            a64r_mov_u64(15, mag, 0);
+            cb_emit32(0x8B2F63FFUL); /* ADD SP, SP, X15 */
+        }
+    }
+}
+
+static void a64r_store_out_arg(u8 src_reg, StackType type, u32 sp_off) {
+    u32 scaled_op = (type == TY_F) ? 0xFD000000UL : 0xF9000000UL;
+    if ((sp_off / 8) <= 4095) {
+        cb_emit32(scaled_op | ((sp_off / 8) << 10) | (31UL << 5) | (u32)src_reg);
+    } else {
+        a64r_mov_u64(15, sp_off, 0);
+        cb_emit32(0x8B2F63EFUL); /* ADD X15, SP, X15 */
+        cb_emit32(scaled_op | (15UL << 5) | (u32)src_reg);
+    }
+}
+
 static void a64r_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, size_t param_cnt,
                           const LocalVar *locals, const u8 *loc_is_reg, const u8 *loc_reg,
                           const i32 *loc_off, size_t total_locals) {
@@ -1094,8 +1143,14 @@ static void a64r_fn_begin(const char *name, u8 used_loc_regs, u32 frame_bytes, s
                 a64r_spill_store(src, ty, loc_off[i]);
             }
         } else {
-            i32 caller_off = (i32)(total_frame); /* unreachable for normal funcs; handled by spill */
-            (void)caller_off;
+            u32 caller_off = (u32)(16 + (i - 12) * 8);
+            if (loc_is_reg[i]) {
+                a64r_load_frame_arg(loc_reg[i], ty, caller_off);
+            } else {
+                u8 tmp = (ty == TY_F) ? 16 : 8;
+                a64r_load_frame_arg(tmp, ty, caller_off);
+                a64r_spill_store(tmp, ty, loc_off[i]);
+            }
         }
     }
 
@@ -1515,8 +1570,8 @@ static void a64r_call_extern(const FuncSig *sig, const u8 *arg_regs) {
 const RegBackend reg_be_arm64 = {
     8, 1, 12, a64_stk_regs, a64_fp_stk_regs, 9, a64_loc_regs, 8, 9, 14, 16, 17,
     a64_cur_addr, a64r_fn_begin, a64r_fn_end, a64r_spill_store, a64r_spill_load,
-    a64r_local_addr, a64r_mov_reg, a64r_mov_imm, a64r_mov_uimm32, a64r_mov_fconst,
-    a64r_load_data_addr, a64r_load_fn_addr, a64r_alu_reg, a64r_alu_imm, a64r_fp_op,
-    a64r_load_mem, a64r_store_mem, a64r_bcopy, a64r_br_fwd, a64r_br_back,
-    a64r_cmp_br_fwd, a64r_cmp_br_back, a64_patch_fwd, a64r_emit_jtab, a64_patch_jtab,
-    a64_call, a64r_icall, a64r_call_extern};
+    a64r_local_addr, a64r_sp_adj, a64r_store_out_arg, a64r_mov_reg, a64r_mov_imm,
+    a64r_mov_uimm32, a64r_mov_fconst, a64r_load_data_addr, a64r_load_fn_addr,
+    a64r_alu_reg, a64r_alu_imm, a64r_fp_op, a64r_load_mem, a64r_store_mem, a64r_bcopy,
+    a64r_br_fwd, a64r_br_back, a64r_cmp_br_fwd, a64r_cmp_br_back, a64_patch_fwd,
+    a64r_emit_jtab, a64_patch_jtab, a64_call, a64r_icall, a64r_call_extern};

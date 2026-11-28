@@ -15,7 +15,7 @@
 #include "collections.h"
 
 typedef unsigned char u8;
-typedef int Bool;
+typedef u8 Bool;
 #ifndef true
 #define false 0
 #define true 1
@@ -281,6 +281,12 @@ typedef struct {
     size_t (*stack_data_off)(void);
     void (*peep_fence)(void);
 } Backend;
+
+/* Maximum number of return values in a function or indirect call signature. */
+#define IR4_MAX_OUTS 4
+
+/* Maximum number of locals per function (including parameters and :bytes copies). */
+#define IR4_MAX_LOCALS 128
 
 /* Error reporting & optional live progress (no-op unless -DIR4_STATUS; lexer.c) */
 void ir4_die(const char *msg);

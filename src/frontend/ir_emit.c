@@ -401,11 +401,11 @@ static void emit_word(size_t fidx) {
     memset(br_tgt.data, 0, w->ir.len + 1);
     for (i = 0; i < w->ir.len; i++) {
         const IrInstr *bi = &w->ir.data[i];
-        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && bi->u.br.target <= w->ir.len) {
+        if ((bi->kind == IR_BR_FWD || bi->kind == IR_BR_BACK) && (size_t)bi->u.br.target <= w->ir.len) {
             br_tgt.data[bi->u.br.target] = 1;
         } else if (bi->kind == IR_JTAB) {
             size_t k;
-            for (k = 0; k < bi->u.jtab.count; k++) {
+            for (k = 0; k < (size_t)bi->u.jtab.count; k++) {
                 size_t tir = jtab_targets.data[bi->u.jtab.start + k];
                 if (tir <= w->ir.len)
                     br_tgt.data[tir] = 1;
@@ -558,7 +558,7 @@ static void emit_word(size_t fidx) {
                 if (!be->emit_jtab || !be->patch_jtab)
                     ir4_die("'jtab' is not supported on this backend");
                 tbl_off = be->emit_jtab(ins->u.jtab.count);
-                for (k = 0; k < ins->u.jtab.count; k++) {
+                for (k = 0; k < (size_t)ins->u.jtab.count; k++) {
                     size_t tir = jtab_targets.data[ins->u.jtab.start + k];
                     if (tir <= i) {
                         be->patch_jtab(tbl_off, k, ins->u.jtab.count, ir_addr.data[tir]);
@@ -694,7 +694,7 @@ void run_reachability_dce(void) {
                 continue;
             for (i = 0; i < w->ir.len; i++) {
                 const IrInstr *ins = &w->ir.data[i];
-                if (ins->kind == IR_PUSH_FN && ins->u.func_idx < funcs.len)
+                if (ins->kind == IR_PUSH_FN && (size_t)ins->u.func_idx < funcs.len)
                     addr_taken[ins->u.func_idx] = true;
             }
         }

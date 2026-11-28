@@ -841,7 +841,10 @@ static void flush_bytes_params(u8 *params_flushed) {
     *params_flushed = 1;
     for (k = 0; k < cur_bytes_copies.len; k++) {
         size_t slot = locals.len;
-        LocalVar *lv = VEC_ADD(locals);
+        LocalVar *lv;
+        if (slot >= IR4_MAX_LOCALS)
+            ir4_die("too many local variables/parameters");
+        lv = VEC_ADD(locals);
         lv->name = cur_bytes_copies.data[k].name;
         lv->type = TY_A;
         lv->slot = slot;
@@ -924,6 +927,8 @@ static void parse_sig_body(FuncSig *sig, size_t *param_cnt_out, int allow_bytes)
                 if (ty == TY_NONE)
                     ir4_die("expected type token (:i, :a, :f) in signature");
             }
+            if (sig->out_types.len >= IR4_MAX_OUTS)
+                ir4_die("too many return values in signature");
             VEC_PUSH(sig->out_types, ty);
             VEC_PUSH(cur_outs, ty);
         } else {
@@ -932,6 +937,8 @@ static void parse_sig_body(FuncSig *sig, size_t *param_cnt_out, int allow_bytes)
             if (parse_type_tok(tok) != TY_NONE) {
                 ir4_die("expected identifier before type in signature");
             }
+            if (slot >= IR4_MAX_LOCALS)
+                ir4_die("too many local variables/parameters");
             lv = VEC_ADD(locals);
             lv->name = intern_str(tok);
             ty_tok = next_tok();
@@ -1449,6 +1456,8 @@ static int parse_local_var(int allow_bytes) {
     if (!vtype)
         ir4_die("expected type after local 'var' name");
     slot = locals.len;
+    if (slot >= IR4_MAX_LOCALS)
+        ir4_die("too many local variables/parameters");
     lv = VEC_ADD(locals);
     lv->name = vname;
     lv->slot = slot;
@@ -1616,7 +1625,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
                 IrInstr *p1 = &w->ir.data[w->ir.len - 2];
                 IrInstr *p2 = &w->ir.data[w->ir.len - 1];
                 if (p0->kind == IR_LOCAL_OP && p0->u.loc.op == LOCAL_GET &&
-                    p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
+                    (size_t)p0->u.loc.slot == lv->slot && p1->kind == IR_PUSH_W &&
                     p2->kind == IR_ALU_OP &&
                     (p2->u.op == OP_ADD || p2->u.op == OP_SUB ||
                      p2->u.op == OP_AADD || p2->u.op == OP_ASUB)) {
@@ -1941,7 +1950,7 @@ static void compile_body(WordIR *w) {
             for (k = 0; k < icall_sig.out_types.len; k++) {
                 tpush(icall_sig.out_types.data[k]);
             }
-            if (icall_sig.in_types.len > 255 || icall_sig.out_types.len > 12)
+            if (icall_sig.in_types.len > 255 || icall_sig.out_types.len > IR4_MAX_OUTS)
                 ir4_die("too many arguments or return values in indirect call");
             {
                 IrInstr *ins = emit_ir(IR_ICALL, w);

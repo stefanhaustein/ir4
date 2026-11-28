@@ -216,29 +216,28 @@ fn sysmillis ( -> :i32 )
   rtc_now __x16gs_last_rtc i32- -> var dt_rtc :i32
   dt_rtc 0 i>i32 i32< if dt_rtc 86400 i>i32 i32+ -> dt_rtc then
   rtc_now -> __x16gs_last_rtc
-  delta 8000000 i>i32 u32/ -> var mod_rtc :i32
-  dt_rtc mod_rtc i32- 268 i>i32 i32+ -> var wrap_num :i32
-  0 i>i32 -> var wraps :i32
-  wrap_num 0 i>i32 i32> if wrap_num 537 i>i32 i32/ -> wraps then
   delta __x16gs_c_per_ms u32/ -> var q :i32
   delta __x16gs_c_per_ms u32mod __x16gs_rem_cyc i32+ -> var rem :i32
-  wraps 0 i>i32 i32> if
-    -1 i>i32 __x16gs_c_per_ms u32/ -> var wq :i32
-    -1 i>i32 __x16gs_c_per_ms u32mod 1 i>i32 i32+ -> var wr :i32
-    wr __x16gs_c_per_ms u32>= if
-      wq 1 i>i32 i32+ -> wq
-      wr __x16gs_c_per_ms i32- -> wr
-    then
-    begin wraps 0 i>i32 i32> while
-      q wq i32+ -> q
-      rem wr i32+ -> rem
-      rem __x16gs_c_per_ms u32>= if
-        q 1 i>i32 i32+ -> q
-        rem __x16gs_c_per_ms i32- -> rem
-      then
-      wraps 1 i>i32 i32- -> wraps
-    repeat
+  -1 i>i32 __x16gs_c_per_ms u32/ -> var wq :i32
+  -1 i>i32 __x16gs_c_per_ms u32mod 1 i>i32 i32+ -> var wr :i32
+  wr __x16gs_c_per_ms u32>= if
+    wq 1 i>i32 i32+ -> wq
+    wr __x16gs_c_per_ms i32- -> wr
   then
+  wq 500 i>i32 i32+ 1000 i>i32 i32/ -> var wrap_sec :i32
+  q 500 i>i32 i32+ 1000 i>i32 i32/ -> var mod_sec :i32
+  dt_rtc mod_sec i32- wrap_sec 2 i>i32 i32/ i32+ -> var wrap_num :i32
+  0 i>i32 -> var wraps :i32
+  wrap_num 0 i>i32 i32> if wrap_num wrap_sec i32/ -> wraps then
+  begin wraps 0 i>i32 i32> while
+    q wq i32+ -> q
+    rem wr i32+ -> rem
+    rem __x16gs_c_per_ms u32>= if
+      q 1 i>i32 i32+ -> q
+      rem __x16gs_c_per_ms i32- -> rem
+    then
+    wraps 1 i>i32 i32- -> wraps
+  repeat
   rem __x16gs_c_per_ms u32>= if
     q 1 i>i32 i32+ -> q
     rem __x16gs_c_per_ms i32- -> rem

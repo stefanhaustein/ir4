@@ -224,6 +224,11 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, size_t total_
         out_bytes += z80_type_bytes(sig->out_types.data[i]);
     }
     out_words = (u8)(out_bytes / 2);
+    /* DE, BC, DE', BC' hold up to 4 16-bit words (note: :i32/:f take >1 word) */
+    {
+        typedef char ir4_z80_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
+        (void)sizeof(ir4_z80_max_outs_check);
+    }
     if (out_words > 4)
         ir4_die("Z80 return values exceed 8 bytes");
 

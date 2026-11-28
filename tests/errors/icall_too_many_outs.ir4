@@ -1,0 +1,8 @@
+\ Error test: more than IR4_MAX_OUTS (4) return values in indirect call
+fn helper ( )
+end
+
+fn main ( -> :i )
+  & helper ( -> :i :i :i :i :i ) drop drop drop drop drop
+  0
+end

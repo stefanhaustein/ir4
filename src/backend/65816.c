@@ -1146,7 +1146,7 @@ static size_t m816_stack_bytes = 0;
 static int m816_cur_is_recursive = 0;
 static size_t m816_static_base = 0;
 static size_t m816_frame_bytes = 0;
-static size_t m816_local_off[128];
+static size_t m816_local_off[IR4_MAX_LOCALS];
 
 static int m816_emit_dp_mem_off(u8 dp, IrOp op, u16 uoff);
 static void m816_local_op(LocalOp op, size_t slot, StackType type, size_t stack_bytes);
@@ -1164,6 +1164,9 @@ static void m816_fn_begin(const char *name, size_t param_cnt, const LocalVar *lo
     m816_cur_is_recursive = is_recursive ? 1 : 0;
     m816_frame_bytes = 0;
     m816_static_base = 0;
+
+    if (total_locals > IR4_MAX_LOCALS)
+        ir4_die("65816 locals exceed IR4_MAX_LOCALS");
 
     for (i = 0; i < total_locals; i++) {
         size_t sz = (locals[i].size > 0) ? locals[i].size : slot_bytes(locals[i].type);
