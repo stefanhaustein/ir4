@@ -77,6 +77,8 @@ VEC_OF(IrVec, IrInstr);
 
 typedef struct {
     IrVec ir;
+    long spill_off;
+    size_t spill_len;
     size_t raw_start;
     size_t raw_len;
     size_t reloc_start;
@@ -117,11 +119,18 @@ extern CodeRelocVec code_relocs;
 extern SizeVec init_fns;
 
 size_t alloc_fn(FnSig **sig_out, FnIR **w_out);
+void free_sig_vecs(FnSig *s);
+void fn_sig_set_types(FnSig *sig, const u8 *ins, size_t in_cnt, const u8 *outs, size_t out_cnt);
 void register_fn_sym(const char *interned_name, size_t idx);
 IrInstr *emit_ir(IrKind kind, FnIR *w);
+size_t fn_ir_len(const FnIR *w);
+void fn_ir_ensure(FnIR *w);
+void fn_ir_drop(FnIR *w);
+void fn_ir_cleanup(void);
 
 /* Lexer & require loader (defined in lexer.c) */
 void lex_init(FILE *in, const char *path);
+void lex_cleanup(void);
 SrcFile *lex_cur(void);
 int src_getc(SrcFile *sf);
 void src_ungetc(SrcFile *sf, int c);

@@ -43,7 +43,7 @@ static void sim_end(int main_idx) {
     u16 putchar_addr;
     u16 div_loop_pc;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--sim65 requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -53,7 +53,7 @@ static void sim_end(int main_idx) {
 
     /* CLD; LDX #$FF; TXS; zero BSS; LDX #init_x */
     cb_emit8(M6502_CLD);
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         (void)be_6502_stack_data_off();
     }
     cb_emit8_8(M6502_LDX_IMM, 0xFF);
@@ -64,7 +64,7 @@ static void sim_end(int main_idx) {
     /* JSR main */
     cb_emit8_16(M6502_JSR, sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         u8 zp_stk = be_6502_stack_zp_base();
         /* Pop 16-bit signed value from (stack_base,X) into $04/$05 */
         if (zp_stk != 0) {
@@ -118,7 +118,7 @@ static void sim_end(int main_idx) {
     cb_emit8_8(M6502_LDA_IMM, 0x00);
     cb_emit8_16(M6502_JMP, SIM65_EXIT);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
         cb_patch16(print_call1, print_u16_addr);
 

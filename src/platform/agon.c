@@ -29,7 +29,7 @@ static void agon_end(int main_idx) {
     size_t rsp_off = be_ez80_rsp_off();
     size_t rtop_off = be_ez80_rstack_top_off();
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--agon requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -101,7 +101,7 @@ static void agon_end(int main_idx) {
     cb_emit8(EZ80_CALL);
     cb_emit24((u32)sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         cb_emit8(EZ80_POP_BC); /* preserve main() return value in BC for test harness */
     } else {
         cb_emit8(EZ80_LD_BC_N24);

@@ -1200,7 +1200,7 @@ static void m816_fn_begin(const char *name, int param_cnt, const LocalVar *local
 static void m816_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     (void)locals;
     (void)total_locals;
-    if (sig->is_recursive && m816_frame_bytes > 0) {
+    if (FN_FLAG(sig, FN_FL_RECURSIVE) && m816_frame_bytes > 0) {
         cb_emit8(M816_CLC);
         cb_emit8_8(M816_LDA_DP, M816_DP_LFP);
         emit8_16(M816_ADC_IMM, (u16)(m816_frame_bytes & 0xFFFF));
@@ -1220,7 +1220,7 @@ static int m816_tail_call(size_t target_addr, const FnSig *sig, const FnSig *cal
     (void)callee;
     (void)locals;
     (void)total_locals;
-    if (sig->is_recursive && m816_frame_bytes > 0) {
+    if (FN_FLAG(sig, FN_FL_RECURSIVE) && m816_frame_bytes > 0) {
         cb_emit8(M816_CLC);
         cb_emit8_8(M816_LDA_DP, M816_DP_LFP);
         emit8_16(M816_ADC_IMM, (u16)(m816_frame_bytes & 0xFFFF));

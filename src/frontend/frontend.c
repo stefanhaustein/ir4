@@ -41,6 +41,10 @@ void ir4_set_opt_level(int level) { ir4_opt_level = level ? 1 : 0; }
 int ir4_get_opt_level(void) { return ir4_opt_level; }
 static BufVec buffers;
 static LocalVec locals;
+static StrVec local_names;
+static ByteVec sig_in_buf;
+static ByteVec sig_out_buf;
+static StrVec sig_in_regs;
 static TypeVec cur_outs;
 static TypeVec tstack;
 static BlockVec blocks;
@@ -166,7 +170,7 @@ static int find_local(const char *name) {
     if (!name)
         return -1;
     for (i = 0; i < locals.len; i++) {
-        if (locals.data[i].name && strcmp(locals.data[i].name, name) == 0)
+        if (local_names.data[i] && strcmp(local_names.data[i], name) == 0)
             return (int)i;
     }
     return -1;
@@ -181,7 +185,16 @@ static int find_fn(const char *p) {
 }
 
 int ir4_find_fn(const char *name) {
-    return find_fn(intern_find(name));
+    size_t i;
+    if (!name)
+        return -1;
+    if (fn_ht.len > 0)
+        return find_fn(intern_find(name));
+    for (i = 0; i < fn_sigs.len; i++) {
+        if (fn_sigs.data[i]->name && strcmp(fn_sigs.data[i]->name, name) == 0)
+            return (int)i;
+    }
+    return -1;
 }
 
 void register_fn_sym(const char *interned_name, size_t idx) {
@@ -224,16 +237,93 @@ static void remove_const(size_t idx) {
 }
 
 static int const_matches_fn(StackType ty, const FnSig *fn) {
-    return fn->is_defined && !fn->is_extern && fn->in_types.len == 0 &&
-           fn->out_types.len == 1 && fn->out_types.data[0] == ty;
+    return FN_FLAG(fn, FN_FL_DEFINED) && !FN_FLAG(fn, FN_FL_EXTERN) &&
+           fn->in_cnt == 0 && fn->out_cnt == 1 && FN_OUT_TYPE(fn, 0) == ty;
 }
 
 static IrVec cur_ir = {NULL, 0, 0};
+
+#ifndef IR4_IR_SPILL
+#ifdef __EZ80__
+#define IR4_IR_SPILL 1
+#else
+#define IR4_IR_SPILL 0
+#endif
+#endif
+
+static FILE *ir_spill_fp = NULL;
+#if IR4_IR_SPILL && defined(__EZ80__)
+static const char *ir_spill_path = "ir4c_ir.tmp";
+#endif
+
+void fn_ir_cleanup(void) {
+    if (ir_spill_fp) {
+        fclose(ir_spill_fp);
+        ir_spill_fp = NULL;
+#if IR4_IR_SPILL && defined(__EZ80__)
+        remove(ir_spill_path);
+#endif
+    }
+}
+
+size_t fn_ir_len(const FnIR *w) {
+    return (w->spill_off >= 0) ? w->spill_len : w->ir.len;
+}
+
+void fn_ir_ensure(FnIR *w) {
+    if (w->spill_off >= 0 && !w->ir.data && w->spill_len > 0) {
+        if (!ir_spill_fp || fseek(ir_spill_fp, w->spill_off, SEEK_SET) != 0)
+            ir4_die("failed to seek IR spill file");
+        w->ir.data = (IrInstr *)malloc(w->spill_len * sizeof(IrInstr));
+        if (!w->ir.data)
+            ir4_die("out of memory loading spilled IR");
+        if (fread(w->ir.data, sizeof(IrInstr), w->spill_len, ir_spill_fp) != w->spill_len)
+            ir4_die("failed to read IR spill file");
+        w->ir.len = w->spill_len;
+        w->ir.cap = w->spill_len;
+    }
+}
+
+void fn_ir_drop(FnIR *w) {
+    if (w->spill_off >= 0 && w->ir.data) {
+        free(w->ir.data);
+        w->ir.data = NULL;
+        w->ir.len = 0;
+        w->ir.cap = 0;
+    }
+}
+
+#if IR4_IR_SPILL
+static void fn_ir_spill(FnIR *w, const IrInstr *data, size_t len) {
+    long off;
+    if (len == 0)
+        return;
+    if (!ir_spill_fp) {
+#ifdef __EZ80__
+        ir_spill_fp = fopen(ir_spill_path, "wb+");
+#else
+        ir_spill_fp = tmpfile();
+#endif
+        if (!ir_spill_fp)
+            ir4_die("cannot open IR spill temp file");
+    }
+    if (fseek(ir_spill_fp, 0L, SEEK_END) != 0)
+        ir4_die("failed to seek IR spill file");
+    off = ftell(ir_spill_fp);
+    if (off < 0)
+        ir4_die("ftell failed on IR spill file");
+    if (fwrite(data, sizeof(IrInstr), len, ir_spill_fp) != len)
+        ir4_die("failed to write IR spill file");
+    w->spill_off = off;
+    w->spill_len = len;
+}
+#endif
 
 static void reset_word_ir(FnIR *w) {
     free(w->ir.data);
     free(w->locals.data);
     memset(w, 0, sizeof(FnIR));
+    w->spill_off = -1;
 }
 
 static void emit_const_fn_body(FnIR *w, const ConstSym *cs) {
@@ -851,23 +941,52 @@ static void flush_bytes_params(u8 *params_flushed) {
         if (slot >= IR4_MAX_LOCALS)
             ir4_die("too many local variables/parameters");
         lv = VEC_ADD(locals);
-        lv->name = cur_bytes_copies.data[k].name;
-        lv->type = TY_A;
-        lv->slot = slot;
+        VEC_PUSH(local_names, cur_bytes_copies.data[k].name);
+        lv->type = (u8)TY_A;
+        lv->slot = (u16)slot;
         lv->size = cur_bytes_copies.data[k].size;
         cur_bytes_copies.data[k].dst_slot = slot;
     }
+}
+
+void fn_sig_set_types(FnSig *sig, const u8 *ins, size_t in_cnt, const u8 *outs, size_t out_cnt) {
+    size_t total;
+    u8 *dst;
+    if (in_cnt > 255 || out_cnt > IR4_MAX_OUTS)
+        ir4_die("too many parameters or return values in signature");
+    total = in_cnt + out_cnt;
+    if (sig->in_cnt + sig->out_cnt > FN_INLINE_TYPES)
+        free(sig->types.heap_t);
+    sig->in_cnt = (u8)in_cnt;
+    sig->out_cnt = (u8)out_cnt;
+    if (total <= FN_INLINE_TYPES) {
+        dst = sig->types.inline_t;
+    } else {
+        dst = (u8 *)malloc(total);
+        if (!dst)
+            ir4_die("out of memory");
+        sig->types.heap_t = dst;
+    }
+    if (in_cnt > 0)
+        memcpy(dst, ins, in_cnt);
+    if (out_cnt > 0)
+        memcpy(dst + in_cnt, outs, out_cnt);
 }
 
 static void parse_icall_sig(FnSig *sig) {
     const char *tok;
     u8 in_outs = 0;
 
+    sig_in_buf.len = 0;
+    sig_out_buf.len = 0;
+
     while ((tok = next_tok()) != NULL) {
         StackType ty;
         if (strcmp(tok, ")") == 0) {
-            if (in_outs && sig->out_types.len == 0)
+            if (in_outs && sig_out_buf.len == 0)
                 ir4_die("expected return type after '->'");
+            fn_sig_set_types(sig, sig_in_buf.data, sig_in_buf.len,
+                             sig_out_buf.data, sig_out_buf.len);
             return;
         }
         if (strcmp(tok, "->") == 0) {
@@ -880,9 +999,9 @@ static void parse_icall_sig(FnSig *sig) {
         if (ty == TY_NONE)
             ir4_die("expected type token (:i, :a, :f, :i32) in indirect call signature");
         if (in_outs) {
-            VEC_PUSH(sig->out_types, ty);
+            VEC_PUSH(sig_out_buf, (u8)ty);
         } else {
-            VEC_PUSH(sig->in_types, ty);
+            VEC_PUSH(sig_in_buf, (u8)ty);
         }
     }
     ir4_die("unterminated '(' in indirect call");
@@ -899,10 +1018,11 @@ static char *local_dup(const char *s) {
 
 static void free_local_names(void) {
     size_t i;
-    for (i = 0; i < locals.len; i++) {
-        free((void *)locals.data[i].name);
-        locals.data[i].name = NULL;
+    for (i = 0; i < local_names.len; i++) {
+        free((void *)local_names.data[i]);
+        local_names.data[i] = NULL;
     }
+    local_names.len = 0;
 }
 
 static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
@@ -910,13 +1030,16 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
     size_t param_cnt = 0;
     u8 in_outs = 0;
     u8 params_flushed = 0;
+    const char *out_reg = "";
 
     free_local_names();
     locals.len = 0;
     cur_outs.len = 0;
     cur_bytes_copies.len = 0;
     cur_bytes_cnt_slot = 0;
-    sig->out_reg = "";
+    sig_in_buf.len = 0;
+    sig_out_buf.len = 0;
+    sig_in_regs.len = 0;
 
     /* Parse inputs -> outputs ) (after '(' has been consumed) */
     while ((tok = next_tok()) != NULL) {
@@ -924,8 +1047,22 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
         const char *ty_tok;
         if (strcmp(tok, ")") == 0) {
             flush_bytes_params(&params_flushed);
-            if (in_outs && sig->out_types.len == 0)
+            if (in_outs && sig_out_buf.len == 0)
                 ir4_die("expected return type after '->'");
+            fn_sig_set_types(sig, sig_in_buf.data, sig_in_buf.len,
+                             sig_out_buf.data, sig_out_buf.len);
+            if (!allow_bytes && (sig_in_regs.len > 0 || out_reg[0] != '\0')) {
+                ExternRegs *ext = NEW(ExternRegs);
+                if (sig_in_regs.len > 0) {
+                    ext->in_regs = (const char **)malloc(sig_in_regs.len * sizeof(const char *));
+                    if (!ext->in_regs)
+                        ir4_die("out of memory");
+                    memcpy(ext->in_regs, sig_in_regs.data,
+                           sig_in_regs.len * sizeof(const char *));
+                }
+                ext->out_reg = out_reg;
+                sig->ext = ext;
+            }
             if (param_cnt_out)
                 *param_cnt_out = param_cnt;
             return;
@@ -941,8 +1078,8 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
         if (in_outs) {
             ty = parse_type_tok(tok);
             if (ty == TY_NONE) {
-                if (!allow_bytes && cur_outs.len == 0 && sig->out_reg[0] == '\0') {
-                    sig->out_reg = intern_str(tok);
+                if (!allow_bytes && cur_outs.len == 0 && out_reg[0] == '\0') {
+                    out_reg = intern_str(tok);
                     tok = next_tok();
                     if (!tok)
                         ir4_die("expected type token (:i, :a, :f) after extern register");
@@ -951,20 +1088,21 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
                 if (ty == TY_NONE)
                     ir4_die("expected type token (:i, :a, :f) in signature");
             }
-            if (sig->out_types.len >= IR4_MAX_OUTS)
+            if (sig_out_buf.len >= IR4_MAX_OUTS)
                 ir4_die("too many return values in signature");
-            VEC_PUSH(sig->out_types, ty);
+            VEC_PUSH(sig_out_buf, (u8)ty);
             VEC_PUSH(cur_outs, ty);
         } else {
             size_t slot = locals.len;
             LocalVar *lv;
+            char *lname;
             if (parse_type_tok(tok) != TY_NONE) {
                 ir4_die("expected identifier before type in signature");
             }
             if (slot >= IR4_MAX_LOCALS)
                 ir4_die("too many local variables/parameters");
             lv = VEC_ADD(locals);
-            lv->name = local_dup(tok);
+            lname = local_dup(tok);
             ty_tok = next_tok();
             if (!ty_tok)
                 ir4_die("expected type token (:i, :a, :f) after identifier in signature");
@@ -981,25 +1119,26 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
                 bc = VEC_ADD(cur_bytes_copies);
                 bc->src_slot = (int)slot;
                 bc->size = (size_t)sz;
-                bc->name = lv->name;
+                bc->name = lname;
                 sprintf(bp_name, "__bp%u", (unsigned)param_cnt);
-                lv->name = local_dup(bp_name);
-                lv->type = TY_A;
-                lv->slot = (int)slot;
+                VEC_PUSH(local_names, local_dup(bp_name));
+                lv->type = (u8)TY_A;
+                lv->slot = (u16)slot;
                 lv->size = 0;
-                VEC_PUSH(sig->in_types, TY_A);
+                VEC_PUSH(sig_in_buf, (u8)TY_A);
                 param_cnt++;
                 continue;
             }
             ty = parse_type_tok(ty_tok);
             if (ty == TY_NONE)
                 ir4_die("expected type token (:i, :a, :f) in signature");
-            lv->type = ty;
-            lv->slot = (int)slot;
+            VEC_PUSH(local_names, lname);
+            lv->type = (u8)ty;
+            lv->slot = (u16)slot;
             lv->size = 0;
-            VEC_PUSH(sig->in_types, ty);
+            VEC_PUSH(sig_in_buf, (u8)ty);
             if (!allow_bytes)
-                VEC_PUSH(sig->in_regs, intern_str(lv->name));
+                VEC_PUSH(sig_in_regs, intern_str(lname));
             param_cnt++;
         }
     }
@@ -1039,26 +1178,30 @@ static void emit_bytes_param_copies(FnIR *w) {
 }
 
 static Bool sigs_match(const FnSig *a, const FnSig *b) {
-    return a->in_types.len == b->in_types.len && a->out_types.len == b->out_types.len &&
-           (a->in_types.len == 0 ||
-            memcmp(a->in_types.data, b->in_types.data, a->in_types.len * sizeof(StackType)) == 0) &&
-           (a->out_types.len == 0 ||
-            memcmp(a->out_types.data, b->out_types.data, a->out_types.len * sizeof(StackType)) == 0);
+    if (a->in_cnt != b->in_cnt || a->out_cnt != b->out_cnt)
+        return 0;
+    if (a->in_cnt + a->out_cnt == 0)
+        return 1;
+    return memcmp(FN_TYPES_PTR(a), FN_TYPES_PTR(b), a->in_cnt + a->out_cnt) == 0;
 }
 
-static void free_sig_vecs(FnSig *s) {
-    free(s->in_types.data);
-    free(s->in_regs.data);
-    free(s->out_types.data);
-    s->in_types.data = NULL;
-    s->in_regs.data = NULL;
-    s->out_types.data = NULL;
+void free_sig_vecs(FnSig *s) {
+    if (s->in_cnt + s->out_cnt > FN_INLINE_TYPES)
+        free(s->types.heap_t);
+    s->in_cnt = 0;
+    s->out_cnt = 0;
+    if (s->ext) {
+        free((void *)s->ext->in_regs);
+        free(s->ext);
+        s->ext = NULL;
+    }
 }
 
 size_t alloc_fn(FnSig **sig_out, FnIR **w_out) {
     size_t idx = fn_sigs.len;
     FnSig *sig = NEW(FnSig);
     FnIR *w = NEW(FnIR);
+    w->spill_off = -1;
     VEC_PUSH(fn_sigs, sig);
     VEC_PUSH(fn_irs, w);
     if (sig_out)
@@ -1092,18 +1235,18 @@ static void compile_fn(int is_default, int is_hot) {
     if (existing >= 0) {
         FnSig fn_sig;
         FnSig *ex = fn_sigs.data[existing];
-        if (ex->is_extern) {
+        if (FN_FLAG(ex, FN_FL_EXTERN)) {
             ir4_die("duplicate function definition");
         }
-        if (ex->is_defined) {
+        if (FN_FLAG(ex, FN_FL_DEFINED)) {
             if (cur_grp == 0 || ex->req_group != cur_grp) {
                 ir4_die("duplicate function definition");
             }
             if (cur_rank == ex->req_rank) {
-                if (is_default && ex->is_default) {
+                if (is_default && FN_FLAG(ex, FN_FL_DEFAULT)) {
                     ir4_die("duplicate 'default' function definition");
                 }
-                if (!is_default && !ex->is_default) {
+                if (!is_default && !FN_FLAG(ex, FN_FL_DEFAULT)) {
                     ir4_die("duplicate function definition");
                 }
             }
@@ -1115,12 +1258,12 @@ static void compile_fn(int is_default, int is_hot) {
         blocks.len = 0;
         parse_sig_body(&fn_sig, &param_cnt, 1);
         if (!sigs_match(&fn_sig, ex)) {
-            ir4_die(ex->is_defined
+            ir4_die(FN_FLAG(ex, FN_FL_DEFINED)
                         ? "override signature does not match 'default' declaration"
                         : "function signature does not match 'fwd' declaration");
         }
-        if ((is_default && ex->is_defined && cur_rank == ex->req_rank) ||
-            (ex->is_defined && cur_rank > ex->req_rank)) {
+        if ((is_default && FN_FLAG(ex, FN_FL_DEFINED) && cur_rank == ex->req_rank) ||
+            (FN_FLAG(ex, FN_FL_DEFINED) && cur_rank > ex->req_rank)) {
             /* Already overridden by a more-specific file in this require group. */
             free_sig_vecs(&fn_sig);
             discard_body = 1;
@@ -1129,9 +1272,9 @@ static void compile_fn(int is_default, int is_hot) {
         } else {
             free_sig_vecs(ex);
             *ex = fn_sig;
-            ex->is_defined = 1;
-            ex->is_default = (u8)is_default;
-            ex->is_hot = (u8)is_hot;
+            FN_SET_FLAG(ex, FN_FL_DEFINED);
+            if (is_default) FN_SET_FLAG(ex, FN_FL_DEFAULT);
+            if (is_hot) FN_SET_FLAG(ex, FN_FL_HOT);
             ex->req_group = cur_grp;
             ex->req_rank = cur_rank;
             sig = ex;
@@ -1150,8 +1293,8 @@ static void compile_fn(int is_default, int is_hot) {
             parse_sig_body(&fn_sig, &param_cnt, 1);
             if (cur_grp == 0 || cs->req_group != cur_grp)
                 ir4_die("function name conflicts with existing constant");
-            if (fn_sig.in_types.len != 0 || fn_sig.out_types.len != 1 ||
-                fn_sig.out_types.data[0] != cs->type) {
+            if (fn_sig.in_cnt != 0 || fn_sig.out_cnt != 1 ||
+                FN_OUT_TYPE(&fn_sig, 0) != cs->type) {
                 ir4_die("override signature does not match 'default' declaration");
             }
             if (cur_rank == cs->req_rank) {
@@ -1169,9 +1312,9 @@ static void compile_fn(int is_default, int is_hot) {
                 remove_const((size_t)ex_const);
                 fidx = alloc_fn(&sig, &w);
                 *sig = fn_sig;
-                sig->is_defined = 1;
-                sig->is_default = (u8)is_default;
-                sig->is_hot = (u8)is_hot;
+                FN_SET_FLAG(sig, FN_FL_DEFINED);
+                if (is_default) FN_SET_FLAG(sig, FN_FL_DEFAULT);
+                if (is_hot) FN_SET_FLAG(sig, FN_FL_HOT);
                 sig->req_group = cur_grp;
                 sig->req_rank = cur_rank;
                 sym_ht_put(&fn_ht, sig->name, fidx);
@@ -1179,9 +1322,9 @@ static void compile_fn(int is_default, int is_hot) {
         } else {
             fidx = alloc_fn(&sig, &w);
             sig->name = intern_str(name);
-            sig->is_defined = 1;
-            sig->is_default = (u8)is_default;
-            sig->is_hot = (u8)is_hot;
+            FN_SET_FLAG(sig, FN_FL_DEFINED);
+            if (is_default) FN_SET_FLAG(sig, FN_FL_DEFAULT);
+            if (is_hot) FN_SET_FLAG(sig, FN_FL_HOT);
             sig->req_group = cur_grp;
             sig->req_rank = cur_rank;
             sym_ht_put(&fn_ht, sig->name, fidx);
@@ -1203,12 +1346,16 @@ static void compile_fn(int is_default, int is_hot) {
         if (!discard_body) {
             w->param_cnt = (int)param_cnt;
             if (build_fn.ir.len > 0) {
+#if IR4_IR_SPILL
+                fn_ir_spill(w, build_fn.ir.data, build_fn.ir.len);
+#else
                 w->ir.data = (IrInstr *)malloc(build_fn.ir.len * sizeof(IrInstr));
                 if (!w->ir.data)
                     ir4_die("out of memory");
                 memcpy(w->ir.data, build_fn.ir.data, build_fn.ir.len * sizeof(IrInstr));
                 w->ir.len = build_fn.ir.len;
                 w->ir.cap = build_fn.ir.len;
+#endif
             }
             w->locals = build_fn.locals;
         } else {
@@ -1344,7 +1491,8 @@ static void compile_code(int is_hot) {
     if (existing >= 0) {
         FnSig code_sig;
         FnSig *ex = fn_sigs.data[existing];
-        if (!ex->is_defined || ex->is_extern || !ex->is_default || cur_grp == 0 ||
+        if (!FN_FLAG(ex, FN_FL_DEFINED) || FN_FLAG(ex, FN_FL_EXTERN) ||
+            !FN_FLAG(ex, FN_FL_DEFAULT) || cur_grp == 0 ||
             ex->req_group != cur_grp) {
             ir4_die("duplicate function definition");
         }
@@ -1360,9 +1508,9 @@ static void compile_code(int is_hot) {
         }
         free_sig_vecs(ex);
         *ex = code_sig;
-        ex->is_defined = 1;
-        ex->is_default = 0;
-        ex->is_hot = (Bool)is_hot;
+        FN_SET_FLAG(ex, FN_FL_DEFINED);
+        FN_CLR_FLAG(ex, FN_FL_DEFAULT);
+        if (is_hot) FN_SET_FLAG(ex, FN_FL_HOT);
         ex->req_group = cur_grp;
         ex->req_rank = cur_rank;
         sig = ex;
@@ -1374,8 +1522,8 @@ static void compile_code(int is_hot) {
             ir4_die("expected '(' after 'code' name");
         fidx = alloc_fn(&sig, &w);
         sig->name = name;
-        sig->is_defined = 1;
-        sig->is_hot = (Bool)is_hot;
+        FN_SET_FLAG(sig, FN_FL_DEFINED);
+        if (is_hot) FN_SET_FLAG(sig, FN_FL_HOT);
         sym_ht_put(&fn_ht, sig->name, fidx);
         sig->req_group = cur_grp;
         sig->req_rank = cur_rank;
@@ -1395,7 +1543,7 @@ static void compile_init(void) {
     fidx = alloc_fn(&sig, &w);
     sprintf(iname, "__init_%u", (unsigned)init_fns.len);
     sig->name = intern_str(iname);
-    sig->is_defined = 1;
+    FN_SET_FLAG(sig, FN_FL_DEFINED);
     sym_ht_put(&fn_ht, sig->name, fidx);
     VEC_PUSH(init_fns, fidx);
 
@@ -1498,11 +1646,11 @@ static int parse_local_var(int allow_bytes) {
     if (slot >= IR4_MAX_LOCALS)
         ir4_die("too many local variables/parameters");
     lv = VEC_ADD(locals);
-    lv->name = local_dup(vname);
+    VEC_PUSH(local_names, local_dup(vname));
     vtype = next_tok();
     if (!vtype)
         ir4_die("expected type after local 'var' name");
-    lv->slot = (int)slot;
+    lv->slot = (u16)slot;
     if (strcmp(vtype, ":bytes") == 0) {
         i32 sz = 0;
         if (!allow_bytes)
@@ -1510,13 +1658,13 @@ static int parse_local_var(int allow_bytes) {
         vtype = next_tok();
         if (!vtype || !parse_int(vtype, &sz) || sz <= 0 || sz > 0xFFFF)
             ir4_die("invalid byte count after ':bytes'");
-        lv->type = TY_A;
+        lv->type = (u8)TY_A;
         lv->size = (size_t)sz;
     } else {
         ty = parse_type_tok(vtype);
         if (ty == TY_NONE)
             ir4_die("expected type token (:i, :i32, :a, :f, :bytes) after 'var'");
-        lv->type = ty;
+        lv->type = (u8)ty;
         lv->size = 0;
     }
     return (int)slot;
@@ -1559,7 +1707,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
             ir4_die("cannot take address of 'const'");
         idx = find_fn(sym);
         if (idx >= 0) {
-            if (fn_sigs.data[idx]->is_extern)
+            if (FN_FLAG(fn_sigs.data[idx], FN_FL_EXTERN))
                 ir4_die("cannot take address of 'extern' function");
             ins = emit_ir(IR_PUSH_FN, w);
             ins->u.fn_idx = (size_t)idx;
@@ -1993,20 +2141,20 @@ static void compile_body(FnIR *w) {
             memset(&icall_sig, 0, sizeof(FnSig));
             parse_icall_sig(&icall_sig);
             tpop_expect(TY_A);
-            for (k = icall_sig.in_types.len; k > 0; k--) {
-                tpop_expect(icall_sig.in_types.data[k - 1]);
+            for (k = icall_sig.in_cnt; k > 0; k--) {
+                tpop_expect(FN_IN_TYPE(&icall_sig, k - 1));
             }
-            for (k = 0; k < icall_sig.out_types.len; k++) {
-                tpush(icall_sig.out_types.data[k]);
+            for (k = 0; k < icall_sig.out_cnt; k++) {
+                tpush(FN_OUT_TYPE(&icall_sig, k));
             }
-            if (icall_sig.in_types.len > 255 || icall_sig.out_types.len > IR4_MAX_OUTS)
+            if (icall_sig.in_cnt > 255 || icall_sig.out_cnt > IR4_MAX_OUTS)
                 ir4_die("too many arguments or return values in indirect call");
             {
                 IrInstr *ins = emit_ir(IR_ICALL, w);
-                ins->u.icall.in_cnt = (u8)icall_sig.in_types.len;
-                ins->u.icall.out_cnt = (u8)icall_sig.out_types.len;
-                for (k = 0; k < icall_sig.out_types.len; k++)
-                    ins->u.icall.out_types[k] = (u8)icall_sig.out_types.data[k];
+                ins->u.icall.in_cnt = icall_sig.in_cnt;
+                ins->u.icall.out_cnt = icall_sig.out_cnt;
+                for (k = 0; k < icall_sig.out_cnt; k++)
+                    ins->u.icall.out_types[k] = (u8)FN_OUT_TYPE(&icall_sig, k);
             }
             free_sig_vecs(&icall_sig);
             continue;
@@ -2080,13 +2228,13 @@ static void compile_body(FnIR *w) {
                 if (idx >= 0) {
                     FnSig *callee = fn_sigs.data[idx];
                     size_t i;
-                    for (i = callee->in_types.len; i > 0; i--) {
-                        tpop_expect(callee->in_types.data[i - 1]);
+                    for (i = callee->in_cnt; i > 0; i--) {
+                        tpop_expect(FN_IN_TYPE(callee, i - 1));
                     }
-                    for (i = 0; i < callee->out_types.len; i++) {
-                        tpush(callee->out_types.data[i]);
+                    for (i = 0; i < callee->out_cnt; i++) {
+                        tpush(FN_OUT_TYPE(callee, i));
                     }
-                    if (callee->is_extern) {
+                    if (FN_FLAG(callee, FN_FL_EXTERN)) {
                         ins = emit_ir(IR_CALL_EXTERN, w);
                     } else {
                         ins = emit_ir(IR_CALL, w);
@@ -2227,7 +2375,7 @@ static void compile_data(void) {
                 idx = find_fn(sym);
                 if (idx < 0)
                     ir4_die("unknown variable or function in '&' inside 'data'");
-                if (fn_sigs.data[idx]->is_extern)
+                if (FN_FLAG(fn_sigs.data[idx], FN_FL_EXTERN))
                     ir4_die("cannot take address of 'extern' function in 'data'");
                 cb_emit_data_word(0, be->addr_bytes);
                 cb_add_data_init_reloc(patch_off, (size_t)idx, be->addr_bytes, true);
@@ -2343,21 +2491,25 @@ static void compile_const(int is_default) {
     ex_fn = find_fn(name);
     if (ex_fn >= 0) {
         FnSig *fn = fn_sigs.data[ex_fn];
-        if (!fn->is_defined || fn->is_extern || cur_grp == 0 || fn->req_group != cur_grp)
+        if (!FN_FLAG(fn, FN_FL_DEFINED) || FN_FLAG(fn, FN_FL_EXTERN) ||
+            cur_grp == 0 || fn->req_group != cur_grp)
             ir4_die("constant name conflicts with existing function");
         if (!const_matches_fn(ty, fn))
             ir4_die("override type does not match 'default' declaration");
         if (cur_rank == fn->req_rank) {
-            if (is_default && fn->is_default)
+            if (is_default && FN_FLAG(fn, FN_FL_DEFAULT))
                 ir4_die("duplicate 'default' declaration");
-            if (!is_default && !fn->is_default)
+            if (!is_default && !FN_FLAG(fn, FN_FL_DEFAULT))
                 ir4_die("duplicate constant definition");
         }
         if ((is_default && cur_rank == fn->req_rank) || (cur_rank > fn->req_rank))
             return;
         emit_const_fn_body(fn_irs.data[ex_fn], &cs);
-        fn->is_default = (u8)is_default;
-        fn->is_hot = 1;
+        if (is_default)
+            FN_SET_FLAG(fn, FN_FL_DEFAULT);
+        else
+            FN_CLR_FLAG(fn, FN_FL_DEFAULT);
+        FN_SET_FLAG(fn, FN_FL_HOT);
         fn->req_rank = cur_rank;
     }
 
@@ -2400,6 +2552,7 @@ static void add_builtin_const(const char *name, i32 val) {
 
 static void init_frontend(FILE *in, const char *path, const Backend *target_be,
                           const char *platform) {
+    fn_ir_cleanup();
     lex_init(in, path);
 
     be = target_be;
@@ -2502,8 +2655,7 @@ static void parse_toplevel(void) {
                 parse_sig_body(&tmp_sig, NULL, 0);
                 if (!sigs_match(fn_sigs.data[existing], &tmp_sig))
                     ir4_die("duplicate 'fwd' declaration");
-                free(tmp_sig.in_types.data);
-                free(tmp_sig.out_types.data);
+                free_sig_vecs(&tmp_sig);
             } else {
                 size_t fidx = alloc_fn(&sig, NULL);
                 sig->name = name;
@@ -2526,20 +2678,19 @@ static void parse_toplevel(void) {
                 ir4_die("extern conflicts with existing constant");
             memset(&ex_sig, 0, sizeof(FnSig));
             ex_sig.name = name;
-            ex_sig.is_extern = 1;
-            ex_sig.is_defined = 1;
+            FN_SET_FLAG(&ex_sig, FN_FL_EXTERN | FN_FL_DEFINED);
             ex_sig.req_group = cur_grp;
             ex_sig.req_rank = cur_rank;
             tok = next_tok();
             if (!tok)
                 ir4_die("expected address or '(' after extern name");
             if (strcmp(tok, "(") == 0) {
-                ex_sig.has_addr = 0;
+                FN_CLR_FLAG(&ex_sig, FN_FL_HAS_ADDR);
             } else if (parse_int(tok, &num_val)) {
                 if (num_val < 0 || num_val > 0xFFFF)
                     ir4_die("invalid extern address");
                 ex_sig.addr = (u16)num_val;
-                ex_sig.has_addr = 1;
+                FN_SET_FLAG(&ex_sig, FN_FL_HAS_ADDR);
                 tok = next_tok();
                 if (!tok || strcmp(tok, "(") != 0) {
                     ir4_die("expected '(' after extern address");
@@ -2548,12 +2699,12 @@ static void parse_toplevel(void) {
                 ir4_die("expected address or '(' after extern name");
             }
             parse_sig_body(&ex_sig, NULL, 0);
-            if (ex_sig.out_types.len > 1)
+            if (ex_sig.out_cnt > 1)
                 ir4_die("extern supports at most 1 return value");
             existing = find_fn(name);
             if (existing >= 0) {
                 FnSig *ex = fn_sigs.data[existing];
-                if (!ex->is_defined) {
+                if (!FN_FLAG(ex, FN_FL_DEFINED)) {
                     if (!sigs_match(&ex_sig, ex))
                         ir4_die("extern signature does not match 'fwd' declaration");
                     free_sig_vecs(ex);
@@ -2623,14 +2774,77 @@ static void parse_toplevel(void) {
     }
 }
 
-void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
-                        const char *platform) {
-    init_frontend(in, path, target_be, platform);
-    parse_toplevel();
+static void purge_pass1_tables(void) {
+    size_t i;
+    for (i = 0; i < consts.len; i++)
+        free(consts.data[i]);
+    free(consts.data);
+    consts.data = NULL;
+    consts.len = 0;
+    consts.cap = 0;
+    sym_ht_free(&const_ht);
+
+    for (i = 0; i < buffers.len; i++)
+        free(buffers.data[i]);
+    free(buffers.data);
+    buffers.data = NULL;
+    buffers.len = 0;
+    buffers.cap = 0;
+    sym_ht_free(&buf_ht);
+
+    free_local_names();
+    free(local_names.data);
+    local_names.data = NULL;
+    local_names.cap = 0;
+    free(locals.data);
+    locals.data = NULL;
+    locals.len = 0;
+    locals.cap = 0;
+
     free(cur_ir.data);
     cur_ir.data = NULL;
     cur_ir.len = 0;
     cur_ir.cap = 0;
+
+    free(sig_in_buf.data);
+    sig_in_buf.data = NULL;
+    sig_in_buf.len = 0;
+    sig_in_buf.cap = 0;
+    free(sig_out_buf.data);
+    sig_out_buf.data = NULL;
+    sig_out_buf.len = 0;
+    sig_out_buf.cap = 0;
+    free(sig_in_regs.data);
+    sig_in_regs.data = NULL;
+    sig_in_regs.len = 0;
+    sig_in_regs.cap = 0;
+    free(cur_outs.data);
+    cur_outs.data = NULL;
+    cur_outs.len = 0;
+    cur_outs.cap = 0;
+    free(tstack.data);
+    tstack.data = NULL;
+    tstack.len = 0;
+    tstack.cap = 0;
+    free(blocks.data);
+    blocks.data = NULL;
+    blocks.len = 0;
+    blocks.cap = 0;
+    free(cur_bytes_copies.data);
+    cur_bytes_copies.data = NULL;
+    cur_bytes_copies.len = 0;
+    cur_bytes_copies.cap = 0;
+
+    lex_cleanup();
+}
+
+void ir4_compile_stream(FILE *in, const char *path, const Backend *target_be,
+                        const char *platform) {
+    init_frontend(in, path, target_be, platform);
+    parse_toplevel();
+    purge_pass1_tables();
     run_reachability_dce();
+    sym_ht_free(&fn_ht);
+    intern_drop_table();
     emit_program();
 }

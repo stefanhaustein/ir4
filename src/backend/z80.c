@@ -217,11 +217,11 @@ static void z80_fn_end(const FnSig *sig, const LocalVar *locals, int total_local
     (void)locals;
     (void)total_locals;
 
-    for (i = 0; i < sig->in_types.len; i++) {
-        param_bytes += z80_type_bytes(sig->in_types.data[i]);
+    for (i = 0; i < sig->in_cnt; i++) {
+        param_bytes += z80_type_bytes(FN_IN_TYPE(sig, i));
     }
-    for (i = 0; i < sig->out_types.len; i++) {
-        out_bytes += z80_type_bytes(sig->out_types.data[i]);
+    for (i = 0; i < sig->out_cnt; i++) {
+        out_bytes += z80_type_bytes(FN_OUT_TYPE(sig, i));
     }
     out_words = (u8)(out_bytes / 2);
     /* DE, BC, DE', BC' hold up to 4 16-bit fn_irs (note: :i32/:f take >1 word) */
@@ -288,8 +288,8 @@ static void z80_call(size_t target_addr) { cb_emit8_16(Z80_CALL, (u16)target_add
 static int z80_tail_call(size_t target_addr, const FnSig *sig, const FnSig *callee,
                          const LocalVar *locals, int total_locals) {
     (void)locals;
-    if (sig->in_types.len != 0 || callee->in_types.len != 0 ||
-        (sig->is_recursive && total_locals > 0))
+    if (sig->in_cnt != 0 || callee->in_cnt != 0 ||
+        (FN_FLAG(sig, FN_FL_RECURSIVE) && total_locals > 0))
         return 0;
     z80_peep_barrier();
     cb_emit8_16(Z80_JP, (u16)target_addr);
@@ -302,14 +302,14 @@ static void z80_call_extern(const FnSig *sig) {
     u8 used_hl = 0;
     size_t i;
 
-    if (!sig->has_addr)
+    if (!FN_FLAG(sig, FN_FL_HAS_ADDR))
         ir4_die("Z80 extern requires a fixed address");
-    if (sig->out_types.len > 1)
+    if (sig->out_cnt > 1)
         ir4_die("Z80 extern supports at most 1 return value");
 
     z80_peep_barrier();
-    for (i = sig->in_types.len; i > 0; i--) {
-        const char *r = sig->in_regs.data[i - 1];
+    for (i = sig->in_cnt; i > 0; i--) {
+        const char *r = (sig->ext && sig->ext->in_regs) ? sig->ext->in_regs[i - 1] : "";
         if (strcmp(r, "BC") == 0 || strcmp(r, "C") == 0) {
             cb_emit8(Z80_POP_BC);
             used_bc = 1;
@@ -352,8 +352,8 @@ static void z80_call_extern(const FnSig *sig) {
 
     cb_emit8_16(Z80_CALL, sig->addr);
 
-    if (sig->out_types.len == 1) {
-        const char *r = sig->out_reg;
+    if (sig->out_cnt == 1) {
+        const char *r = sig->ext ? sig->ext->out_reg : "";
         if (strcmp(r, "HL") == 0) {
             z80_push(Z80_PUSH_HL);
         } else if (strcmp(r, "DE") == 0) {

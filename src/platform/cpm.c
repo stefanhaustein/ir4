@@ -18,7 +18,7 @@ static void cpm_end(int main_idx) {
     u16 print_u16_addr;
     u16 div10_addr;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--cpm requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -27,7 +27,7 @@ static void cpm_end(int main_idx) {
     be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         cb_emit8(Z80_POP_HL);
 
         /* If HL < 0, print '-' and negate HL */
@@ -67,7 +67,7 @@ static void cpm_end(int main_idx) {
     cb_emit8_8(Z80_LD_C_N, 0);
     cb_emit8_16(Z80_JP, CPM_BDOS);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
         cb_patch16(pos_patch, print_u16_addr);
 

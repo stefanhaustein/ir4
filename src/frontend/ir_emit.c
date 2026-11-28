@@ -43,44 +43,59 @@ void ir_emit_reset(void) {
     heap_start_off = 0;
 }
 
-static Bool can_reach_fn(size_t cur, size_t target, Bool *visited, const Bool *addr_taken) {
-    FnIR *w = fn_irs.data[cur];
-    size_t i;
-    if (fn_sigs.data[cur]->is_extern || w->is_code)
-        return false;
-    for (i = 0; i < w->ir.len; i++) {
-        const IrInstr *ins = &w->ir.data[i];
-        if (ins->kind == IR_CALL) {
-            size_t callee = ins->u.fn_idx;
-            if (callee == target)
-                return true;
-            if (!visited[callee]) {
-                visited[callee] = true;
-                if (can_reach_fn(callee, target, visited, addr_taken))
+static Bool can_reach_fn(size_t start, size_t target, Bool *visited, const Bool *addr_taken) {
+    SizeVec stack;
+    stack.data = NULL;
+    stack.len = 0;
+    stack.cap = 0;
+    VEC_PUSH(stack, start);
+    while (stack.len > 0) {
+        size_t cur = stack.data[--stack.len];
+        FnIR *w = fn_irs.data[cur];
+        size_t i;
+        if (FN_FLAG(fn_sigs.data[cur], FN_FL_EXTERN) || w->is_code)
+            continue;
+        fn_ir_ensure(w);
+        for (i = 0; i < w->ir.len; i++) {
+            const IrInstr *ins = &w->ir.data[i];
+            if (ins->kind == IR_CALL) {
+                size_t callee = ins->u.fn_idx;
+                if (callee == target) {
+                    fn_ir_drop(w);
+                    free(stack.data);
                     return true;
-            }
-        } else if (ins->kind == IR_ICALL) {
-            size_t k;
-            for (k = 0; k < fn_sigs.len; k++) {
-                if (!addr_taken[k])
-                    continue;
-                if (k == target)
-                    return true;
-                if (!visited[k]) {
-                    visited[k] = true;
-                    if (can_reach_fn(k, target, visited, addr_taken))
+                }
+                if (!visited[callee]) {
+                    visited[callee] = true;
+                    VEC_PUSH(stack, callee);
+                }
+            } else if (ins->kind == IR_ICALL) {
+                size_t k;
+                for (k = 0; k < fn_sigs.len; k++) {
+                    if (!addr_taken[k])
+                        continue;
+                    if (k == target) {
+                        fn_ir_drop(w);
+                        free(stack.data);
                         return true;
+                    }
+                    if (!visited[k]) {
+                        visited[k] = true;
+                        VEC_PUSH(stack, k);
+                    }
                 }
             }
         }
+        fn_ir_drop(w);
     }
+    free(stack.data);
     return false;
 }
 
 static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     FnSig *sig = fn_sigs.data[fidx];
     FnIR *cw = fn_irs.data[fidx];
-    if (!ir4_get_opt_level() || !cw->is_code || !sig->is_hot || cw->raw_len == 0 ||
+    if (!ir4_get_opt_level() || !cw->is_code || !FN_FLAG(sig, FN_FL_HOT) || cw->raw_len == 0 ||
         cw->raw_len > HOT_CODE_INLINE_MAX)
         return 0;
     if (strcmp(be->name, "6502") != 0 && strcmp(be->name, "65816") != 0 &&
@@ -90,28 +105,39 @@ static int can_inline_hot_code(size_t fidx, size_t *out_len) {
     return 1;
 }
 
-static void mark_reachable(size_t fidx) {
-    FnIR *w = fn_irs.data[fidx];
-    size_t i;
-    if (fn_sigs.data[fidx]->is_extern)
-        return;
-    if (!fn_sigs.data[fidx]->is_defined)
-        ir4_die("called 'fwd' function was never defined");
-    if (w->reachable)
-        return;
-    w->reachable = 1;
-    if (w->is_code)
-        return;
-    for (i = 0; i < w->ir.len; i++) {
-        const IrInstr *ins = &w->ir.data[i];
-        if (ins->kind == IR_CALL) {
-            size_t inl_len = 0;
-            if (!can_inline_hot_code(ins->u.fn_idx, &inl_len))
-                mark_reachable(ins->u.fn_idx);
-        } else if (ins->kind == IR_PUSH_FN) {
-            mark_reachable(ins->u.fn_idx);
+static void mark_reachable(size_t root) {
+    SizeVec stack;
+    stack.data = NULL;
+    stack.len = 0;
+    stack.cap = 0;
+    VEC_PUSH(stack, root);
+    while (stack.len > 0) {
+        size_t fidx = stack.data[--stack.len];
+        FnIR *w = fn_irs.data[fidx];
+        size_t i;
+        if (FN_FLAG(fn_sigs.data[fidx], FN_FL_EXTERN))
+            continue;
+        if (!FN_FLAG(fn_sigs.data[fidx], FN_FL_DEFINED))
+            ir4_die("called 'fwd' function was never defined");
+        if (w->reachable)
+            continue;
+        w->reachable = 1;
+        if (w->is_code)
+            continue;
+        fn_ir_ensure(w);
+        for (i = 0; i < w->ir.len; i++) {
+            const IrInstr *ins = &w->ir.data[i];
+            if (ins->kind == IR_CALL) {
+                size_t inl_len = 0;
+                if (!can_inline_hot_code(ins->u.fn_idx, &inl_len))
+                    VEC_PUSH(stack, ins->u.fn_idx);
+            } else if (ins->kind == IR_PUSH_FN) {
+                VEC_PUSH(stack, ins->u.fn_idx);
+            }
         }
+        fn_ir_drop(w);
     }
+    free(stack.data);
 }
 
 static void emit_raw_code_block(size_t raw_start, size_t raw_len, size_t reloc_start,
@@ -283,7 +309,7 @@ static void emit_call_instr(const FnIR *w, const FnSig *sig, size_t *ip) {
     size_t i = *ip;
     size_t target = w->ir.data[i].u.fn_idx;
     size_t inl_len = 0;
-    if (fn_sigs.data[target]->is_extern) {
+    if (FN_FLAG(fn_sigs.data[target], FN_FL_EXTERN)) {
         be->call_extern(fn_sigs.data[target]);
         return;
     }
@@ -292,7 +318,7 @@ static void emit_call_instr(const FnIR *w, const FnSig *sig, size_t *ip) {
                             fn_irs.data[target]->reloc_start, fn_irs.data[target]->reloc_cnt);
         return;
     }
-    if (fn_sigs.data[target]->has_addr && be->tail_call && ir_can_fuse(w, i, 1) &&
+    if (FN_FLAG(fn_sigs.data[target], FN_FL_HAS_ADDR) && be->tail_call && ir_can_fuse(w, i, 1) &&
         w->ir.data[i + 1].kind == IR_FN_END) {
 #if IR4_ENABLE_6502
         if (be == &be_6502) {
@@ -314,7 +340,7 @@ static void emit_call_instr(const FnIR *w, const FnSig *sig, size_t *ip) {
         }
 #endif
         be->call(fn_sigs.data[target]->addr);
-        if (!fn_sigs.data[target]->has_addr) {
+        if (!FN_FLAG(fn_sigs.data[target], FN_FL_HAS_ADDR)) {
             FwdCall *fc = VEC_ADD(fwd_calls);
             fc->call_pc = call_pc;
             fc->call_addr = call_addr;
@@ -349,7 +375,7 @@ static void emit_fn(size_t fidx) {
             }
         }
         sig->addr = be->cur_addr();
-        sig->has_addr = 1;
+        FN_SET_FLAG(sig, FN_FL_HAS_ADDR);
         emit_raw_code_block(w->raw_start, w->raw_len, w->reloc_start, w->reloc_cnt);
         if (strcmp(be->name, "6502") == 0)
             cb_emit8(0x60); /* RTS */
@@ -363,6 +389,8 @@ static void emit_fn(size_t fidx) {
             ir4_die("'code' is not supported on this backend");
         return;
     }
+
+    fn_ir_ensure(w);
 
 #if IR4_ENABLE_ARM64 || IR4_ENABLE_RV32
     {
@@ -391,6 +419,7 @@ static void emit_fn(size_t fidx) {
                 VEC_PUSH(fwd_calls, fc);
             }
             free(reg_fwd.data);
+            fn_ir_drop(w);
             return;
         }
     }
@@ -427,8 +456,9 @@ static void emit_fn(size_t fidx) {
             size_t fc_len = fwd_calls.len;
             size_t start_addr = be->cur_addr();
             sig->addr = start_addr;
-            sig->has_addr = 1;
-            be->fn_begin(sig->name, w->param_cnt, w->locals.data, (int)w->locals.len, sig->is_recursive);
+            FN_SET_FLAG(sig, FN_FL_HAS_ADDR);
+            be->fn_begin(sig->name, w->param_cnt, w->locals.data, (int)w->locals.len,
+                         FN_FLAG(sig, FN_FL_RECURSIVE));
 
     for (i = 0; i <= w->ir.len; i++) {
         if (be->peep_fence && ir_is_br_target(w, i))
@@ -529,7 +559,7 @@ static void emit_fn(size_t fidx) {
                 size_t target = ins->u.fn_idx;
                 size_t fn_addr = be->cur_addr();
                 size_t fn_pc = be->push_fn(fn_sigs.data[target]->addr);
-                if (!fn_sigs.data[target]->has_addr) {
+                if (!FN_FLAG(fn_sigs.data[target], FN_FL_HAS_ADDR)) {
                     FwdCall *fc = VEC_ADD(fwd_calls);
                     fc->call_pc = fn_pc;
                     fc->call_addr = fn_addr;
@@ -611,6 +641,7 @@ static void emit_fn(size_t fidx) {
     }
     free(pending.data);
     free(pending_jtab.data);
+    fn_ir_drop(w);
 }
 
 void run_reachability_dce(void) {
@@ -628,10 +659,13 @@ void run_reachability_dce(void) {
         register_fn_sym(fn_sigs.data[main_idx]->name, (size_t)main_idx);
         wrap_idx = alloc_fn(&wsig, &ww);
         wsig->name = intern_str("main");
-        wsig->is_defined = 1;
+        FN_SET_FLAG(wsig, FN_FL_DEFINED);
         register_fn_sym(wsig->name, wrap_idx);
-        for (k = 0; k < fn_sigs.data[main_idx]->out_types.len; k++) {
-            VEC_PUSH(wsig->out_types, fn_sigs.data[main_idx]->out_types.data[k]);
+        {
+            FnSig *msig = fn_sigs.data[main_idx];
+            fn_sig_set_types(wsig, NULL, 0,
+                             msig->out_cnt ? (FN_TYPES_PTR(msig) + msig->in_cnt) : NULL,
+                             msig->out_cnt);
         }
         for (k = 0; k < init_fns.len; k++) {
             ins = emit_ir(IR_CALL, ww);
@@ -656,7 +690,7 @@ void run_reachability_dce(void) {
         }
     } else {
         for (f = 0; f < fn_sigs.len; f++) {
-            if (!fn_sigs.data[f]->is_extern && fn_sigs.data[f]->is_defined)
+            if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && FN_FLAG(fn_sigs.data[f], FN_FL_DEFINED))
                 fn_irs.data[f]->reachable = true;
         }
     }
@@ -664,7 +698,8 @@ void run_reachability_dce(void) {
     /* Free IR and local metadata of unreachable functions before Pass 2 lowering */
     for (f = 0; f < fn_sigs.len; f++) {
         FnIR *w = fn_irs.data[f];
-        if (!w->reachable && !w->is_code) {
+        if (!w->reachable && !w->is_code && !FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN)) {
+            free_sig_vecs(fn_sigs.data[f]);
             free(w->ir.data);
             w->ir.data = NULL;
             w->ir.len = 0;
@@ -690,7 +725,7 @@ void run_reachability_dce(void) {
         for (f = 0; f < fn_sigs.len; f++) {
             FnIR *w = fn_irs.data[f];
             size_t i;
-            if (!w->reachable || fn_sigs.data[f]->is_extern || w->is_code)
+            if (!w->reachable || FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) || w->is_code)
                 continue;
             for (i = 0; i < w->ir.len; i++) {
                 const IrInstr *ins = &w->ir.data[i];
@@ -702,7 +737,10 @@ void run_reachability_dce(void) {
         for (f = 0; f < fn_sigs.len; f++) {
             if (fn_irs.data[f]->reachable) {
                 memset(visited, 0, fn_sigs.len * sizeof(Bool));
-                fn_sigs.data[f]->is_recursive = can_reach_fn(f, f, visited, addr_taken);
+                if (can_reach_fn(f, f, visited, addr_taken))
+                    FN_SET_FLAG(fn_sigs.data[f], FN_FL_RECURSIVE);
+                else
+                    FN_CLR_FLAG(fn_sigs.data[f], FN_FL_RECURSIVE);
             }
         }
         free(visited);
@@ -720,11 +758,11 @@ static u16 assign_code_banks(void) {
     for (f = 0; f < fn_sigs.len; f++) {
         FnSig *sig = fn_sigs.data[f];
         FnIR *w = fn_irs.data[f];
-        if (sig->is_extern || !w->reachable) {
+        if (FN_FLAG(sig, FN_FL_EXTERN) || !w->reachable) {
             sig->bank = 0;
             continue;
         }
-        if (sig->is_hot || w->is_code || strcmp(sig->name, "main") == 0 ||
+        if (FN_FLAG(sig, FN_FL_HOT) || w->is_code || strcmp(sig->name, "main") == 0 ||
             strcmp(sig->name, "init") == 0) {
             sig->bank = 0;
         } else {
@@ -787,11 +825,13 @@ static Bool *select_compact_fns(void) {
 #endif
 
     for (f = 0; f < fn_sigs.len; f++) {
-        if (!fn_sigs.data[f]->is_extern && fn_irs.data[f]->reachable && !fn_irs.data[f]->is_code) {
-            est[f] = (u32)(fn_irs.data[f]->ir.len * 10);
+        if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && fn_irs.data[f]->reachable &&
+            !fn_irs.data[f]->is_code) {
+            size_t ilen = fn_ir_len(fn_irs.data[f]);
+            est[f] = (u32)(ilen * 10);
             total_est += est[f];
-            if (fn_irs.data[f]->ir.len > max_ir)
-                max_ir = fn_irs.data[f]->ir.len;
+            if (ilen > max_ir)
+                max_ir = ilen;
         }
     }
     if (total_est > compact_thresh) {
@@ -801,12 +841,13 @@ static Bool *select_compact_fns(void) {
         for (f = 0; f < fn_sigs.len; f++) {
             FnIR *w = fn_irs.data[f];
             size_t i;
-            if (fn_sigs.data[f]->is_extern || !w->reachable || w->is_code)
+            if (FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) || !w->reachable || w->is_code)
                 continue;
-            fn_compact[f] = !fn_sigs.data[f]->is_hot;
-            if (fn_sigs.data[f]->is_hot)
+            fn_ir_ensure(w);
+            fn_compact[f] = !FN_FLAG(fn_sigs.data[f], FN_FL_HOT);
+            if (FN_FLAG(fn_sigs.data[f], FN_FL_HOT))
                 heat[f] += 10000;
-            if (fn_sigs.data[f]->is_recursive)
+            if (FN_FLAG(fn_sigs.data[f], FN_FL_RECURSIVE))
                 heat[f] += 100;
             memset(depth, 0, w->ir.len);
             for (i = 0; i < w->ir.len; i++) {
@@ -827,20 +868,24 @@ static Bool *select_compact_fns(void) {
                     heat[ins->u.fn_idx] += wgt * 4;
                 }
             }
+            fn_ir_drop(w);
         }
         /* Propagate loop heat one hop to callees of hot functions */
         for (pass = 0; pass < 2; pass++) {
             for (f = 0; f < fn_sigs.len; f++) {
                 FnIR *w = fn_irs.data[f];
                 size_t i;
-                if (fn_sigs.data[f]->is_extern || !w->reachable || w->is_code || heat[f] == 0)
+                if (FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) || !w->reachable || w->is_code ||
+                    heat[f] == 0)
                     continue;
+                fn_ir_ensure(w);
                 for (i = 0; i < w->ir.len; i++) {
                     const IrInstr *ins = &w->ir.data[i];
                     if (ins->kind == IR_CALL && heat[ins->u.fn_idx] < heat[f]) {
                         heat[ins->u.fn_idx] += heat[f] / 2;
                     }
                 }
+                fn_ir_drop(w);
             }
         }
         /* Greedily keep hottest functions (by heat/byte) native up to budget */
@@ -903,7 +948,7 @@ void emit_program(void) {
             if (b > 0)
                 cb_begin_bank(b);
             for (f = 0; f < fn_sigs.len; f++) {
-                if (!fn_sigs.data[f]->is_extern && fn_irs.data[f]->reachable &&
+                if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && fn_irs.data[f]->reachable &&
                     fn_sigs.data[f]->bank == b) {
                     emit_fn(f);
                 }
@@ -914,8 +959,10 @@ void emit_program(void) {
                 for (f = 0; f < fn_sigs.len; f++) {
                     FnIR *w = fn_irs.data[f];
                     size_t i;
-                    if (fn_sigs.data[f]->is_extern || !w->reachable || fn_sigs.data[f]->bank == 0)
+                    if (FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) || !w->reachable ||
+                        fn_sigs.data[f]->bank == 0)
                         continue;
+                    fn_ir_ensure(w);
                     for (i = 0; i < w->ir.len; i++) {
                         const IrInstr *ins = &w->ir.data[i];
                         if (ins->kind == IR_ICALL) {
@@ -932,6 +979,7 @@ void emit_program(void) {
                                 need_fp = 1;
                         }
                     }
+                    fn_ir_drop(w);
                 }
                 be_6502_ensure_helpers(need_mul, need_div, need_icall, need_fp);
             }
@@ -942,14 +990,14 @@ void emit_program(void) {
         int reach_total = 0;
         int reach_done = 0;
         for (f = 0; f < fn_sigs.len; f++) {
-            if (!fn_sigs.data[f]->is_extern && fn_irs.data[f]->reachable)
+            if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && fn_irs.data[f]->reachable)
                 reach_total++;
         }
         ir4_status_prog("Generating code", 0, reach_total);
         for (f = 0; f < fn_sigs.len; f++) {
-            if (!fn_sigs.data[f]->is_extern && fn_irs.data[f]->reachable) {
+            if (!FN_FLAG(fn_sigs.data[f], FN_FL_EXTERN) && fn_irs.data[f]->reachable) {
 #if IR4_ENABLE_6502 || IR4_ENABLE_EZ80
-                if (fn_sigs.data[f]->is_hot)
+                if (FN_FLAG(fn_sigs.data[f], FN_FL_HOT))
                     set_be_compact(0);
                 else if (fn_compact)
                     set_be_compact(fn_compact[f] ? 1 : 0);
@@ -987,4 +1035,5 @@ void emit_program(void) {
             cb_patch_data_init_reloc(c, fn_sigs.data[tv]->addr);
         }
     }
+    fn_ir_cleanup();
 }

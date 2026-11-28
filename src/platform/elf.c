@@ -75,7 +75,7 @@ static void virt_end(int main_idx) {
     u32 hi;
     i32 lo;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--virt requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -94,7 +94,7 @@ static void virt_end(int main_idx) {
     /* JAL ra, main */
     cb_emit32(enc_j((i32)sig->addr - (i32)cb_pc(), 1));
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         size_t div_loop;
         size_t print_loop;
         if (ir4_get_opt_level() == 0) {
@@ -200,7 +200,7 @@ static void obj_end(int main_idx) {
 
     {
         const FnSig *sig = ir4_fn_sig(main_idx);
-        if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+        if (sig->in_cnt != 0 || sig->out_cnt > 1) {
             fprintf(stderr, "--obj requires 'main' with 0 inputs and at most 1 output\n");
             exit(1);
         }
@@ -228,7 +228,7 @@ static void obj_end(int main_idx) {
 
         cb_emit32(enc_j((i32)sig->addr - (i32)cb_pc(), 1)); /* JAL ra, ir4 main */
 
-        if (sig->out_types.len == 1) {
+        if (sig->out_cnt == 1) {
             if (ir4_get_opt_level() == 0) {
                 cb_emit32(enc_i(0, 9, 2, 10, 0x03UL)); /* LW a0, 0(s1) */
                 cb_emit32(enc_i(4, 9, 0, 9, 0x13UL));  /* ADDI s1, s1, 4 */

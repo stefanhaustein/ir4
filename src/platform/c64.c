@@ -83,7 +83,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
     u16 print_u16_addr;
     u16 div_loop_pc;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "%s requires 'main' with 0 inputs and at most 1 output\n",
                 is_x16 ? "--x16" : "--c64");
         exit(1);
@@ -93,7 +93,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
 
     /* CLD; zero BSS; LDX #init_x (initialize IR4th data stack without clobbering hardware SP) */
     cb_emit8(M6502_CLD);
-    if (sig->out_types.len == 1 && be_6502_stack_zp_base() == 0) {
+    if (sig->out_cnt == 1 && be_6502_stack_zp_base() == 0) {
         (void)be_6502_stack_data_off();
     }
     be_6502_emit_zero_bss(tmp_lo, tmp_hi);
@@ -102,7 +102,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
     /* JSR main */
     cb_emit8_16(M6502_JSR, sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         u8 zp_stk = be_6502_stack_zp_base();
         /* Pop 16-bit signed value from (stack_base,X) into tmp_lo/tmp_hi */
         if (zp_stk != 0) {
@@ -166,7 +166,7 @@ void be_6502_cbm_end(int main_idx, int is_x16) {
         cb_emit8(M6502_RTS);
     }
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         print_u16_addr = cb_cur_addr();
         cb_patch16(print_call1, print_u16_addr);
 

@@ -27,6 +27,39 @@ static char **ht_slots = NULL;
 static size_t ht_cap = 0;
 static size_t ht_len = 0;
 
+#define STR_ARENA_CHUNK 2048
+
+typedef struct StrArenaChunk {
+    struct StrArenaChunk *next;
+    size_t used;
+    char data[STR_ARENA_CHUNK];
+} StrArenaChunk;
+
+static StrArenaChunk *str_arena_head = NULL;
+
+static char *arena_alloc_str(size_t need) {
+    StrArenaChunk *c = str_arena_head;
+    if (need > STR_ARENA_CHUNK) {
+        char *big = (char *)malloc(need);
+        if (!big)
+            ir4_die("out of memory in string intern table");
+        return big;
+    }
+    if (!c || c->used + need > STR_ARENA_CHUNK) {
+        c = (StrArenaChunk *)malloc(sizeof(StrArenaChunk));
+        if (!c)
+            ir4_die("out of memory in string intern table");
+        c->used = 0;
+        c->next = str_arena_head;
+        str_arena_head = c;
+    }
+    {
+        char *p = c->data + c->used;
+        c->used += need;
+        return p;
+    }
+}
+
 static unsigned int hash_str_n(const char *s, size_t len) {
     unsigned int h = 5381U;
     unsigned int n = (unsigned int)len;
@@ -90,9 +123,7 @@ const char *intern_str_n(const char *s, size_t len) {
             return p;
         slot = (slot + 1) & mask;
     }
-    copy = (char *)malloc(len + 1);
-    if (!copy)
-        ir4_die("out of memory in string intern table");
+    copy = arena_alloc_str(len + 1);
     if (len > 0)
         memcpy(copy, s, len);
     copy[len] = '\0';
@@ -200,4 +231,20 @@ void sym_ht_clear(SymHt *ht) {
     if (ht->keys && ht->cap > 0)
         memset(ht->keys, 0, ht->cap * sizeof(const char *));
     ht->len = 0;
+}
+
+void sym_ht_free(SymHt *ht) {
+    free(ht->keys);
+    free(ht->vals);
+    ht->keys = NULL;
+    ht->vals = NULL;
+    ht->cap = 0;
+    ht->len = 0;
+}
+
+void intern_drop_table(void) {
+    free(ht_slots);
+    ht_slots = NULL;
+    ht_cap = 0;
+    ht_len = 0;
 }

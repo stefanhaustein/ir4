@@ -35,7 +35,7 @@ static void sim816_end(int main_idx) {
     size_t putchar_addr, print_u16_addr;
     size_t putc_call1 = 0, putc_call2 = 0, print_call = 0;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "-t sim65816 requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -75,7 +75,7 @@ static void sim816_end(int main_idx) {
     cb_emit8(M816_JSL);
     cb_emit24((u32)sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         size_t pos_br;
         /* Pop 16-bit signed return value from $0200,X */
         cb_emit8(M816_LDA_ABSX);

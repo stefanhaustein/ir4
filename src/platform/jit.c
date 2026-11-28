@@ -49,7 +49,7 @@ static void arm64_run_jit(int main_idx) {
     long (*jit_fn)(void *);
     long result;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--run requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -65,7 +65,7 @@ static void arm64_run_jit(int main_idx) {
     imm26 = ((u32)(diff >> 2)) & 0x03FFFFFFUL;
     cb_emit16((u16)((0x94000000UL | imm26) & 0xFFFFU));
     cb_emit16((u16)(((0x94000000UL | imm26) >> 16) & 0xFFFFU));
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         if (ir4_get_opt_level() == 0) {
             cb_emit16(0x07E0);
             cb_emit16(0xF841); /* LDR X0, [SP], #16 */

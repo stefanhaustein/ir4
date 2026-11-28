@@ -205,32 +205,52 @@ typedef enum {
 } IrOp;
 
 typedef struct {
-    const char *name;
-    StackType type;
-    int slot;
+    u8 type; /* StackType */
+    u16 slot;
     size_t size;
 } LocalVar;
+
+#define FN_FL_EXTERN    0x01
+#define FN_FL_DEFINED   0x02
+#define FN_FL_DEFAULT   0x04
+#define FN_FL_HOT       0x08
+#define FN_FL_HAS_ADDR  0x10
+#define FN_FL_RECURSIVE 0x20
+
+#define FN_INLINE_TYPES 8
 
 VEC_OF(TypeVec, StackType);
 VEC_OF(StrVec, const char *);
 
 typedef struct {
+    const char **in_regs; /* NULL or in_cnt entries */
+    const char *out_reg;
+} ExternRegs;
+
+typedef struct {
     const char *name;
     size_t addr;
-    Bool is_extern;
-    Bool is_defined;
-    Bool is_default;
-    Bool is_hot;
-    Bool has_addr;
-    Bool is_recursive;
-    u16 req_group;
+    u8 flags;
     u8 req_rank;
+    u16 req_group;
     u16 bank;
-    TypeVec in_types;
-    StrVec in_regs;
-    TypeVec out_types;
-    const char *out_reg;
+    u8 in_cnt;
+    u8 out_cnt;
+    ExternRegs *ext;
+    union {
+        u8 inline_t[FN_INLINE_TYPES];
+        u8 *heap_t;
+    } types;
 } FnSig;
+
+#define FN_FLAG(s, f)      (((s)->flags & (f)) != 0)
+#define FN_SET_FLAG(s, f)  ((s)->flags |= (u8)(f))
+#define FN_CLR_FLAG(s, f)  ((s)->flags &= (u8)~(f))
+
+#define FN_TYPES_PTR(s)    (((s)->in_cnt + (s)->out_cnt <= FN_INLINE_TYPES) \
+                            ? (s)->types.inline_t : (s)->types.heap_t)
+#define FN_IN_TYPE(s, i)   ((StackType)FN_TYPES_PTR(s)[(i)])
+#define FN_OUT_TYPE(s, i)  ((StackType)FN_TYPES_PTR(s)[(s)->in_cnt + (i)])
 
 /* Backend code-generation interface implemented by each target (be_*.c). */
 typedef struct {

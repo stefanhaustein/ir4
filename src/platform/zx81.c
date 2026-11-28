@@ -14,7 +14,7 @@ static void zx81_end(int main_idx) {
     const FnSig *sig = ir4_fn_sig(main_idx);
     u16 entry_addr = cb_cur_addr();
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--zx81 requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -22,7 +22,7 @@ static void zx81_end(int main_idx) {
     cb_patch16(1, entry_addr);
     be_z80_emit_zero_bss();
     cb_emit8_16(Z80_CALL, sig->addr);
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         cb_emit8(0xC1); /* POP BC (return value for RAND USR) */
     } else {
         cb_emit8(0x01); /* LD BC, 0 */

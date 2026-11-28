@@ -225,22 +225,22 @@ static void rv_emit_extern_call(const char *name) {
 
 static void rv_call_extern(const FnSig *sig) {
     size_t i;
-    if (sig->in_types.len > 8 || sig->out_types.len > 1) {
+    if (sig->in_cnt > 8 || sig->out_cnt > 1) {
         ir4_die("RV32 extern supports at most 8 args and 1 return");
     }
 
-    for (i = sig->in_types.len; i > 0; i--) {
+    for (i = sig->in_cnt; i > 0; i--) {
         pop_reg(RV_A0 + (u32)(i - 1));
     }
 
-    if (sig->has_addr) {
+    if (FN_FLAG(sig, FN_FL_HAS_ADDR)) {
         rv_li(RV_T0, (u32)sig->addr);
         cb_emit32(enc_i(0, RV_T0, 0, RV_RA, 0x67UL)); /* JALR ra, 0(t0) */
     } else {
         rv_emit_extern_call(sig->name);
     }
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         push_reg(RV_A0);
     }
 }
@@ -1660,9 +1660,9 @@ static void rvr_icall(u8 reg) { cb_emit32(enc_i(0, reg, 0, RV_RA, 0x67UL)); }
 
 static void rvr_call_extern(const FnSig *sig, const u8 *arg_regs) {
     (void)arg_regs; /* stk_regs[0..7] are already a0..a7 */
-    if (sig->in_types.len > 8 || sig->out_types.len > 1)
+    if (sig->in_cnt > 8 || sig->out_cnt > 1)
         ir4_die("RV32 extern supports at most 8 args and 1 return");
-    if (sig->has_addr) {
+    if (FN_FLAG(sig, FN_FL_HAS_ADDR)) {
         rv_li(RV_T0, (u32)sig->addr);
         cb_emit32(enc_i(0, RV_T0, 0, RV_RA, 0x67UL));
     } else {

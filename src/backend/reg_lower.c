@@ -318,7 +318,7 @@ static void prescan_fn(const RegBackend *rbe, const FnSig *sig, const FnIR *w,
                          const FnSigVec *fn_sigs, u8 *loc_addr_taken, size_t *out_max_depth) {
     size_t i;
     size_t depth = 0;
-    size_t max_depth = sig->out_types.len;
+    size_t max_depth = sig->out_cnt;
     StackType types[MAX_VSTACK];
     SavedStack *saved = (SavedStack *)calloc(w->ir.len + 1, sizeof(SavedStack));
     int dead = 0;
@@ -409,10 +409,10 @@ static void prescan_fn(const RegBackend *rbe, const FnSig *sig, const FnIR *w,
             case IR_CALL_EXTERN: {
                 const FnSig *csig = fn_sigs->data[ins->u.fn_idx];
                 size_t k;
-                depth -= csig->in_types.len;
-                for (k = 0; k < csig->out_types.len; k++) {
+                depth -= csig->in_cnt;
+                for (k = 0; k < csig->out_cnt; k++) {
                     check_vstack_push(depth);
-                    types[depth++] = csig->out_types.data[k];
+                    types[depth++] = FN_OUT_TYPE(csig, k);
                 }
                 break;
             }
@@ -538,7 +538,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
         frame_bytes = (frame_bytes + 15U) & ~15U;
 
     sig->addr = rbe->cur_addr();
-    sig->has_addr = 1;
+    FN_SET_FLAG(sig, FN_FL_HAS_ADDR);
 
     rbe->fn_begin(sig->name, used_loc_regs, frame_bytes, w->param_cnt, w->locals.data,
                   loc_is_reg, loc_reg, loc_off, w->locals.len);
@@ -654,7 +654,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
                 fn_pc = rbe->load_fn_addr(dst, fn_sigs->data[target]->addr);
                 commit_dst(&st, st.depth, TY_A, dst);
                 st.depth++;
-                if (!fn_sigs->data[target]->has_addr) {
+                if (!FN_FLAG(fn_sigs->data[target], FN_FL_HAS_ADDR)) {
                     RegFwdCall *fc = VEC_ADD(*fwd_calls);
                     fc->call_pc = fn_pc;
                     fc->call_addr = fn_addr;
@@ -914,8 +914,8 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
             case IR_CALL: {
                 size_t target = ins->u.fn_idx;
                 const FnSig *csig = fn_sigs->data[target];
-                size_t in_cnt = csig->in_types.len;
-                size_t out_cnt = csig->out_types.len;
+                size_t in_cnt = csig->in_cnt;
+                size_t out_cnt = csig->out_cnt;
                 size_t base_d = st.depth - in_cnt;
                 size_t reg_cnt = in_cnt < rbe->num_stk_regs ? in_cnt : rbe->num_stk_regs;
                 size_t stk_cnt = in_cnt > rbe->num_stk_regs ? (in_cnt - rbe->num_stk_regs) : 0;
@@ -931,21 +931,22 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
                 if (out_arg_bytes > 0) {
                     rbe->sp_adj(-(i32)out_arg_bytes);
                     for (k = rbe->num_stk_regs; k < in_cnt; k++) {
-                        StackType aty = csig->in_types.data[k];
+                        StackType aty = FN_IN_TYPE(csig, k);
                         u8 tmp = (rbe->has_fp_regs && aty == TY_F) ? rbe->fp_scratch : rbe->scratch0;
                         load_from_slot(&st, base_d + k, tmp, aty);
                         rbe->store_out_arg(tmp, aty,
                                            (u32)((k - rbe->num_stk_regs) * rbe->word_bytes));
                     }
                 }
-                for (k = 0; k < reg_cnt; k++)
-                    load_from_slot(&st, base_d + k, slot_reg(&st, k, csig->in_types.data[k]),
-                                   csig->in_types.data[k]);
+                for (k = 0; k < reg_cnt; k++) {
+                    StackType aty = FN_IN_TYPE(csig, k);
+                    load_from_slot(&st, base_d + k, slot_reg(&st, k, aty), aty);
+                }
 
                 call_addr = rbe->cur_addr();
                 call_pc = cb_pc();
                 rbe->call(csig->addr);
-                if (!csig->has_addr) {
+                if (!FN_FLAG(csig, FN_FL_HAS_ADDR)) {
                     RegFwdCall *fc = VEC_ADD(*fwd_calls);
                     fc->call_pc = call_pc;
                     fc->call_addr = call_addr;
@@ -957,7 +958,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
 
                 for (k = out_cnt; k > 0; k--) {
                     size_t idx = k - 1;
-                    StackType ot = csig->out_types.data[idx];
+                    StackType ot = FN_OUT_TYPE(csig, idx);
                     u8 src;
                     check_vstack_push(base_d + idx);
                     src = slot_reg(&st, idx, ot);
@@ -1018,8 +1019,8 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
 
             case IR_CALL_EXTERN: {
                 const FnSig *csig = fn_sigs->data[ins->u.fn_idx];
-                size_t in_cnt = csig->in_types.len;
-                size_t out_cnt = csig->out_types.len;
+                size_t in_cnt = csig->in_cnt;
+                size_t out_cnt = csig->out_cnt;
                 size_t base_d = st.depth - in_cnt;
                 u8 arg_regs[16];
                 size_t int_idx = 0, flt_idx = 0;
@@ -1028,7 +1029,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
                 if (out_cnt > 1)
                     ir4_die("extern supports at most 1 return value in register backend");
                 for (k = 0; k < in_cnt; k++) {
-                    if (rbe->has_fp_regs && csig->in_types.data[k] == TY_F) {
+                    if (rbe->has_fp_regs && FN_IN_TYPE(csig, k) == TY_F) {
                         if (flt_idx >= 8)
                             ir4_die("extern supports at most 8 float args in register backend");
                         flt_idx++;
@@ -1045,7 +1046,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
                 int_idx = 0;
                 flt_idx = 0;
                 for (k = 0; k < in_cnt; k++) {
-                    StackType aty = csig->in_types.data[k];
+                    StackType aty = FN_IN_TYPE(csig, k);
                     u8 dst = (rbe->has_fp_regs && aty == TY_F) ? rbe->fp_stk_regs[flt_idx++]
                                                                : rbe->stk_regs[int_idx++];
                     load_from_slot(&st, base_d + k, dst, aty);
@@ -1053,7 +1054,7 @@ void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
                 }
                 rbe->call_extern(csig, arg_regs);
                 if (out_cnt == 1) {
-                    StackType ot = csig->out_types.data[0];
+                    StackType ot = FN_OUT_TYPE(csig, 0);
                     u8 ret_reg;
                     check_vstack_push(base_d);
                     ret_reg = slot_reg(&st, 0, ot);

@@ -121,7 +121,7 @@ static void x16_cart_begin(size_t base) {
 
 static void x16_cart_end(int main_idx) {
     const FnSig *sig = ir4_fn_sig(main_idx);
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--x16-cart requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -296,7 +296,7 @@ static int x16_cart_write(FILE *fp, size_t base) {
     bank_buf[pos++] = (u8)(sig->addr & 0xFF);
     bank_buf[pos++] = (u8)((sig->addr >> 8) & 0xFF);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         u8 zp_stk = be_6502_stack_zp_base();
         if (zp_stk != 0) {
             bank_buf[pos++] = 0xB5;
@@ -369,7 +369,7 @@ static int x16_cart_write(FILE *fp, size_t base) {
     bank_buf[pos++] = 0x47;
     bank_buf[pos++] = 0xFF;
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         print_addr = (u16)(0xC000 + pos);
         cb_put_le16(&bank_buf[p_print1], print_addr);
         bank_buf[pos++] = M6502_LDA_IMM;

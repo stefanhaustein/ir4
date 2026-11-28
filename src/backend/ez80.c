@@ -521,8 +521,8 @@ static void ez_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals
     if (ez_compact) {
         if (ez_frame_bytes > 0) {
             size_t i, out_words = 0;
-            for (i = 0; i < sig->out_types.len; i++) {
-                StackType t = sig->out_types.data[i];
+            for (i = 0; i < sig->out_cnt; i++) {
+                StackType t = FN_OUT_TYPE(sig, i);
                 out_words += (t == TY_F || t == TY_I32) ? 2 : 1;
             }
             if (out_words > 4)
@@ -536,8 +536,8 @@ static void ez_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals
     }
     if (ez_frame_bytes > 0) {
         size_t i, out_words = 0;
-        for (i = 0; i < sig->out_types.len; i++) {
-            StackType t = sig->out_types.data[i];
+        for (i = 0; i < sig->out_cnt; i++) {
+            StackType t = FN_OUT_TYPE(sig, i);
             out_words += (t == TY_F || t == TY_I32) ? 2 : 1;
         }
         if (out_words > 4)
@@ -587,7 +587,7 @@ static void ez_call(size_t target_addr) {
 }
 
 static void ez_call_extern(const FnSig *sig) {
-    if (!sig->has_addr)
+    if (!FN_FLAG(sig, FN_FL_HAS_ADDR))
         ir4_die("eZ80 extern requires fixed address");
     emit8_24(ez_compact ? BC_CALL : EZ80_CALL, (u32)sig->addr);
 }

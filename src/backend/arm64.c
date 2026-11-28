@@ -102,8 +102,8 @@ typedef char ir4_arm64_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
 
 static void a64_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     size_t k;
-    size_t param_cnt = sig->in_types.len;
-    size_t out_count = sig->out_types.len;
+    size_t param_cnt = sig->in_cnt;
+    size_t out_count = sig->out_cnt;
     (void)locals;
     (void)total_locals;
 
@@ -142,12 +142,12 @@ static void a64_call_extern(const FnSig *sig) {
     u8 flt_cnt = 0;
     size_t i;
 
-    if (sig->has_addr) {
+    if (FN_FLAG(sig, FN_FL_HAS_ADDR)) {
         ir4_die("ARM64 extern does not take a fixed address");
     }
 
-    for (i = 0; i < sig->in_types.len; i++) {
-        if (sig->in_types.data[i] == TY_F)
+    for (i = 0; i < sig->in_cnt; i++) {
+        if (FN_IN_TYPE(sig, i) == TY_F)
             flt_cnt++;
         else
             int_cnt++;
@@ -156,8 +156,8 @@ static void a64_call_extern(const FnSig *sig) {
         ir4_die("ARM64 extern supports at most 8 int and 8 float args");
     }
 
-    for (i = sig->in_types.len; i > 0; i--) {
-        if (sig->in_types.data[i - 1] == TY_F) {
+    for (i = sig->in_cnt; i > 0; i--) {
+        if (FN_IN_TYPE(sig, i - 1) == TY_F) {
             flt_cnt--;
             cb_emit32(0xFC4107E0UL | (u32)flt_cnt); /* LDR D<k>, [SP], #16 */
         } else {
@@ -173,8 +173,8 @@ static void a64_call_extern(const FnSig *sig) {
     cb_emit32(0xF2E00009UL); /* MOVK X9, #0, LSL #48 */
     cb_emit32(0xD63F0120UL); /* BLR X9 */
 
-    if (sig->out_types.len == 1) {
-        if (sig->out_types.data[0] == TY_F)
+    if (sig->out_cnt == 1) {
+        if (FN_OUT_TYPE(sig, 0) == TY_F)
             push_d0();
         else
             push_x0();
@@ -1544,10 +1544,10 @@ static void a64r_icall(u8 reg) { cb_emit32(0xD63F0000UL | ((u32)reg << 5)); }
 static void a64r_call_extern(const FnSig *sig, const u8 *arg_regs) {
     u8 int_idx = 0, flt_idx = 0;
     size_t i;
-    if (sig->has_addr)
+    if (FN_FLAG(sig, FN_FL_HAS_ADDR))
         ir4_die("ARM64 extern does not take a fixed address");
-    for (i = 0; i < sig->in_types.len; i++) {
-        if (sig->in_types.data[i] == TY_F) {
+    for (i = 0; i < sig->in_cnt; i++) {
+        if (FN_IN_TYPE(sig, i) == TY_F) {
             if (flt_idx >= 8)
                 ir4_die("ARM64 extern supports at most 8 float args");
             a64r_mov_reg(flt_idx, arg_regs[i], TY_F);

@@ -142,6 +142,7 @@ void ir4_die(const char *msg) {
     } else {
         fprintf(stderr, "error: ir4c: %s\n", msg);
     }
+    fn_ir_cleanup();
     exit(1);
 }
 
@@ -169,6 +170,17 @@ void lex_init(FILE *in, const char *path) {
     seen_files.len = 0;
     VEC_PUSH(seen_files, root_path);
     ir4_status_file("Parsing", root_path, 0);
+}
+
+void lex_cleanup(void) {
+    free(src_stack.data);
+    src_stack.data = NULL;
+    src_stack.len = 0;
+    src_stack.cap = 0;
+    free(seen_files.data);
+    seen_files.data = NULL;
+    seen_files.len = 0;
+    seen_files.cap = 0;
 }
 
 SrcFile *lex_cur(void) {

@@ -53,7 +53,7 @@ static void bc_run_vm(int main_idx) {
     size_t init_sz = cb_init_data_size();
     u16 data_addr;
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "--run requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -91,7 +91,7 @@ static void bc_run_vm(int main_idx) {
             pc = call_stack[--csp];
             if (pc == 0xFFFF) {
                 i16 res = 0;
-                if (sig->out_types.len == 1)
+                if (sig->out_cnt == 1)
                     res = (i16)rd16(mem, sp);
                 free(mem);
                 printf("VM main() returned: %d\n", (int)res);

@@ -47,7 +47,7 @@ static void x16gs_end(int main_idx) {
     }
     entry_addr = cb_cur_addr();
 
-    if (sig->in_types.len != 0 || sig->out_types.len > 1) {
+    if (sig->in_cnt != 0 || sig->out_cnt > 1) {
         fprintf(stderr, "-t x16gs requires 'main' with 0 inputs and at most 1 output\n");
         exit(1);
     }
@@ -88,7 +88,7 @@ static void x16gs_end(int main_idx) {
     cb_emit8(M816_JSL);
     cb_emit24((u32)sig->addr);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         size_t pos_br;
         static const u8 ktramp[10] = {
             0x38, 0xFB,             /* SEC; XCE (enter E=1 inside Bank $00) */
@@ -158,7 +158,7 @@ static void x16gs_end(int main_idx) {
     cb_emit8(M816_TCD);
     cb_emit8(M816_RTL);
 
-    if (sig->out_types.len == 1) {
+    if (sig->out_cnt == 1) {
         size_t putchar_addr = cb_cur_addr();
         size_t print_u16_addr, div_lp, bit_lp, pr_lp;
 

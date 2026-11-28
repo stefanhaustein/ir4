@@ -55,6 +55,7 @@ const char *intern_find(const char *s);
 const char *intern_find_n(const char *s, size_t len);
 const char *intern_str(const char *s);
 const char *intern_str_n(const char *s, size_t len);
+void intern_drop_table(void);
 
 /* Pointer-keyed open-addressing hash table (for interned symbol -> index) */
 typedef struct {
@@ -67,5 +68,6 @@ typedef struct {
 int sym_ht_find(const SymHt *ht, const char *p);
 void sym_ht_put(SymHt *ht, const char *p, size_t val);
 void sym_ht_clear(SymHt *ht);
+void sym_ht_free(SymHt *ht);
 
 #endif

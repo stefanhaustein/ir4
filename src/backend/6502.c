@@ -409,13 +409,13 @@ static void m6502_call_extern(const FnSig *sig) {
         cb_emit8_16(BC_CALL, stub_addr);
         return;
     }
-    if (!sig->has_addr)
+    if (!FN_FLAG(sig, FN_FL_HAS_ADDR))
         ir4_die("6502 extern requires a fixed address");
-    if (sig->out_types.len > 1)
+    if (sig->out_cnt > 1)
         ir4_die("6502 extern supports at most 1 return value");
 
-    for (i = sig->in_types.len; i > 0; i--) {
-        const char *r = sig->in_regs.data[i - 1];
+    for (i = sig->in_cnt; i > 0; i--) {
+        const char *r = (sig->ext && sig->ext->in_regs) ? sig->ext->in_regs[i - 1] : "";
         m6502_lda_stk(0);
         if (strcmp(r, "A") == 0) {
             cb_emit8_8(M6502_STA_ZP, zp_scratch);
@@ -450,8 +450,8 @@ static void m6502_call_extern(const FnSig *sig) {
         cb_emit8_16(M6502_JSR, sig->addr);
     }
 
-    if (sig->out_types.len == 1) {
-        const char *r = sig->out_reg;
+    if (sig->out_cnt == 1) {
+        const char *r = sig->ext ? sig->ext->out_reg : "";
         if (strcmp(r, "X") == 0) {
             cb_emit8(M6502_TXA);
         } else if (strcmp(r, "Y") == 0) {
