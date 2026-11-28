@@ -21,7 +21,7 @@ def parse_lib(path: Path):
     lines = path.read_text(encoding="utf-8").splitlines()
     header = []
     i = 0
-    while i < len(lines) and lines[i].startswith("\\"):
+    while i < len(lines) and lines[i].startswith("\\") and not lines[i].startswith("\\\\"):
         raw = lines[i][2:] if lines[i].startswith("\\ ") else lines[i][1:]
         header.append(raw.rstrip())
         i += 1
@@ -30,6 +30,8 @@ def parse_lib(path: Path):
     pending = []
     for line in lines[i:]:
         stripped = line.strip()
+        if stripped.startswith("\\\\"):
+            continue
         if stripped.startswith("\\"):
             pending.append(stripped[1:].strip())
             continue

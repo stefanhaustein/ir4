@@ -6,59 +6,63 @@
 \   SEC; XCE; CLI; JSR <addr>; SEI; CLC; XCE; RTL
 \ Call with ( a_in :i addr :i -> a_out :i ).
 code x16gs __x16gs_kernal ( a_in :i addr :i -> :i )
-  0xBD :i8 0x00 :i8 0x02 :i8      \ LDA $0200,X (addr)
-  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8 \ STA $000454
-  0xE8 :i8 0xE8 :i8               \ INX; INX
-  0xBD :i8 0x00 :i8 0x02 :i8      \ LDA $0200,X (a_in)
-  0xA8 :i8                        \ TAY (hold a_in in Y across trampoline setup)
-  0x86 :i8 0x1E :i8               \ STX $1E (save data stack X at $041E)
-  0x3B :i8                        \ TSC
-  0x85 :i8 0x1C :i8               \ STA $1C (save native S at $041C)
-  0xE2 :i8 0x20 :i8               \ SEP #$20
-  0xA9 :i8 0x38 :i8               \ LDA #$38 (SEC)
-  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ STA $000450
-  0xA9 :i8 0xFB :i8               \ LDA #$FB (XCE)
-  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8 \ STA $000451
-  0xA9 :i8 0x58 :i8               \ LDA #$58 (CLI)
-  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8 \ STA $000452
-  0xA9 :i8 0x20 :i8               \ LDA #$20 (JSR)
-  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8 \ STA $000453
-  0xA9 :i8 0x78 :i8               \ LDA #$78 (SEI)
-  0x8F :i8 0x56 :i8 0x04 :i8 0x00 :i8 \ STA $000456
-  0xA9 :i8 0x18 :i8               \ LDA #$18 (CLC)
-  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8 \ STA $000457
-  0xA9 :i8 0xFB :i8               \ LDA #$FB (XCE)
-  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8 \ STA $000458
-  0xA9 :i8 0x6B :i8               \ LDA #$6B (RTL)
-  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8 \ STA $000459
-  0xC2 :i8 0x20 :i8               \ REP #$20
-  0xA9 :i8 0x00 :i8 0x00 :i8      \ LDA #$0000
-  0x5B :i8                        \ TCD (D = $0000)
-  0xE2 :i8 0x20 :i8               \ SEP #$20
-  0x8B :i8 0x68 :i8               \ PHB; PLA
-  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ STA $00042A (save caller DBR)
-  0xA9 :i8 0x00 :i8               \ LDA #$00
-  0x48 :i8 0xAB :i8               \ PHA; PLB (DBR = $00)
-  0xC2 :i8 0x20 :i8               \ REP #$20
-  0xA2 :i8 0xDF :i8 0x01 :i8      \ LDX #$01DF
-  0x9A :i8                        \ TXS
-  0x98 :i8                        \ TYA (a_in -> A)
-  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8 \ JSL $000450 (switches E=1 & back in Bank $00)
-  0xC2 :i8 0x30 :i8               \ REP #$30
-  0xA8 :i8                        \ TAY (save 8-bit A result)
-  0xE2 :i8 0x20 :i8               \ SEP #$20
-  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8 \ LDA $00042A (restore caller DBR)
-  0x48 :i8 0xAB :i8               \ PHA; PLB
-  0xC2 :i8 0x20 :i8               \ REP #$20
-  0xA9 :i8 0x00 :i8 0x04 :i8      \ LDA #$0400
-  0x5B :i8                        \ TCD (D = $0400)
-  0xA6 :i8 0x1E :i8               \ LDX $1E (restore data stack X)
-  0xA5 :i8 0x1C :i8               \ LDA $1C (restore native S)
-  0x1B :i8                        \ TCS
-  0x98 :i8                        \ TYA
-  0x29 :i8 0xFF :i8 0x00 :i8      \ AND #$00FF
-  0x9D :i8 0x00 :i8 0x02 :i8      \ STA $0200,X (overwrite a_in slot with result)
-end
+  0xBD :i8 0x00 :i8 0x02 :i8           \\ LDA $0200,X         ; addr
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000454
+  0xE8 :i8                             \\ INX
+  0xE8 :i8                             \\ INX
+  0xBD :i8 0x00 :i8 0x02 :i8           \\ LDA $0200,X         ; a_in
+  0xA8 :i8                             \\ TAY                 ; hold a_in in Y across trampoline setup
+  0x86 :i8 0x1E :i8                    \\ STX $1E             ; save data stack X at $041E
+  0x3B :i8                             \\ TSC
+  0x85 :i8 0x1C :i8                    \\ STA $1C             ; save native S at $041C
+  0xE2 :i8 0x20 :i8                    \\ SEP #$20
+  0xA9 :i8 0x38 :i8                    \\ LDA #$38            ; SEC
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000450
+  0xA9 :i8 0xFB :i8                    \\ LDA #$FB            ; XCE
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000451
+  0xA9 :i8 0x58 :i8                    \\ LDA #$58            ; CLI
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000452
+  0xA9 :i8 0x20 :i8                    \\ LDA #$20            ; JSR
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000453
+  0xA9 :i8 0x78 :i8                    \\ LDA #$78            ; SEI
+  0x8F :i8 0x56 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000456
+  0xA9 :i8 0x18 :i8                    \\ LDA #$18            ; CLC
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000457
+  0xA9 :i8 0xFB :i8                    \\ LDA #$FB            ; XCE
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000458
+  0xA9 :i8 0x6B :i8                    \\ LDA #$6B            ; RTL
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8  \\ STA f:$000459
+  0xC2 :i8 0x20 :i8                    \\ REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8           \\ LDA #$0000
+  0x5B :i8                             \\ TCD                 ; D = $0000
+  0xE2 :i8 0x20 :i8                    \\ SEP #$20
+  0x8B :i8                             \\ PHB
+  0x68 :i8                             \\ PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\ STA f:$00042A       ; save caller DBR
+  0xA9 :i8 0x00 :i8                    \\ LDA #$00
+  0x48 :i8                             \\ PHA
+  0xAB :i8                             \\ PLB                 ; DBR = $00
+  0xC2 :i8 0x20 :i8                    \\ REP #$20
+  0xA2 :i8 0xDF :i8 0x01 :i8           \\ LDX #$01DF
+  0x9A :i8                             \\ TXS
+  0x98 :i8                             \\ TYA                 ; a_in -> A
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\ JSL $000450         ; switches E=1 & back in Bank $00
+  0xC2 :i8 0x30 :i8                    \\ REP #$30
+  0xA8 :i8                             \\ TAY                 ; save 8-bit A result
+  0xE2 :i8 0x20 :i8                    \\ SEP #$20
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\ LDA f:$00042A       ; restore caller DBR
+  0x48 :i8                             \\ PHA
+  0xAB :i8                             \\ PLB
+  0xC2 :i8 0x20 :i8                    \\ REP #$20
+  0xA9 :i8 0x00 :i8 0x04 :i8           \\ LDA #$0400
+  0x5B :i8                             \\ TCD                 ; D = $0400
+  0xA6 :i8 0x1E :i8                    \\ LDX $1E             ; restore data stack X
+  0xA5 :i8 0x1C :i8                    \\ LDA $1C             ; restore native S
+  0x1B :i8                             \\ TCS
+  0x98 :i8                             \\ TYA
+  0x29 :i8 0xFF :i8 0x00 :i8           \\ AND #$00FF
+  0x9D :i8 0x00 :i8 0x02 :i8           \\ STA $0200,X         ; overwrite a_in slot with result
+end \\ 9541
 
 fn emit ( c :i )
   c 0xFFD2 __x16gs_kernal drop

@@ -1193,13 +1193,17 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
     *out_len = 0;
     *out_reloc_start = code_relocs.len;
     *out_reloc_cnt = 0;
+    lex_begin_code_asm();
 
     while ((tok = next_tok()) != NULL) {
         if (strcmp(tok, "end") == 0) {
             if (has_pending)
                 ir4_die("missing width (:i8, :i16, :i32) in raw code");
+            lex_finish_code_asm();
             return;
-        } else if (strcmp(tok, ":i8") == 0) {
+        }
+        lex_feed_code_tok(tok);
+        if (strcmp(tok, ":i8") == 0) {
             if (!has_pending)
                 ir4_die("expected integer before ':i8'");
             if (pending < -128 || pending > 255)
@@ -1254,6 +1258,7 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
             tok = next_tok();
             if (!tok)
                 ir4_die("expected identifier after '&' in raw code");
+            lex_feed_code_tok(tok);
             idx = find_buffer(tok);
             if (idx < 0)
                 ir4_die("expected 'var' or 'data' identifier after '&' in raw code");
@@ -2027,7 +2032,7 @@ static void compile_body(WordIR *w) {
         exit(1);
     }
 
-    ir4_die("unexpected EOF inside word definition (missing ';')");
+    ir4_die("unexpected EOF inside word definition (missing 'end')");
 }
 
 static void flush_vals_word(i32 val) {

@@ -8,7 +8,7 @@ IR4(th) compiles via direct 2-pass machine-code generation (with dead-code elimi
 
 ### 1.1 Tokenization & Whitespace
 * Programs consist of **whitespace-delimited tokens** (spaces, tabs, newlines).
-* Line comments start with `\` followed by whitespace (or newline) and extend to the end of the line.
+* Line comments start with `\` (or `\\` for structured assembly comments in `code` blocks) followed by whitespace (or newline) and extend to the end of the line. When `\\` assembly comments appear inside a `code ... end` block, `end` carries a 4-hex-digit sync hash (`end \\ <hex>`) verified by `ir4c` and maintained by `tools/sync_asm.py`.
 * `#line <num>` or `#line <num> "<filename>"` sets the current source line number (and optionally filename) for subsequent error messages.
 
 ### 1.2 Lexical Categories

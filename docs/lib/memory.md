@@ -19,7 +19,8 @@ Byte-slice memory operations
 
 ### 6502
 
-Auto-generated from tools/6502/mem.asm by tools/asm2ir4.py (do not edit manually).
+6502 memory primitives for IR4th.
+Preserves X (IR4th data stack pointer). Uses ZP $02..$08.
 
 ### 65816
 
@@ -29,4 +30,5 @@ Preserves X (data stack), D, DBR, M=0, X=0; uses scratch DP $00..$0D.
 
 ### z80
 
-Auto-generated from tools/z80/mem.asm by tools/asm2ir4.py (do not edit manually).
+Z80 memory primitives for IR4th.
+Uses IY for return address; zero relocations.

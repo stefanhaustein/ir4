@@ -90,6 +90,7 @@ typedef struct {
     FILE *fp;
     const char *path;
     u32 line_num;
+    u32 hdr_asm_hash;
     u16 req_group;
     u8 req_rank;
     u8 can_reopen;
@@ -120,6 +121,9 @@ void src_ungetc(SrcFile *sf, int c);
 int skip_ws_and_comments(void);
 const char *next_tok(void);
 const char *next_tok_intern(void);
+void lex_begin_code_asm(void);
+void lex_feed_code_tok(const char *tok);
+void lex_finish_code_asm(void);
 void push_require_ex(const char *name, int lib_only);
 const char *read_require_path(void);
 void push_require(const char *name);

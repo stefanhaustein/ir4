@@ -16,10 +16,16 @@ LCC_RCC  ?= ./lcc/build/rcc
 
 .PHONY: all test test-err test-z80 test-ez80 test-6502 test-65816 test-rv32 test-web test-x16gs docs-web rt rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web agon x16gs clean
 
-all: $(TARGET)
+ASM_IR4_FILES = $(wildcard lib/*.ir4 lib/*/*.ir4 pasta84/rtl/*.ir4)
+
+all: $(BUILD)/.asm_sync $(TARGET)
 
 $(BUILD):
 	mkdir -p $(BUILD)
+
+$(BUILD)/.asm_sync: $(ASM_IR4_FILES) tools/sync_asm.py | $(BUILD)
+	@python3 tools/sync_asm.py --since $(BUILD)/.asm_sync $(ASM_IR4_FILES)
+	@touch $(BUILD)/.asm_sync
 
 $(BUILD)/%.o: src/%.c src/ir4.h
 	mkdir -p $(@D)
@@ -52,7 +58,7 @@ $(BUILD)/platform/elf.o: src/codebuf.h src/frontend.h src/backend/rv32.h
 $(TARGET): $(OBJS)
 	$(CC) $(CFLAGS) $(OBJS) -o $(TARGET) -lm
 
-test: $(TARGET) tests/test_*.ir4
+test: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t z80   -o $(BUILD)/fib_z80.bin      tests/test_fib.ir4
 	./$(TARGET) -t 6502  -o $(BUILD)/fib_6502.bin     tests/test_fib.ir4
 	./$(TARGET) -t arm64 -o $(BUILD)/fib_arm64.bin    --run tests/test_fib.ir4
@@ -137,7 +143,7 @@ test-err: $(TARGET)
 		fi; \
 	done
 
-test-z80: $(TARGET) tests/test_*.ir4
+test-z80: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t cpm -o build/fib.com      tests/test_fib.ir4
 	./$(TARGET) -t cpm -o build/core.com     tests/test_core.ir4
 	./$(TARGET) -t cpm -o build/muldiv.com   tests/test_muldiv.ir4
@@ -178,7 +184,7 @@ test-z80: $(TARGET) tests/test_*.ir4
 		echo "tnylpo not found; skipping Z80 execution"; \
 	fi
 
-test-ez80: $(TARGET) tests/test_*.ir4
+test-ez80: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t agon -o $(BUILD)/fib_agon.bin      tests/test_fib.ir4
 	./$(TARGET) -t agon -o $(BUILD)/core_agon.bin     tests/test_core.ir4
 	./$(TARGET) -t agon -o $(BUILD)/muldiv_agon.bin   tests/test_muldiv.ir4
@@ -216,7 +222,7 @@ test-ez80: $(TARGET) tests/test_*.ir4
 		echo "fab-agon-emulator not found; skipping eZ80 execution"; \
 	fi
 
-test-6502: $(TARGET) tests/test_*.ir4
+test-6502: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/fib_sim65.bin      tests/test_fib.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/core_sim65.bin     tests/test_core.ir4
 	./$(TARGET) -t sim65 -o $(BUILD)/muldiv_sim65.bin   tests/test_muldiv.ir4
@@ -254,7 +260,7 @@ test-6502: $(TARGET) tests/test_*.ir4
 		echo "sim65 not found; skipping 6502 execution"; \
 	fi
 
-test-65816: $(TARGET) tests/test_*.ir4
+test-65816: $(BUILD)/.asm_sync $(TARGET) tests/test_*.ir4
 	@for name in fib core muldiv mem float req data math i32 fnptr peephole file system joystick sound; do \
 		out=$$(./$(TARGET) -t sim65816 -o $(BUILD)/$${name}_65816.bin tests/test_$${name}.ir4 | tr -d '\r' | tail -n 1); \
 		echo "sim65816 test_$${name}.ir4 -> $$out"; \
@@ -315,6 +321,7 @@ test-rv32: $(TARGET) tests/test_*.ir4
 	fi
 
 rt: rt-z80 rt-ez80 rt-6502 rt-rv32 rt-web
+	python3 tools/sync_asm.py --force $(ASM_IR4_FILES)
 
 rt-web:
 	python3 tools/web/gen_web_vm.py --input tools/web/ir4_vm.js --output src/plat_web_vm.h
@@ -349,13 +356,9 @@ rt-ez80:
 
 rt-z80:
 	python3 tools/z80/gen_math48.py --input tools/z80/math48.asm --output src/be_z80_math48.h
-	python3 tools/asm2ir4.py --cpu z80 --input tools/z80/i32.asm --output lib/z80/i32.ir4
-	python3 tools/asm2ir4.py --cpu z80 --input tools/z80/mem.asm --output lib/z80/memory.ir4
 
 rt-6502:
 	python3 tools/6502/gen_wozfp.py --input tools/6502/wozfp.asm --output src/be_6502_wozfp.h
-	python3 tools/asm2ir4.py --cpu 6502 --input tools/6502/i32.asm --output lib/6502/i32.ir4
-	python3 tools/asm2ir4.py --cpu 6502 --input tools/6502/mem.asm --output lib/6502/memory.ir4
 
 rt-rv32:
 	python3 tools/rv32/gen_rv32_fp.py --input tools/rv32/rv32_fp.c --output src/be_rv32_fp.h
@@ -391,7 +394,7 @@ X16GS_CPP_FLAGS = -E -P -nostdinc -U__APPLE__ -Ilcc/include/ir4 -Isrc -Isrc/fron
 
 x16gs: $(BUILD)/x16gs/ir4c.prg
 
-$(BUILD)/x16gs/ir4c.prg: $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/frontend.h src/frontend/internal.h src/backend/65816.h lcc/lib/libc.c lcc/lib/c.ir4 lib/*.ir4 lib/65816/*.ir4 lib/x16gs/*.ir4
+$(BUILD)/x16gs/ir4c.prg: $(BUILD)/.asm_sync $(TARGET) $(X16GS_SRCS) src/ir4.h src/codebuf.h src/frontend.h src/frontend/internal.h src/backend/65816.h lcc/lib/libc.c lcc/lib/c.ir4 lib/*.ir4 lib/65816/*.ir4 lib/x16gs/*.ir4
 	@if [ ! -x "$(LCC_RCC)" ]; then \
 		if [ -d lcc ]; then \
 			mkdir -p lcc/build && $(MAKE) -C lcc BUILDDIR=build rcc; \

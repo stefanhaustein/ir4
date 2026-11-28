@@ -11,6 +11,31 @@ static StrVec extra_lib_roots;
 static StrVec seen_files;
 static StrBuf tok_sb;
 
+#define FNV1A_INIT 2166136261UL
+
+static int code_asm_active = 0;
+static int code_asm_seen = 0;
+static int last_tok_ended_line = 0;
+static u32 code_asm_hash = FNV1A_INIT;
+static u32 code_tok_hash = FNV1A_INIT;
+
+static u32 fnv1a_byte(u32 h, u8 b) {
+    return (h ^ (u32)b) * 16777619UL;
+}
+
+static u32 fnv1a_trimmed_line(u32 h, const char *s, size_t len) {
+    size_t a = 0;
+    size_t b = len;
+    while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r'))
+        a++;
+    while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r'))
+        b--;
+    while (a < b) {
+        h = fnv1a_byte(h, (u8)s[a++]);
+    }
+    return fnv1a_byte(h, (u8)'\n');
+}
+
 void ir4_add_lib_root(const char *path) {
     if (!path || path[0] == '\0')
         return;
@@ -111,6 +136,7 @@ void lex_init(FILE *in, const char *path) {
     sf->fp = in;
     sf->path = root_path;
     sf->line_num = 1;
+    sf->hdr_asm_hash = FNV1A_INIT;
     sf->req_group = 0;
     sf->req_rank = 0;
     sf->can_reopen = 0;
@@ -118,6 +144,9 @@ void lex_init(FILE *in, const char *path) {
     sf->buf_len = 0;
     sf->pushback = -1;
     next_req_group = 1;
+    code_asm_active = 0;
+    code_asm_seen = 0;
+    last_tok_ended_line = 0;
 
     seen_files.len = 0;
     VEC_PUSH(seen_files, root_path);
@@ -199,6 +228,34 @@ int skip_ws_and_comments(void) {
             continue;
         if (c == '\\') {
             int c2 = src_getc(cur);
+            if (c2 == '\\') {
+                int c3 = src_getc(cur);
+                if (c3 == EOF || c3 == '\n' || isspace((unsigned char)c3)) {
+                    char ln[256];
+                    size_t n = 0;
+                    if (c3 != EOF && c3 != '\n') {
+                        while ((c = src_getc(cur)) != EOF && c != '\n') {
+                            if (n < sizeof(ln))
+                                ln[n++] = (char)c;
+                        }
+                        if (c == '\n')
+                            bump_line(cur);
+                    } else if (c3 == '\n') {
+                        bump_line(cur);
+                    }
+                    if (code_asm_active) {
+                        code_asm_seen = 1;
+                        code_asm_hash = fnv1a_trimmed_line(code_asm_hash, ln, n);
+                    } else {
+                        cur->hdr_asm_hash = fnv1a_trimmed_line(cur->hdr_asm_hash, ln, n);
+                    }
+                    continue;
+                }
+                /* Token starting with \\<non-space>: push back c3 and return first '\\'?
+                   Wait: single pushback cannot unget both c2 and c3; handle directly in next_tok if needed,
+                   or reject invalid '\\' comment syntax. */
+                ir4_die("expected whitespace after '\\\\'");
+            }
             if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
                 if (c2 == '\n') {
                     bump_line(cur);
@@ -272,10 +329,94 @@ const char *next_tok(void) {
                 parse_line_directive(cur, c);
                 continue;
             }
+            last_tok_ended_line = (c == '\n' || c == EOF) ? 1 : 0;
             if (c == '\n')
                 bump_line(cur);
         }
         return tok_sb.data;
+    }
+}
+
+void lex_begin_code_asm(void) {
+    SrcFile *cur = lex_cur();
+    code_asm_active = 1;
+    code_asm_seen = 0;
+    code_asm_hash = cur ? cur->hdr_asm_hash : FNV1A_INIT;
+    code_tok_hash = FNV1A_INIT;
+}
+
+void lex_feed_code_tok(const char *tok) {
+    while (*tok) {
+        code_tok_hash = fnv1a_byte(code_tok_hash, (u8)*tok++);
+    }
+    code_tok_hash = fnv1a_byte(code_tok_hash, (u8)'\n');
+}
+
+void lex_finish_code_asm(void) {
+    SrcFile *cur = lex_cur();
+    u32 mix = code_asm_hash ^ ((code_tok_hash << 1) | (code_tok_hash >> 31));
+    u16 expected = (u16)((mix ^ (mix >> 16)) & 0xFFFFUL);
+    int has_tag = 0;
+    u16 got = 0;
+
+    code_asm_active = 0;
+    if (cur && !last_tok_ended_line) {
+        int c = src_getc(cur);
+        while (c == ' ' || c == '\t' || c == '\r')
+            c = src_getc(cur);
+        if (c == '\\') {
+            int c2 = src_getc(cur);
+            if (c2 == '\\') {
+                int k;
+                c = src_getc(cur);
+                if (c != ' ' && c != '\t')
+                    ir4_die("expected hex hash after 'end \\\\'");
+                while (c == ' ' || c == '\t')
+                    c = src_getc(cur);
+                for (k = 0; k < 4; k++) {
+                    int d = -1;
+                    if (c >= '0' && c <= '9')
+                        d = c - '0';
+                    else if (c >= 'a' && c <= 'f')
+                        d = c - 'a' + 10;
+                    else if (c >= 'A' && c <= 'F')
+                        d = c - 'A' + 10;
+                    else
+                        ir4_die("expected 4-digit hex hash after 'end \\\\'");
+                    got = (u16)((got << 4) | (u16)d);
+                    c = src_getc(cur);
+                }
+                while (c == ' ' || c == '\t' || c == '\r')
+                    c = src_getc(cur);
+                if (c != '\n' && c != EOF)
+                    ir4_die("unexpected trailing characters after 'end \\\\' hash");
+                if (c == '\n')
+                    bump_line(cur);
+                has_tag = 1;
+            } else if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
+                if (c2 == '\n') {
+                    bump_line(cur);
+                } else if (c2 != EOF) {
+                    while ((c = src_getc(cur)) != EOF && c != '\n')
+                        ;
+                    if (c == '\n')
+                        bump_line(cur);
+                }
+            } else {
+                ir4_die("unexpected token after 'end'");
+            }
+        } else if (c == '\n') {
+            bump_line(cur);
+        } else if (c != EOF) {
+            src_ungetc(cur, c);
+        }
+    }
+
+    if (code_asm_seen) {
+        if (!has_tag || got != expected)
+            ir4_die("missing or stale '\\\\' assembly hash on 'end' (run make)");
+    } else if (has_tag) {
+        ir4_die("unexpected 'end \\\\' hash on code block without '\\\\' assembly");
     }
 }
 
@@ -303,6 +444,7 @@ static void push_src_file(FILE *fp, const char *path, u16 req_group, u8 req_rank
     sf->fp = fp;
     sf->path = ipath;
     sf->line_num = 1;
+    sf->hdr_asm_hash = FNV1A_INIT;
     sf->req_group = req_group;
     sf->req_rank = req_rank;
     sf->can_reopen = (fp == NULL) ? 1 : 0;
