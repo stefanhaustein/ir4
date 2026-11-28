@@ -351,6 +351,11 @@ docs-web: $(TARGET) tools/web/ir4_vm.js examples/spheres.ir4
 	mkdir -p docs/web
 	cp tools/web/ir4_vm.js docs/web/ir4_vm.js
 	./$(TARGET) -t web-js -o docs/web/spheres.js examples/spheres.ir4
+	@if [ -x pasta84/pasta80 ]; then \
+		python3 pasta84/gen_web_demos.py; \
+	else \
+		echo "pasta84/pasta80 not found; skipping PASTA/80 web demos"; \
+	fi
 
 rt-ez80:
 	python3 tools/ez80/gen_ez80_rt.py --output src/be_ez80_rt.h

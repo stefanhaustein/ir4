@@ -62,9 +62,9 @@ static void x16gs_end(int main_idx) {
     cb_emit8(M816_STA_LONG);
     cb_emit24(0x000440UL);
 
-    /* Hardware stack S = $1FFF (Bank $00), Direct Page D = $0400 (X16 Golden RAM $0400..$043F) */
+    /* Hardware stack S in Bank $00 ($06FF in Golden RAM for resident banks >= $10, else $1FFF), D = $0400 */
     cb_emit8(M816_LDX_IMM);
-    cb_emit16(0x1FFF);
+    cb_emit16((x16gs_base >= 0x100000UL) ? 0x06FF : 0x1FFF);
     cb_emit8(M816_TXS);
     cb_emit8(M816_LDA_IMM);
     cb_emit16(0x0400);

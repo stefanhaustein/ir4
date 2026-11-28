@@ -1258,10 +1258,7 @@ static void a64r_alu_reg(IrOp op, u8 dst, u8 lhs, u8 rhs) {
 
 static int a64r_alu_imm(IrOp op, u8 dst, u8 lhs, i32 imm) {
     if (op == OP_ADD || op == OP_AADD || op == OP_SUB || op == OP_ASUB) {
-        i32 delta;
-        if ((op == OP_SUB || op == OP_ASUB) && imm == (-2147483647 - 1))
-            return 0;
-        delta = (op == OP_SUB || op == OP_ASUB) ? -imm : imm;
+        i32 delta = (op == OP_SUB || op == OP_ASUB) ? -imm : imm;
         if (delta == 0) {
             a64r_mov_reg(dst, lhs, TY_W);
             return 1;

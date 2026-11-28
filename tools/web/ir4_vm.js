@@ -631,38 +631,54 @@
   }
 
   function createBrowserHost(el, opts) {
-    var w = opts.width || 320;
-    var h = opts.height || 240;
+    var FONT_FAMILY = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
+    var TERM_CELL_W = 8;
+    var TERM_CELL_H = 16;
+    var initW = opts.width || 320;
+    var initH = opts.height || 240;
+    var scale = opts.scale || 2;
+    var w = initW;
+    var h = initH;
     var depth = 24;
     var color = 0xFFFFFF;
+    var gfxActive = false;
     var startMs = Date.now();
     var ticks = 0;
+    var nextVsyncTs = 0;
     var keyQueue = [];
     var keysDown = {};
     var resumeFn = null;
-    var termCols = Math.max(20, Math.floor(w / 8));
-    var termRows = Math.max(10, Math.floor(h / 10));
-    var tx = 0, ty = 0, tfg = 7, tcursor = 1;
+    var dispW = Math.max(160, Math.round(initW * scale));
+    var dispH = Math.max(160, Math.round(initH * scale));
+    var termCols = Math.max(20, Math.floor(dispW / TERM_CELL_W));
+    var termRows = Math.max(10, Math.floor(dispH / TERM_CELL_H));
+    var termPixelW = termCols * TERM_CELL_W;
+    var termPixelH = termRows * TERM_CELL_H;
+    var tx = 0, ty = 0, tfg = 7, tbg = 0, tscreenBg = 0, tcursor = 1;
     var termBuf = [];
     var termFg = [];
+    var termBg = [];
     var termDirty = false;
-    function makeRow(ch, fg) {
+    function makeRow(ch, fg, bg) {
       return {
         ch: new Array(termCols).fill(ch),
-        fg: new Uint8Array(termCols).fill(fg)
+        fg: new Uint8Array(termCols).fill(fg),
+        bg: new Uint8Array(termCols).fill(bg)
       };
     }
     for (var r = 0; r < termRows; r++) {
-      var row = makeRow(" ", 7);
-      termBuf.push(row.ch); termFg.push(row.fg);
+      var row = makeRow(" ", 7, 0);
+      termBuf.push(row.ch); termFg.push(row.fg); termBg.push(row.bg);
     }
 
     var rootEl = el.shadowRoot || el.attachShadow({ mode: "open" });
     rootEl.innerHTML = "";
     var wrap = document.createElement("div");
-    wrap.style.cssText = "position:relative;overflow:hidden;background:#000;width:" + w + "px;height:" + h + "px;" +
-      "transform-origin:top left;outline:none;font-family:monospace;";
+    wrap.style.cssText = "position:relative;overflow:hidden;background:#000;outline:none;font-family:" + FONT_FAMILY + ";";
     wrap.tabIndex = 0;
+
+    var gfxWrap = document.createElement("div");
+    gfxWrap.style.cssText = "position:absolute;left:0;top:0;transform-origin:top left;display:none;";
 
     var bgCanvas = document.createElement("canvas");
     bgCanvas.width = w;
@@ -672,30 +688,59 @@
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, w, h);
 
-    var termPre = document.createElement("pre");
-    termPre.style.cssText = "position:absolute;left:0;top:0;margin:0;padding:0;width:" + w + "px;height:" + h + "px;" +
-      "color:#aaa;font:10px/10px monospace;pointer-events:none;white-space:pre;overflow:hidden;";
+    ctx.font = "13px " + FONT_FAMILY;
+    var m13 = ctx.measureText("MMMMMMMMMM").width / 10;
+    var termFontPx = (m13 > 0) ? +(13 * TERM_CELL_W / m13).toFixed(3) : 13;
+    ctx.font = "8px " + FONT_FAMILY;
+    var gfxAdv8 = ctx.measureText("M").width || 4.8;
 
-    wrap.appendChild(bgCanvas);
-    wrap.appendChild(termPre);
+    var termPre = document.createElement("pre");
+    termPre.setAttribute("role", "region");
+    termPre.setAttribute("aria-label", "Terminal");
+    termPre.style.cssText = "position:absolute;left:0;top:0;margin:0;padding:0;width:" + termPixelW + "px;height:" + termPixelH + "px;" +
+      "background:#000;color:#aaa;font:" + termFontPx + "px/" + TERM_CELL_H + "px " + FONT_FAMILY + ";" +
+      "font-variant-ligatures:none;white-space:pre;overflow:hidden;user-select:text;";
+
+    gfxWrap.appendChild(bgCanvas);
 
     var sprCanvases = [];
     var sprImgs = [];
     for (var si = 0; si < 64; si++) {
       var sc = document.createElement("canvas");
       sc.style.cssText = "position:absolute;left:0;top:0;display:none;pointer-events:none;image-rendering:pixelated;z-index:" + (64 - si) + ";";
-      wrap.appendChild(sc);
+      gfxWrap.appendChild(sc);
       sprCanvases.push(sc);
     }
 
-    function applyScale() {
-      var s = opts.scale || 2;
-      wrap.style.transform = "scale(" + s + ")";
+    wrap.appendChild(gfxWrap);
+    wrap.appendChild(termPre);
+
+    function updateLayout() {
       el.style.display = "inline-block";
-      el.style.width = (w * s) + "px";
-      el.style.height = (h * s) + "px";
+      if (gfxActive) {
+        var gw = Math.round(w * scale);
+        var gh = Math.round(h * scale);
+        wrap.style.width = gw + "px";
+        wrap.style.height = gh + "px";
+        el.style.width = gw + "px";
+        el.style.height = gh + "px";
+        gfxWrap.style.width = w + "px";
+        gfxWrap.style.height = h + "px";
+        gfxWrap.style.transform = "scale(" + scale + ")";
+        gfxWrap.style.display = "block";
+        termPre.style.display = "none";
+        termPre.setAttribute("aria-hidden", "true");
+      } else {
+        wrap.style.width = termPixelW + "px";
+        wrap.style.height = termPixelH + "px";
+        el.style.width = termPixelW + "px";
+        el.style.height = termPixelH + "px";
+        gfxWrap.style.display = "none";
+        termPre.style.display = "block";
+        termPre.removeAttribute("aria-hidden");
+      }
     }
-    applyScale();
+    updateLayout();
     rootEl.appendChild(wrap);
 
     function termCss(idx) {
@@ -709,21 +754,36 @@
 
     function flushTerm() {
       termDirty = false;
+      termPre.style.background = termCss(tscreenBg);
       var html = "";
+      var curX = (tcursor && !gfxActive && tx >= 0 && tx < termCols && ty >= 0 && ty < termRows) ? tx : -1;
+      var curY = (curX >= 0) ? ty : -1;
       for (var y = 0; y < termRows; y++) {
-        var ch = termBuf[y], fg = termFg[y];
+        var ch = termBuf[y], fg = termFg[y], bg = termBg[y];
         var x = 0;
         while (x < termCols) {
-          var cf = fg[x], run = "";
-          while (x < termCols && fg[x] === cf) {
-            run += ch[x++];
+          var cf = fg[x], cb = bg[x];
+          var isCur = (y === curY && x === curX);
+          var startX = x;
+          var run = ch[x++];
+          if (!isCur) {
+            while (x < termCols && fg[x] === cf && bg[x] === cb && !(y === curY && x === curX)) {
+              run += ch[x++];
+            }
           }
-          html += "<span style=\"color:" + termCss(cf) + "\">" + escHtml(run) + "</span>";
+          var rw = (x - startX) * TERM_CELL_W;
+          var st = "display:inline-block;width:" + rw + "px;height:" + TERM_CELL_H + "px;line-height:" +
+            TERM_CELL_H + "px;vertical-align:top;color:" + termCss(cf) + ";background:" + termCss(cb);
+          if (isCur) {
+            st += ";box-shadow:inset 0 -2px 0 " + termCss(cf);
+          }
+          html += "<span style=\"" + st + "\">" + escHtml(run) + "</span>";
         }
         if (y + 1 < termRows) html += "\n";
       }
       termPre.innerHTML = html;
     }
+    flushTerm();
 
     function renderTerm() {
       if (!termDirty) {
@@ -733,9 +793,9 @@
     }
 
     function scrollTerm() {
-      termBuf.shift(); termFg.shift();
-      var row = makeRow(" ", tfg);
-      termBuf.push(row.ch); termFg.push(row.fg);
+      termBuf.shift(); termFg.shift(); termBg.shift();
+      var row = makeRow(" ", tfg, tbg);
+      termBuf.push(row.ch); termFg.push(row.fg); termBg.push(row.bg);
       ty = termRows - 1;
     }
 
@@ -752,6 +812,7 @@
         if (ty >= termRows) scrollTerm();
         termBuf[ty][tx] = String.fromCharCode(c);
         termFg[ty][tx] = tfg;
+        termBg[ty][tx] = tbg;
         tx++;
       }
       if (ty >= termRows) scrollTerm();
@@ -809,22 +870,23 @@
         web_termy: function (vm) { vm.pushI32(ty); },
         web_termclear: function () {
           for (var y = 0; y < termRows; y++) {
-            termBuf[y].fill(" "); termFg[y].fill(tfg);
+            termBuf[y].fill(" "); termFg[y].fill(tfg); termBg[y].fill(tbg);
           }
+          tscreenBg = tbg;
           tx = 0; ty = 0; renderTerm();
         },
         web_termcleareol: function () {
           for (var x = tx; x < termCols; x++) {
-            termBuf[ty][x] = " "; termFg[ty][x] = tfg;
+            termBuf[ty][x] = " "; termFg[ty][x] = tfg; termBg[ty][x] = tbg;
           }
           renderTerm();
         },
         web_termcleareos: function () {
           for (var x = tx; x < termCols; x++) {
-            termBuf[ty][x] = " "; termFg[ty][x] = tfg;
+            termBuf[ty][x] = " "; termFg[ty][x] = tfg; termBg[ty][x] = tbg;
           }
           for (var y = ty + 1; y < termRows; y++) {
-            termBuf[y].fill(" "); termFg[y].fill(tfg);
+            termBuf[y].fill(" "); termFg[y].fill(tfg); termBg[y].fill(tbg);
           }
           renderTerm();
         },
@@ -832,34 +894,69 @@
           var y = vm.popI32(), x = vm.popI32();
           tx = Math.max(0, Math.min(termCols - 1, x));
           ty = Math.max(0, Math.min(termRows - 1, y));
+          if (tcursor) renderTerm();
         },
-        web_termcursor: function (vm) { tcursor = vm.popI32(); },
+        web_termcursor: function (vm) {
+          var c = vm.popI32() ? 1 : 0;
+          if (tcursor !== c) { tcursor = c; renderTerm(); }
+        },
         web_termfg: function (vm) { tfg = vm.popI32() & 15; },
-        web_termbg: function (vm) { vm.popI32(); },
-        web_termreset: function () { tfg = 7; },
+        web_termbg: function (vm) { tbg = vm.popI32() & 15; },
+        web_termreset: function () { tfg = 7; tbg = 0; renderTerm(); },
         web_gfxwidth: function (vm) { vm.pushI32(w); },
         web_gfxheight: function (vm) { vm.pushI32(h); },
         web_gfxdepth: function (vm) { vm.pushI32(depth); },
+        web_gfxcharw: function (vm) { vm.pushI32(Math.max(1, Math.round(gfxAdv8))); },
         web_gfxvsync: function (vm) {
           vm.yieldNow();
-          ticks++;
-          requestAnimationFrame(function () { if (resumeFn) { var f = resumeFn; resumeFn = null; f(); } });
+          function waitFrame(ts) {
+            if (nextVsyncTs === 0) nextVsyncTs = ts;
+            if (ts + 1.5 < nextVsyncTs) {
+              requestAnimationFrame(waitFrame);
+              return;
+            }
+            nextVsyncTs = Math.max(ts, nextVsyncTs + 1000 / 60);
+            ticks++;
+            if (resumeFn) { var f = resumeFn; resumeFn = null; f(); }
+          }
+          requestAnimationFrame(waitFrame);
         },
         web_gfxticks: function (vm) { vm.pushI32(ticks | 0); },
-        web_gfxmode: function (vm) { var m = vm.popI32(); depth = (m === 1) ? 8 : 24; },
-        web_gfxdone: function () {},
+        web_gfxmode: function (vm) {
+          var m = vm.popI32();
+          depth = (m === 1) ? 8 : 24;
+          gfxActive = true;
+          updateLayout();
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, w, h);
+          ctx.fillStyle = cssColor(color);
+          ctx.strokeStyle = cssColor(color);
+        },
+        web_gfxdone: function () {
+          gfxActive = false;
+          w = initW; h = initH;
+          bgCanvas.width = w; bgCanvas.height = h;
+          bgCanvas.style.width = w + "px"; bgCanvas.style.height = h + "px";
+          for (var si = 0; si < 64; si++) sprCanvases[si].style.display = "none";
+          updateLayout();
+          flushTerm();
+        },
         web_gfxinit: function (vm) {
           var d = vm.popI32(), gh = vm.popI32(), gw = vm.popI32();
           depth = (d <= 8) ? 8 : 24;
           if (gw > 0 && gh > 0) {
             w = gw; h = gh;
-            bgCanvas.width = w; bgCanvas.height = h;
-            bgCanvas.style.width = w + "px"; bgCanvas.style.height = h + "px";
-            wrap.style.width = w + "px"; wrap.style.height = h + "px";
-            applyScale();
+          } else {
+            w = initW; h = initH;
           }
+          bgCanvas.width = w; bgCanvas.height = h;
+          bgCanvas.style.width = w + "px"; bgCanvas.style.height = h + "px";
+          gfxActive = true;
+          updateLayout();
           ctx.fillStyle = "#000";
           ctx.fillRect(0, 0, w, h);
+          ctx.fillStyle = cssColor(color);
+          ctx.strokeStyle = cssColor(color);
         },
         web_gfxrgb: function (vm) {
           var b = vm.popI32() & 255, g = vm.popI32() & 255, r = vm.popI32() & 255;
@@ -887,7 +984,7 @@
           var rh = vm.popI32(), rw = vm.popI32(), y = vm.popI32(), x = vm.popI32();
           ctx.fillRect(x, y, rw, rh);
         },
-        web_gfxclear: function () { ctx.fillStyle = "#000"; ctx.fillRect(0, 0, w, h); ctx.fillStyle = cssColor(color); },
+        web_gfxclear: function () { ctx.fillStyle = cssColor(color); ctx.fillRect(0, 0, w, h); },
         web_gfxcircle: function (vm) {
           var r = vm.popI32(), cy = vm.popI32(), cx = vm.popI32();
           ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
@@ -917,9 +1014,10 @@
           var len = vm.popI32(), sAddr = vm.popU32(), y = vm.popI32(), x = vm.popI32();
           var txt = "";
           for (var i = 0; i < len; i++) txt += String.fromCharCode(vm.mem[sAddr + i]);
-          ctx.font = "8px monospace";
-          ctx.textBaseline = "top";
-          ctx.fillText(txt, x, y);
+          ctx.font = "8px " + FONT_FAMILY;
+          ctx.textBaseline = "alphabetic";
+          ctx.fillStyle = cssColor(color);
+          ctx.fillText(txt, x, y + 6.5);
         },
         web_sprimg: function (vm) {
           var ncolors = vm.popI32(), palAddr = vm.popU32(), dataAddr = vm.popU32();
@@ -1091,7 +1189,7 @@
         web_inkey: function (vm) { vm.pushI32(0); },
         web_key: function (vm) { vm.pushI32(0); },
         web_termwidth: function (vm) { vm.pushI32(80); },
-        web_termheight: function (vm) { vm.pushI32(25); },
+        web_termheight: function (vm) { vm.pushI32(30); },
         web_termx: function (vm) { vm.pushI32(tx); },
         web_termy: function (vm) { vm.pushI32(ty); },
         web_termclear: function () { tx = 0; ty = 0; },
@@ -1105,6 +1203,7 @@
         web_gfxwidth: function (vm) { vm.pushI32(gfxW); },
         web_gfxheight: function (vm) { vm.pushI32(gfxH); },
         web_gfxdepth: function (vm) { vm.pushI32(gfxD); },
+        web_gfxcharw: function (vm) { vm.pushI32(5); },
         web_gfxvsync: function () { ticks++; },
         web_gfxticks: function (vm) { vm.pushI32(ticks++); },
         web_gfxmode: function (vm) { gfxD = (vm.popI32() === 1) ? 8 : 24; },
@@ -1150,7 +1249,7 @@
             for (var xx = x; xx < x + rw; xx++)
               if (xx >= 0 && yy >= 0 && xx < gfxW && yy < gfxH) gfxFb[yy * gfxW + xx] = gfxCol;
         },
-        web_gfxclear: function () { gfxFb.fill(0); },
+        web_gfxclear: function () { gfxFb.fill(gfxCol); },
         web_gfxcircle: function (vm) { vm.popI32(); vm.popI32(); vm.popI32(); },
         web_gfxfill: function (vm) {
           var sy = vm.popI32(), sx = vm.popI32();
