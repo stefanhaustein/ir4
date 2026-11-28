@@ -181,10 +181,10 @@ static void z80_fn_begin(const char *name, int param_cnt, const LocalVar *locals
 
     /* Allocate & zero-initialize non-parameter SP locals */
     if (z80_local_bytes > 0) {
-        u16 words = (u16)(z80_local_bytes / 2);
-        if (words <= 8) {
+        u16 fn_irs = (u16)(z80_local_bytes / 2);
+        if (fn_irs <= 8) {
             cb_emit8_16(Z80_LD_HL_NN, 0x0000);
-            for (off = 0; off < words; off++) {
+            for (off = 0; off < fn_irs; off++) {
                 cb_emit8(Z80_PUSH_HL);
             }
         } else {
@@ -209,7 +209,7 @@ static void z80_fn_begin(const char *name, int param_cnt, const LocalVar *locals
     }
 }
 
-static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void z80_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     size_t i;
     u16 param_bytes = 0;
     u16 out_bytes = 0;
@@ -224,7 +224,7 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, int total_loc
         out_bytes += z80_type_bytes(sig->out_types.data[i]);
     }
     out_words = (u8)(out_bytes / 2);
-    /* DE, BC, DE', BC' hold up to 4 16-bit words (note: :i32/:f take >1 word) */
+    /* DE, BC, DE', BC' hold up to 4 16-bit fn_irs (note: :i32/:f take >1 word) */
     {
         typedef char ir4_z80_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
         (void)sizeof(ir4_z80_max_outs_check);
@@ -247,9 +247,9 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, int total_loc
 
     /* Drop non-parameter locals without disturbing DE/BC/DE'/BC' */
     if (z80_local_bytes > 0 && z80_local_bytes <= 8) {
-        u16 words = (u16)(z80_local_bytes / 2);
+        u16 fn_irs = (u16)(z80_local_bytes / 2);
         u16 k;
-        for (k = 0; k < words; k++) {
+        for (k = 0; k < fn_irs; k++) {
             cb_emit8(Z80_POP_AF);
         }
     } else if (z80_local_bytes > 8) {
@@ -285,7 +285,7 @@ static void z80_fn_end(const FuncSig *sig, const LocalVar *locals, int total_loc
 
 static void z80_call(size_t target_addr) { cb_emit8_16(Z80_CALL, (u16)target_addr); }
 
-static int z80_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+static int z80_tail_call(size_t target_addr, const FnSig *sig, const FnSig *callee,
                          const LocalVar *locals, int total_locals) {
     (void)locals;
     if (sig->in_types.len != 0 || callee->in_types.len != 0 ||
@@ -296,7 +296,7 @@ static int z80_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *
     return 1;
 }
 
-static void z80_call_extern(const FuncSig *sig) {
+static void z80_call_extern(const FnSig *sig) {
     u8 used_bc = 0;
     u8 used_de = 0;
     u8 used_hl = 0;

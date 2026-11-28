@@ -60,20 +60,20 @@ typedef struct {
 
     void (*call)(size_t target_addr);
     void (*icall)(u8 reg);
-    void (*call_extern)(const FuncSig *sig, const u8 *arg_regs);
+    void (*call_extern)(const FnSig *sig, const u8 *arg_regs);
 } RegBackend;
 
 typedef struct {
     size_t call_pc;
     size_t call_addr;
-    size_t func_idx;
+    size_t fn_idx;
     Bool is_fn_ptr;
 } RegFwdCall;
 
 VEC_OF(RegFwdCallVec, RegFwdCall);
 
-void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
-                    const FuncVec *funcs, const WordVec *words,
+void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
+                    const FnSigVec *fn_sigs, const FnIRVec *fn_irs,
                     const SizeVec *jtab_targets, size_t heap_start_off,
                     RegFwdCallVec *fwd_calls);
 

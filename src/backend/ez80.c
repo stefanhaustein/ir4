@@ -513,7 +513,7 @@ static void ez_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
     }
 }
 
-static void ez_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void ez_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     typedef char ir4_ez80_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
     (void)sizeof(ir4_ez80_max_outs_check);
     (void)locals;
@@ -586,7 +586,7 @@ static void ez_call(size_t target_addr) {
     emit8_24(ez_compact ? BC_CALL : EZ80_CALL, (u32)target_addr);
 }
 
-static void ez_call_extern(const FuncSig *sig) {
+static void ez_call_extern(const FnSig *sig) {
     if (!sig->has_addr)
         ir4_die("eZ80 extern requires fixed address");
     emit8_24(ez_compact ? BC_CALL : EZ80_CALL, (u32)sig->addr);

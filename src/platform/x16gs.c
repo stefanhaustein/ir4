@@ -36,7 +36,7 @@ static void x16gs_emit_dp_data_addr(u8 dp, size_t data_off) {
 }
 
 static void x16gs_end(int main_idx) {
-    const FuncSig *sig = ir4_func_sig(main_idx);
+    const FnSig *sig = ir4_fn_sig(main_idx);
     size_t entry_addr;
     size_t putc_call1 = 0, putc_call2 = 0, print_call = 0;
 

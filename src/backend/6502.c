@@ -320,7 +320,7 @@ static void m6502_fn_begin(const char *name, int param_cnt, const LocalVar *loca
     }
 }
 
-static void m6502_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void m6502_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     (void)sig;
     (void)locals;
     (void)total_locals;
@@ -372,7 +372,7 @@ static void m6502_call(size_t target_addr) {
     cb_emit8_16(m6502_compact ? BC_CALL : M6502_JSR, (u16)target_addr);
 }
 
-static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+static int m6502_tail_call(size_t target_addr, const FnSig *sig, const FnSig *callee,
                            const LocalVar *locals, int total_locals) {
     u16 tbank = m6502_call_target_bank;
     m6502_call_target_bank = 0;
@@ -391,7 +391,7 @@ static int m6502_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig
     return 1;
 }
 
-static void m6502_call_extern(const FuncSig *sig) {
+static void m6502_call_extern(const FnSig *sig) {
     size_t i;
     u8 has_a = 0, has_x = 0, has_y = 0;
     if (m6502_compact) {

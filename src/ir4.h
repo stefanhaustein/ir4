@@ -230,7 +230,7 @@ typedef struct {
     StrVec in_regs;
     TypeVec out_types;
     const char *out_reg;
-} FuncSig;
+} FnSig;
 
 /* Backend code-generation interface implemented by each target (be_*.c). */
 typedef struct {
@@ -242,11 +242,11 @@ typedef struct {
     size_t (*cur_addr)(void);
     void (*fn_begin)(const char *name, int param_cnt, const LocalVar *locals,
                      int total_locals, Bool is_recursive);
-    void (*fn_end)(const FuncSig *sig, const LocalVar *locals, int total_locals);
+    void (*fn_end)(const FnSig *sig, const LocalVar *locals, int total_locals);
     void (*call)(size_t target_addr);
-    int (*tail_call)(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+    int (*tail_call)(size_t target_addr, const FnSig *sig, const FnSig *callee,
                      const LocalVar *locals, int total_locals);
-    void (*call_extern)(const FuncSig *sig);
+    void (*call_extern)(const FnSig *sig);
 
     void (*push_w)(i32 val);
     void (*push_a)(u32 val);

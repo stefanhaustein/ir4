@@ -39,7 +39,7 @@ static const char *jit_get_argv(long idx) {
  *   RET
  */
 static void arm64_run_jit(int main_idx) {
-    const FuncSig *sig = ir4_func_sig(main_idx);
+    const FnSig *sig = ir4_fn_sig(main_idx);
     size_t main_addr = sig->addr;
     size_t entry_pc = cb_pc();
     i32 diff;

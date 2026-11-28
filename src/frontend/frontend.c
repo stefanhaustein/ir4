@@ -27,12 +27,12 @@ VEC_OF(BlockVec, BlockInfo *);
 
 const Backend *be;
 const char *platform_name = NULL;
-FuncVec funcs;
-WordVec words;
+FnSigVec fn_sigs;
+FnIRVec fn_irs;
 SizeVec jtab_targets;
 ByteVec raw_code_buf;
 CodeRelocVec code_relocs;
-SizeVec init_funcs;
+SizeVec init_fns;
 
 static int ir4_opt_level = 1;
 static size_t fold_fence = 0;
@@ -172,20 +172,20 @@ static int find_local(const char *p) {
     return -1;
 }
 
-static SymHt func_ht;
+static SymHt fn_ht;
 static SymHt buf_ht;
 static SymHt const_ht;
 
-static int find_func(const char *p) {
-    return p ? sym_ht_find(&func_ht, p) : -1;
+static int find_fn(const char *p) {
+    return p ? sym_ht_find(&fn_ht, p) : -1;
 }
 
-int ir4_find_func(const char *name) {
-    return find_func(intern_find(name));
+int ir4_find_fn(const char *name) {
+    return find_fn(intern_find(name));
 }
 
-void register_func_sym(const char *interned_name, size_t idx) {
-    sym_ht_put(&func_ht, interned_name, idx);
+void register_fn_sym(const char *interned_name, size_t idx) {
+    sym_ht_put(&fn_ht, interned_name, idx);
 }
 
 static int find_buffer(const char *p) {
@@ -223,18 +223,18 @@ static void remove_const(size_t idx) {
         sym_ht_put(&const_ht, consts.data[i]->name, i);
 }
 
-static int const_matches_fn(StackType ty, const FuncSig *fn) {
+static int const_matches_fn(StackType ty, const FnSig *fn) {
     return fn->is_defined && !fn->is_extern && fn->in_types.len == 0 &&
            fn->out_types.len == 1 && fn->out_types.data[0] == ty;
 }
 
-static void reset_word_ir(WordIR *w) {
+static void reset_word_ir(FnIR *w) {
     free(w->ir.data);
     free(w->locals.data);
-    memset(w, 0, sizeof(WordIR));
+    memset(w, 0, sizeof(FnIR));
 }
 
-static void emit_const_fn_body(WordIR *w, const ConstSym *cs) {
+static void emit_const_fn_body(FnIR *w, const ConstSym *cs) {
     IrInstr *ins;
     reset_word_ir(w);
     ins = emit_ir(
@@ -252,16 +252,16 @@ static void emit_const_fn_body(WordIR *w, const ConstSym *cs) {
     emit_ir(IR_FN_END, w);
 }
 
-size_t ir4_func_addr(int idx) {
-    if (idx < 0 || (size_t)idx >= funcs.len)
+size_t ir4_fn_addr(int idx) {
+    if (idx < 0 || (size_t)idx >= fn_sigs.len)
         ir4_die("function index out of bounds");
-    return funcs.data[idx]->addr;
+    return fn_sigs.data[idx]->addr;
 }
 
-const FuncSig *ir4_func_sig(int idx) {
-    if (idx < 0 || (size_t)idx >= funcs.len)
+const FnSig *ir4_fn_sig(int idx) {
+    if (idx < 0 || (size_t)idx >= fn_sigs.len)
         ir4_die("function index out of bounds");
-    return funcs.data[idx];
+    return fn_sigs.data[idx];
 }
 
 typedef struct {
@@ -372,7 +372,7 @@ static const BuiltinDef builtins[] = {/* Native word (:i) arithmetic & bitwise *
                                       {"i>u32", OP_U2I32, TY_W, TY_NONE, TY_I32},
                                       {"i32>i", OP_I322W, TY_I32, TY_NONE, TY_W}};
 
-IrInstr *emit_ir(IrKind kind, WordIR *w) {
+IrInstr *emit_ir(IrKind kind, FnIR *w) {
     IrInstr *ins = VEC_ADD(w->ir);
     memset(ins, 0, sizeof(IrInstr));
     ins->kind = (u8)kind;
@@ -613,7 +613,7 @@ static void init_builtin_ht(void) {
     builtin_ht_init = 1;
 }
 
-static int handle_builtin(const char *tok, WordIR *w) {
+static int handle_builtin(const char *tok, FnIR *w) {
     StackType a, b;
     size_t i;
     IrInstr *ins;
@@ -853,7 +853,7 @@ static void flush_bytes_params(u8 *params_flushed) {
     }
 }
 
-static void parse_icall_sig(FuncSig *sig) {
+static void parse_icall_sig(FnSig *sig) {
     const char *tok;
     u8 in_outs = 0;
 
@@ -882,7 +882,7 @@ static void parse_icall_sig(FuncSig *sig) {
     ir4_die("unterminated '(' in indirect call");
 }
 
-static void parse_sig_body(FuncSig *sig, size_t *param_cnt_out, int allow_bytes) {
+static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
     const char *tok;
     size_t param_cnt = 0;
     u8 in_outs = 0;
@@ -983,9 +983,9 @@ static void parse_sig_body(FuncSig *sig, size_t *param_cnt_out, int allow_bytes)
     ir4_die("unexpected EOF in signature (missing ')')");
 }
 
-static void compile_body(WordIR *w);
+static void compile_body(FnIR *w);
 
-static void emit_bytes_param_copies(WordIR *w) {
+static void emit_bytes_param_copies(FnIR *w) {
     size_t k;
     for (k = 0; k < cur_bytes_copies.len; k++) {
         IrInstr *ins;
@@ -1014,7 +1014,7 @@ static void emit_bytes_param_copies(WordIR *w) {
     }
 }
 
-static Bool sigs_match(const FuncSig *a, const FuncSig *b) {
+static Bool sigs_match(const FnSig *a, const FnSig *b) {
     return a->in_types.len == b->in_types.len && a->out_types.len == b->out_types.len &&
            (a->in_types.len == 0 ||
             memcmp(a->in_types.data, b->in_types.data, a->in_types.len * sizeof(StackType)) == 0) &&
@@ -1022,7 +1022,7 @@ static Bool sigs_match(const FuncSig *a, const FuncSig *b) {
             memcmp(a->out_types.data, b->out_types.data, a->out_types.len * sizeof(StackType)) == 0);
 }
 
-static void free_sig_vecs(FuncSig *s) {
+static void free_sig_vecs(FnSig *s) {
     free(s->in_types.data);
     free(s->in_regs.data);
     free(s->out_types.data);
@@ -1031,12 +1031,12 @@ static void free_sig_vecs(FuncSig *s) {
     s->out_types.data = NULL;
 }
 
-size_t alloc_func(FuncSig **sig_out, WordIR **w_out) {
-    size_t idx = funcs.len;
-    FuncSig *sig = NEW(FuncSig);
-    WordIR *w = NEW(WordIR);
-    VEC_PUSH(funcs, sig);
-    VEC_PUSH(words, w);
+size_t alloc_fn(FnSig **sig_out, FnIR **w_out) {
+    size_t idx = fn_sigs.len;
+    FnSig *sig = NEW(FnSig);
+    FnIR *w = NEW(FnIR);
+    VEC_PUSH(fn_sigs, sig);
+    VEC_PUSH(fn_irs, w);
     if (sig_out)
         *sig_out = sig;
     if (w_out)
@@ -1044,12 +1044,12 @@ size_t alloc_func(FuncSig **sig_out, WordIR **w_out) {
     return idx;
 }
 
-static void compile_word(int is_default, int is_hot) {
+static void compile_fn(int is_default, int is_hot) {
     const char *tok;
     const char *name;
-    FuncSig *sig;
-    WordIR *w;
-    WordIR discard_w;
+    FnSig *sig;
+    FnIR *w;
+    FnIR discard_w;
     int discard_body = 0;
     size_t fidx;
     int existing;
@@ -1064,10 +1064,10 @@ static void compile_word(int is_default, int is_hot) {
     if (!tok || strcmp(tok, "(") != 0)
         ir4_die("expected '(' after word name");
 
-    existing = find_func(name);
+    existing = find_fn(name);
     if (existing >= 0) {
-        FuncSig fn_sig;
-        FuncSig *ex = funcs.data[existing];
+        FnSig fn_sig;
+        FnSig *ex = fn_sigs.data[existing];
         if (ex->is_extern) {
             ir4_die("duplicate function definition");
         }
@@ -1085,7 +1085,7 @@ static void compile_word(int is_default, int is_hot) {
             }
         }
         fidx = (size_t)existing;
-        memset(&fn_sig, 0, sizeof(FuncSig));
+        memset(&fn_sig, 0, sizeof(FnSig));
         fn_sig.name = name;
         tstack.len = 0;
         blocks.len = 0;
@@ -1100,7 +1100,7 @@ static void compile_word(int is_default, int is_hot) {
             /* Already overridden by a more-specific file in this require group. */
             free_sig_vecs(&fn_sig);
             discard_body = 1;
-            memset(&discard_w, 0, sizeof(WordIR));
+            memset(&discard_w, 0, sizeof(FnIR));
             w = &discard_w;
         } else {
             free_sig_vecs(ex);
@@ -1111,15 +1111,15 @@ static void compile_word(int is_default, int is_hot) {
             ex->req_group = cur_grp;
             ex->req_rank = cur_rank;
             sig = ex;
-            w = words.data[fidx];
+            w = fn_irs.data[fidx];
             reset_word_ir(w);
         }
     } else {
         int ex_const = find_const(name);
-        FuncSig fn_sig;
+        FnSig fn_sig;
         if (ex_const >= 0) {
             ConstSym *cs = consts.data[ex_const];
-            memset(&fn_sig, 0, sizeof(FuncSig));
+            memset(&fn_sig, 0, sizeof(FnSig));
             fn_sig.name = name;
             tstack.len = 0;
             blocks.len = 0;
@@ -1139,28 +1139,28 @@ static void compile_word(int is_default, int is_hot) {
             if ((is_default && cur_rank == cs->req_rank) || (cur_rank > cs->req_rank)) {
                 free_sig_vecs(&fn_sig);
                 discard_body = 1;
-                memset(&discard_w, 0, sizeof(WordIR));
+                memset(&discard_w, 0, sizeof(FnIR));
                 w = &discard_w;
             } else {
                 remove_const((size_t)ex_const);
-                fidx = alloc_func(&sig, &w);
+                fidx = alloc_fn(&sig, &w);
                 *sig = fn_sig;
                 sig->is_defined = 1;
                 sig->is_default = (u8)is_default;
                 sig->is_hot = (u8)is_hot;
                 sig->req_group = cur_grp;
                 sig->req_rank = cur_rank;
-                sym_ht_put(&func_ht, sig->name, fidx);
+                sym_ht_put(&fn_ht, sig->name, fidx);
             }
         } else {
-            fidx = alloc_func(&sig, &w);
+            fidx = alloc_fn(&sig, &w);
             sig->name = intern_str(name);
             sig->is_defined = 1;
             sig->is_default = (u8)is_default;
             sig->is_hot = (u8)is_hot;
             sig->req_group = cur_grp;
             sig->req_rank = cur_rank;
-            sym_ht_put(&func_ht, sig->name, fidx);
+            sym_ht_put(&fn_ht, sig->name, fidx);
             tstack.len = 0;
             blocks.len = 0;
             parse_sig_body(sig, &param_cnt, 1);
@@ -1283,8 +1283,8 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
 static void compile_code(int is_hot) {
     const char *tok;
     const char *name;
-    FuncSig *sig;
-    WordIR *w;
+    FnSig *sig;
+    FnIR *w;
     size_t fidx;
 
     int existing;
@@ -1297,10 +1297,10 @@ static void compile_code(int is_hot) {
         ir4_die("expected word name after 'code'");
     if (find_const(name) >= 0)
         ir4_die("code word conflicts with existing constant");
-    existing = find_func(name);
+    existing = find_fn(name);
     if (existing >= 0) {
-        FuncSig code_sig;
-        FuncSig *ex = funcs.data[existing];
+        FnSig code_sig;
+        FnSig *ex = fn_sigs.data[existing];
         if (!ex->is_defined || ex->is_extern || !ex->is_default || cur_grp == 0 ||
             ex->req_group != cur_grp) {
             ir4_die("duplicate function definition");
@@ -1309,7 +1309,7 @@ static void compile_code(int is_hot) {
         if (!tok || strcmp(tok, "(") != 0)
             ir4_die("expected '(' after 'code' name");
         fidx = (size_t)existing;
-        memset(&code_sig, 0, sizeof(FuncSig));
+        memset(&code_sig, 0, sizeof(FnSig));
         code_sig.name = name;
         parse_sig_body(&code_sig, NULL, 0);
         if (!sigs_match(&code_sig, ex)) {
@@ -1323,17 +1323,17 @@ static void compile_code(int is_hot) {
         ex->req_group = cur_grp;
         ex->req_rank = cur_rank;
         sig = ex;
-        w = words.data[fidx];
+        w = fn_irs.data[fidx];
         reset_word_ir(w);
     } else {
         tok = next_tok();
         if (!tok || strcmp(tok, "(") != 0)
             ir4_die("expected '(' after 'code' name");
-        fidx = alloc_func(&sig, &w);
+        fidx = alloc_fn(&sig, &w);
         sig->name = name;
         sig->is_defined = 1;
         sig->is_hot = (Bool)is_hot;
-        sym_ht_put(&func_ht, sig->name, fidx);
+        sym_ht_put(&fn_ht, sig->name, fidx);
         sig->req_group = cur_grp;
         sig->req_rank = cur_rank;
         parse_sig_body(sig, NULL, 0);
@@ -1344,17 +1344,17 @@ static void compile_code(int is_hot) {
 }
 
 static void compile_init(void) {
-    FuncSig *sig;
-    WordIR *w;
+    FnSig *sig;
+    FnIR *w;
     size_t fidx;
     char iname[32];
 
-    fidx = alloc_func(&sig, &w);
-    sprintf(iname, "__init_%u", (unsigned)init_funcs.len);
+    fidx = alloc_fn(&sig, &w);
+    sprintf(iname, "__init_%u", (unsigned)init_fns.len);
     sig->name = intern_str(iname);
     sig->is_defined = 1;
-    sym_ht_put(&func_ht, sig->name, fidx);
-    VEC_PUSH(init_funcs, fidx);
+    sym_ht_put(&fn_ht, sig->name, fidx);
+    VEC_PUSH(init_fns, fidx);
 
     tstack.len = 0;
     blocks.len = 0;
@@ -1422,7 +1422,7 @@ static size_t find_or_add_label(LabelVec *labels, const char *name) {
     return labels->len - 1;
 }
 
-static void emit_label_br(WordIR *w, LabelVec *labels, LabelRefVec *refs, size_t lidx,
+static void emit_label_br(FnIR *w, LabelVec *labels, LabelRefVec *refs, size_t lidx,
                           BranchCond cond) {
     IrInstr *ins;
     if (labels->data[lidx].defined) {
@@ -1480,7 +1480,7 @@ static int parse_local_var(int allow_bytes) {
     return (int)slot;
 }
 
-static int handle_var_op(const char *tok, WordIR *w) {
+static int handle_var_op(const char *tok, FnIR *w) {
     IrInstr *ins;
     const char *sym;
     int idx;
@@ -1515,12 +1515,12 @@ static int handle_var_op(const char *tok, WordIR *w) {
         }
         if (find_const(sym) >= 0)
             ir4_die("cannot take address of 'const'");
-        idx = find_func(sym);
+        idx = find_fn(sym);
         if (idx >= 0) {
-            if (funcs.data[idx]->is_extern)
+            if (fn_sigs.data[idx]->is_extern)
                 ir4_die("cannot take address of 'extern' function");
             ins = emit_ir(IR_PUSH_FN, w);
-            ins->u.func_idx = (size_t)idx;
+            ins->u.fn_idx = (size_t)idx;
             tpush(TY_A);
             return 1;
         }
@@ -1669,7 +1669,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
     return 0;
 }
 
-static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
+static int handle_control_flow(const char *tok, FnIR *w, Bool *unreachable,
                                LabelVec *labels, LabelRefVec *label_refs) {
     IrInstr *ins;
 
@@ -1852,7 +1852,7 @@ static int handle_control_flow(const char *tok, WordIR *w, Bool *unreachable,
     return 0;
 }
 
-static void resolve_word_labels(WordIR *w, LabelVec *labels, LabelRefVec *label_refs,
+static void resolve_word_labels(FnIR *w, LabelVec *labels, LabelRefVec *label_refs,
                                 size_t jtab_start) {
     size_t r;
 
@@ -1873,7 +1873,7 @@ static void resolve_word_labels(WordIR *w, LabelVec *labels, LabelRefVec *label_
     free(label_refs->data);
 }
 
-static void compile_body(WordIR *w) {
+static void compile_body(FnIR *w) {
     const char *tok;
     IrInstr *ins;
     Bool unreachable = false;
@@ -1939,9 +1939,9 @@ static void compile_body(WordIR *w) {
             continue;
 
         if (strcmp(tok, "(") == 0) {
-            FuncSig icall_sig;
+            FnSig icall_sig;
             size_t k;
-            memset(&icall_sig, 0, sizeof(FuncSig));
+            memset(&icall_sig, 0, sizeof(FnSig));
             parse_icall_sig(&icall_sig);
             tpop_expect(TY_A);
             for (k = icall_sig.in_types.len; k > 0; k--) {
@@ -2026,9 +2026,9 @@ static void compile_body(WordIR *w) {
                     continue;
                 }
 
-                idx = find_func(sym);
+                idx = find_fn(sym);
                 if (idx >= 0) {
-                    FuncSig *callee = funcs.data[idx];
+                    FnSig *callee = fn_sigs.data[idx];
                     size_t i;
                     for (i = callee->in_types.len; i > 0; i--) {
                         tpop_expect(callee->in_types.data[i - 1]);
@@ -2041,7 +2041,7 @@ static void compile_body(WordIR *w) {
                     } else {
                         ins = emit_ir(IR_CALL, w);
                     }
-                    ins->u.func_idx = (size_t)idx;
+                    ins->u.fn_idx = (size_t)idx;
                     continue;
                 }
             }
@@ -2174,10 +2174,10 @@ static void compile_data(void) {
             } else {
                 if (find_const(sym) >= 0)
                     ir4_die("cannot take address of 'const'");
-                idx = find_func(sym);
+                idx = find_fn(sym);
                 if (idx < 0)
                     ir4_die("unknown variable or function in '&' inside 'data'");
-                if (funcs.data[idx]->is_extern)
+                if (fn_sigs.data[idx]->is_extern)
                     ir4_die("cannot take address of 'extern' function in 'data'");
                 cb_emit_data_word(0, be->addr_bytes);
                 cb_add_data_init_reloc(patch_off, (size_t)idx, be->addr_bytes, true);
@@ -2286,9 +2286,9 @@ static void compile_const(int is_default) {
         }
     }
 
-    ex_fn = find_func(name);
+    ex_fn = find_fn(name);
     if (ex_fn >= 0) {
-        FuncSig *fn = funcs.data[ex_fn];
+        FnSig *fn = fn_sigs.data[ex_fn];
         if (!fn->is_defined || fn->is_extern || cur_grp == 0 || fn->req_group != cur_grp)
             ir4_die("constant name conflicts with existing function");
         if (!const_matches_fn(ty, fn))
@@ -2301,7 +2301,7 @@ static void compile_const(int is_default) {
         }
         if ((is_default && cur_rank == fn->req_rank) || (cur_rank > fn->req_rank))
             return;
-        emit_const_fn_body(words.data[ex_fn], &cs);
+        emit_const_fn_body(fn_irs.data[ex_fn], &cs);
         fn->is_default = (u8)is_default;
         fn->is_hot = 1;
         fn->req_rank = cur_rank;
@@ -2350,12 +2350,12 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
 
     be = target_be;
     platform_name = platform;
-    funcs.len = 0;
-    words.len = 0;
+    fn_sigs.len = 0;
+    fn_irs.len = 0;
     buffers.len = 0;
     consts.len = 0;
     jtab_targets.len = 0;
-    sym_ht_clear(&func_ht);
+    sym_ht_clear(&fn_ht);
     sym_ht_clear(&buf_ht);
     sym_ht_clear(&const_ht);
     add_builtin_const("true", -1);
@@ -2381,7 +2381,7 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
     raw_code_buf.len = 0;
     code_relocs.len = 0;
     ir_emit_reset();
-    init_funcs.len = 0;
+    init_fns.len = 0;
 
     if (be->word_bytes < 4 && strcmp(be->name, "bc") != 0 && strcmp(be->name, "ez80") != 0) {
         push_require_ex("i32.ir4", 1);
@@ -2394,7 +2394,7 @@ static void parse_toplevel(void) {
 
     while ((tok = next_tok()) != NULL) {
         if (strcmp(tok, "fn") == 0) {
-            compile_word(0, 0);
+            compile_fn(0, 0);
         } else if (strcmp(tok, "const") == 0) {
             compile_const(0);
         } else if (strcmp(tok, "default") == 0 || strcmp(tok, "hot") == 0) {
@@ -2424,43 +2424,43 @@ static void parse_toplevel(void) {
                 if (!tok || strcmp(tok, "fn") != 0) {
                     ir4_die("expected 'fn', 'const', or 'code' after function modifier");
                 }
-                compile_word(is_default, is_hot);
+                compile_fn(is_default, is_hot);
             }
         } else if (strcmp(tok, "code") == 0) {
             compile_code(0);
         } else if (strcmp(tok, "init") == 0) {
             compile_init();
         } else if (strcmp(tok, "fwd") == 0) {
-            FuncSig *sig;
+            FnSig *sig;
             int existing;
             const char *name = next_tok_intern();
             if (!name)
                 ir4_die("expected word name after 'fwd'");
             if (find_const(name) >= 0)
                 ir4_die("forward declaration conflicts with existing constant");
-            existing = find_func(name);
+            existing = find_fn(name);
             if (existing >= 0) {
-                FuncSig tmp_sig;
-                memset(&tmp_sig, 0, sizeof(FuncSig));
+                FnSig tmp_sig;
+                memset(&tmp_sig, 0, sizeof(FnSig));
                 tok = next_tok();
                 if (!tok || strcmp(tok, "(") != 0)
                     ir4_die("expected '(' after 'fwd' name");
                 parse_sig_body(&tmp_sig, NULL, 0);
-                if (!sigs_match(funcs.data[existing], &tmp_sig))
+                if (!sigs_match(fn_sigs.data[existing], &tmp_sig))
                     ir4_die("duplicate 'fwd' declaration");
                 free(tmp_sig.in_types.data);
                 free(tmp_sig.out_types.data);
             } else {
-                size_t fidx = alloc_func(&sig, NULL);
+                size_t fidx = alloc_fn(&sig, NULL);
                 sig->name = name;
-                sym_ht_put(&func_ht, sig->name, fidx);
+                sym_ht_put(&fn_ht, sig->name, fidx);
                 tok = next_tok();
                 if (!tok || strcmp(tok, "(") != 0)
                     ir4_die("expected '(' after 'fwd' name");
                 parse_sig_body(sig, NULL, 0);
             }
         } else if (strcmp(tok, "extern") == 0) {
-            FuncSig ex_sig;
+            FnSig ex_sig;
             const char *name;
             int existing;
             u16 cur_grp = lex_cur()->req_group;
@@ -2470,7 +2470,7 @@ static void parse_toplevel(void) {
                 ir4_die("expected word name after 'extern'");
             if (find_const(name) >= 0)
                 ir4_die("extern conflicts with existing constant");
-            memset(&ex_sig, 0, sizeof(FuncSig));
+            memset(&ex_sig, 0, sizeof(FnSig));
             ex_sig.name = name;
             ex_sig.is_extern = 1;
             ex_sig.is_defined = 1;
@@ -2496,9 +2496,9 @@ static void parse_toplevel(void) {
             parse_sig_body(&ex_sig, NULL, 0);
             if (ex_sig.out_types.len > 1)
                 ir4_die("extern supports at most 1 return value");
-            existing = find_func(name);
+            existing = find_fn(name);
             if (existing >= 0) {
-                FuncSig *ex = funcs.data[existing];
+                FnSig *ex = fn_sigs.data[existing];
                 if (!ex->is_defined) {
                     if (!sigs_match(&ex_sig, ex))
                         ir4_die("extern signature does not match 'fwd' declaration");
@@ -2518,10 +2518,10 @@ static void parse_toplevel(void) {
                     ir4_die("duplicate function definition");
                 }
             } else {
-                FuncSig *sig;
-                size_t fidx = alloc_func(&sig, NULL);
+                FnSig *sig;
+                size_t fidx = alloc_fn(&sig, NULL);
                 *sig = ex_sig;
-                sym_ht_put(&func_ht, sig->name, fidx);
+                sym_ht_put(&fn_ht, sig->name, fidx);
             }
         } else if (strcmp(tok, "require") == 0) {
             push_require(read_require_path());

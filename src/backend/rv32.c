@@ -183,7 +183,7 @@ static void rv_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
     }
 }
 
-static void rv_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void rv_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     (void)sig;
     (void)locals;
     (void)total_locals;
@@ -200,7 +200,7 @@ static void rv_call(size_t target_addr) {
     cb_emit32(enc_j(diff, RV_RA));
 }
 
-static int rv_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+static int rv_tail_call(size_t target_addr, const FnSig *sig, const FnSig *callee,
                         const LocalVar *locals, int total_locals) {
     i32 diff;
     (void)sig;
@@ -223,7 +223,7 @@ static void rv_emit_extern_call(const char *name) {
     cb_emit32(enc_i(0, RV_T0, 0, RV_RA, 0x67UL)); /* JALR ra, 0(t0) */
 }
 
-static void rv_call_extern(const FuncSig *sig) {
+static void rv_call_extern(const FnSig *sig) {
     size_t i;
     if (sig->in_types.len > 8 || sig->out_types.len > 1) {
         ir4_die("RV32 extern supports at most 8 args and 1 return");
@@ -1658,7 +1658,7 @@ static size_t rvr_emit_jtab(u8 reg, size_t count) {
 
 static void rvr_icall(u8 reg) { cb_emit32(enc_i(0, reg, 0, RV_RA, 0x67UL)); }
 
-static void rvr_call_extern(const FuncSig *sig, const u8 *arg_regs) {
+static void rvr_call_extern(const FnSig *sig, const u8 *arg_regs) {
     (void)arg_regs; /* stk_regs[0..7] are already a0..a7 */
     if (sig->in_types.len > 8 || sig->out_types.len > 1)
         ir4_die("RV32 extern supports at most 8 args and 1 return");

@@ -7,7 +7,7 @@
 VEC_OF(ByteVec, u8);
 VEC_OF(LocalVec, LocalVar);
 VEC_OF(SizeVec, size_t);
-VEC_OF(FuncVec, FuncSig *);
+VEC_OF(FnSigVec, FnSig *);
 
 typedef enum {
     IR_FN_END,
@@ -48,7 +48,7 @@ typedef struct {
             u8 t2; /* StackType */
         } stk;
         u8 op; /* IrOp */
-        unsigned int func_idx;
+        unsigned int fn_idx;
         struct {
             u8 cond; /* BranchCond */
             unsigned int target;
@@ -85,9 +85,9 @@ typedef struct {
     LocalVec locals;
     Bool reachable;
     Bool is_code;
-} WordIR;
+} FnIR;
 
-VEC_OF(WordVec, WordIR *);
+VEC_OF(FnIRVec, FnIR *);
 VEC_OF(CodeRelocVec, CodeReloc);
 
 #define IR4_MAX_TOK 256
@@ -109,16 +109,16 @@ typedef struct {
 /* Shared compiler state (defined in frontend.c) */
 extern const Backend *be;
 extern const char *platform_name;
-extern FuncVec funcs;
-extern WordVec words;
+extern FnSigVec fn_sigs;
+extern FnIRVec fn_irs;
 extern SizeVec jtab_targets;
 extern ByteVec raw_code_buf;
 extern CodeRelocVec code_relocs;
-extern SizeVec init_funcs;
+extern SizeVec init_fns;
 
-size_t alloc_func(FuncSig **sig_out, WordIR **w_out);
-void register_func_sym(const char *interned_name, size_t idx);
-IrInstr *emit_ir(IrKind kind, WordIR *w);
+size_t alloc_fn(FnSig **sig_out, FnIR **w_out);
+void register_fn_sym(const char *interned_name, size_t idx);
+IrInstr *emit_ir(IrKind kind, FnIR *w);
 
 /* Lexer & require loader (defined in lexer.c) */
 void lex_init(FILE *in, const char *path);

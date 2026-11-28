@@ -362,7 +362,7 @@ int main(int argc, char **argv) {
     /* lexer.c closes sf->fp on EOF to conserve file handles on 8-slot targets */
 
     if (plat && plat->end) {
-        int main_idx = ir4_find_func("main");
+        int main_idx = ir4_find_fn("main");
         if (plat->needs_main && main_idx < 0) {
             ir4_status_clear();
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
@@ -422,7 +422,7 @@ int main(int argc, char **argv) {
            be->name, (unsigned long)base, (unsigned long)cb_pc());
 
     if (plat && plat->run) {
-        int main_idx = ir4_find_func("main");
+        int main_idx = ir4_find_fn("main");
         if (main_idx < 0) {
             fprintf(stderr, "%s requires a 'main' function\n", plat->flag);
             return 1;

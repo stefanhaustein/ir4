@@ -100,7 +100,7 @@ static void a64_fn_begin(const char *name, int param_cnt, const LocalVar *locals
 
 typedef char ir4_arm64_max_outs_check[(IR4_MAX_OUTS <= 4) ? 1 : -1];
 
-static void a64_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void a64_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     size_t k;
     size_t param_cnt = sig->in_types.len;
     size_t out_count = sig->out_types.len;
@@ -137,7 +137,7 @@ static void a64_call(size_t target_addr) {
     cb_emit32(0x94000000UL | (((u32)(diff >> 2)) & 0x03FFFFFFUL));
 }
 
-static void a64_call_extern(const FuncSig *sig) {
+static void a64_call_extern(const FnSig *sig) {
     u8 int_cnt = 0;
     u8 flt_cnt = 0;
     size_t i;
@@ -1541,7 +1541,7 @@ static size_t a64r_emit_jtab(u8 reg, size_t count) {
 
 static void a64r_icall(u8 reg) { cb_emit32(0xD63F0000UL | ((u32)reg << 5)); }
 
-static void a64r_call_extern(const FuncSig *sig, const u8 *arg_regs) {
+static void a64r_call_extern(const FnSig *sig, const u8 *arg_regs) {
     u8 int_idx = 0, flt_idx = 0;
     size_t i;
     if (sig->has_addr)

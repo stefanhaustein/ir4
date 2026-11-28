@@ -314,8 +314,8 @@ static void save_branch_state(SavedStack *saved, size_t target_ir, size_t ir_len
         saved[target_ir].types[i] = st->stk[i].type;
 }
 
-static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR *w,
-                         const FuncVec *funcs, u8 *loc_addr_taken, size_t *out_max_depth) {
+static void prescan_fn(const RegBackend *rbe, const FnSig *sig, const FnIR *w,
+                         const FnSigVec *fn_sigs, u8 *loc_addr_taken, size_t *out_max_depth) {
     size_t i;
     size_t depth = 0;
     size_t max_depth = sig->out_types.len;
@@ -407,7 +407,7 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
                 break;
             case IR_CALL:
             case IR_CALL_EXTERN: {
-                const FuncSig *csig = funcs->data[ins->u.func_idx];
+                const FnSig *csig = fn_sigs->data[ins->u.fn_idx];
                 size_t k;
                 depth -= csig->in_types.len;
                 for (k = 0; k < csig->out_types.len; k++) {
@@ -463,7 +463,7 @@ static void prescan_word(const RegBackend *rbe, const FuncSig *sig, const WordIR
     *out_max_depth = max_depth;
 }
 
-static int is_br_target(const WordIR *w, size_t ir_idx, const SizeVec *jtab_targets) {
+static int is_br_target(const FnIR *w, size_t ir_idx, const SizeVec *jtab_targets) {
     size_t j;
     for (j = 0; j < w->ir.len; j++) {
         const IrInstr *bi = &w->ir.data[j];
@@ -480,8 +480,8 @@ static int is_br_target(const WordIR *w, size_t ir_idx, const SizeVec *jtab_targ
     return 0;
 }
 
-void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
-                    const FuncVec *funcs, const WordVec *words,
+void reg_lower_fn(const RegBackend *rbe, FnSig *sig, FnIR *w,
+                    const FnSigVec *fn_sigs, const FnIRVec *fn_irs,
                     const SizeVec *jtab_targets, size_t heap_start_off,
                     RegFwdCallVec *fwd_calls) {
     size_t i, p;
@@ -514,9 +514,9 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
     pending_jtab.cap = 0;
 
     if (!loc_addr_taken || !loc_is_reg || !loc_reg || !loc_off || !saved || !ir_addr)
-        ir4_die("out of memory in reg_lower_word");
+        ir4_die("out of memory in reg_lower_fn");
 
-    prescan_word(rbe, sig, w, funcs, loc_addr_taken, &max_depth);
+    prescan_fn(rbe, sig, w, fn_sigs, loc_addr_taken, &max_depth);
 
     for (i = 0; i < w->locals.len; i++) {
         if (w->locals.data[i].size == 0 && !loc_addr_taken[i] &&
@@ -645,20 +645,20 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 break;
 
             case IR_PUSH_FN: {
-                size_t target = ins->u.func_idx;
+                size_t target = ins->u.fn_idx;
                 size_t fn_addr = rbe->cur_addr();
                 u8 dst;
                 size_t fn_pc;
                 check_vstack_push(st.depth);
                 dst = dst_reg_for(&st, st.depth, TY_A);
-                fn_pc = rbe->load_fn_addr(dst, funcs->data[target]->addr);
+                fn_pc = rbe->load_fn_addr(dst, fn_sigs->data[target]->addr);
                 commit_dst(&st, st.depth, TY_A, dst);
                 st.depth++;
-                if (!funcs->data[target]->has_addr) {
+                if (!fn_sigs->data[target]->has_addr) {
                     RegFwdCall *fc = VEC_ADD(*fwd_calls);
                     fc->call_pc = fn_pc;
                     fc->call_addr = fn_addr;
-                    fc->func_idx = target;
+                    fc->fn_idx = target;
                     fc->is_fn_ptr = 1;
                 }
                 break;
@@ -912,8 +912,8 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
             }
 
             case IR_CALL: {
-                size_t target = ins->u.func_idx;
-                const FuncSig *csig = funcs->data[target];
+                size_t target = ins->u.fn_idx;
+                const FnSig *csig = fn_sigs->data[target];
                 size_t in_cnt = csig->in_types.len;
                 size_t out_cnt = csig->out_types.len;
                 size_t base_d = st.depth - in_cnt;
@@ -922,7 +922,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                 u32 out_arg_bytes = (u32)((stk_cnt * rbe->word_bytes + 15U) & ~15U);
                 size_t k, call_addr, call_pc;
 
-                if (words->data[target]->is_code)
+                if (fn_irs->data[target]->is_code)
                     ir4_die("calling raw 'code' word is unsupported in register backend");
 
                 save_live_below(&st, base_d);
@@ -949,7 +949,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
                     RegFwdCall *fc = VEC_ADD(*fwd_calls);
                     fc->call_pc = call_pc;
                     fc->call_addr = call_addr;
-                    fc->func_idx = target;
+                    fc->fn_idx = target;
                     fc->is_fn_ptr = 0;
                 }
                 if (out_arg_bytes > 0)
@@ -1017,7 +1017,7 @@ void reg_lower_word(const RegBackend *rbe, FuncSig *sig, WordIR *w,
             }
 
             case IR_CALL_EXTERN: {
-                const FuncSig *csig = funcs->data[ins->u.func_idx];
+                const FnSig *csig = fn_sigs->data[ins->u.fn_idx];
                 size_t in_cnt = csig->in_types.len;
                 size_t out_cnt = csig->out_types.len;
                 size_t base_d = st.depth - in_cnt;

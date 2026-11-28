@@ -71,7 +71,7 @@ int be_6502_cbm_write(FILE *fp, size_t base) {
 }
 
 void be_6502_cbm_end(int main_idx, int is_x16) {
-    const FuncSig *sig = ir4_func_sig(main_idx);
+    const FnSig *sig = ir4_fn_sig(main_idx);
     u16 entry_addr = cb_cur_addr();
     u8 tmp_lo = is_x16 ? 0x02 : C64_TMP_LO;
     u8 tmp_hi = is_x16 ? 0x03 : C64_TMP_HI;

@@ -103,7 +103,7 @@ static void bc_fn_begin(const char *name, int param_cnt, const LocalVar *locals,
     bc_fn_begin_w(name, param_cnt, locals, total_locals, is_recursive, 2);
 }
 
-static void bc_fn_end_w(const FuncSig *sig, const LocalVar *locals, int total_locals,
+static void bc_fn_end_w(const FnSig *sig, const LocalVar *locals, int total_locals,
                         u8 word_bytes) {
     (void)sig;
     (void)locals;
@@ -115,7 +115,7 @@ static void bc_fn_end_w(const FuncSig *sig, const LocalVar *locals, int total_lo
     cb_emit8(BC_RET);
 }
 
-static void bc_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void bc_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     bc_fn_end_w(sig, locals, total_locals, 2);
 }
 
@@ -129,7 +129,7 @@ static void bc32_call(size_t target_addr) {
     cb_emit32((u32)target_addr);
 }
 
-static void bc_call_extern(const FuncSig *sig) {
+static void bc_call_extern(const FnSig *sig) {
     size_t i;
     for (i = 0; i < extern_names.len; i++) {
         if (strcmp(extern_names.data[i], sig->name) == 0) {
@@ -666,7 +666,7 @@ static void bc32_fn_begin(const char *name, int param_cnt, const LocalVar *local
                           int total_locals, Bool is_recursive) {
     bc_fn_begin_w(name, param_cnt, locals, total_locals, is_recursive, 4);
 }
-static void bc32_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void bc32_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     bc_fn_end_w(sig, locals, total_locals, 4);
 }
 static void bc32_push_w(i32 val) { bc_emit_push_w(val, 4); }

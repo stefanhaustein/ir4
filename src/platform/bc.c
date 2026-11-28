@@ -41,7 +41,7 @@ static void wr_f(u8 *m, u16 addr, float f) {
 }
 
 static void bc_run_vm(int main_idx) {
-    const FuncSig *sig = ir4_func_sig(main_idx);
+    const FnSig *sig = ir4_fn_sig(main_idx);
     u8 *mem;
     u16 call_stack[VM_CALL_MAX];
     size_t csp = 0;
@@ -797,8 +797,8 @@ static void wr32_mem(U8Vec *v, u32 val) {
 }
 
 static Bool bc32_build(U8Vec *out, size_t base) {
-    int main_idx = ir4_find_func("main");
-    u32 entry = (main_idx >= 0) ? (u32)ir4_func_addr(main_idx) : (u32)base;
+    int main_idx = ir4_find_fn("main");
+    u32 entry = (main_idx >= 0) ? (u32)ir4_fn_addr(main_idx) : (u32)base;
     u32 code_sz = (u32)cb_pc();
     u32 init_sz = (u32)cb_init_data_size();
     u32 total_data = (u32)cb_data_size();

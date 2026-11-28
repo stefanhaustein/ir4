@@ -196,7 +196,7 @@ static void emit_dp_data_addr(u8 dp, size_t data_off) {
 }
 
 void be_65816_emit_zero_bss(void) {
-    /* Zero [__bss_start .. __bss_end) in 16-bit words via [DP_PTR0],Y */
+    /* Zero [__bss_start .. __bss_end) in 16-bit fn_irs via [DP_PTR0],Y */
     size_t init_sz = cb_init_data_size();
     size_t total_sz = cb_data_size();
     size_t bss_sz = (total_sz > init_sz) ? (total_sz - init_sz) : 0;
@@ -1197,7 +1197,7 @@ static void m816_fn_begin(const char *name, int param_cnt, const LocalVar *local
     }
 }
 
-static void m816_fn_end(const FuncSig *sig, const LocalVar *locals, int total_locals) {
+static void m816_fn_end(const FnSig *sig, const LocalVar *locals, int total_locals) {
     (void)locals;
     (void)total_locals;
     if (sig->is_recursive && m816_frame_bytes > 0) {
@@ -1215,7 +1215,7 @@ static void m816_fn_end(const FuncSig *sig, const LocalVar *locals, int total_lo
 
 static void m816_call(size_t target_addr) { emit8_24(M816_JSL, (u32)target_addr); }
 
-static int m816_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig *callee,
+static int m816_tail_call(size_t target_addr, const FnSig *sig, const FnSig *callee,
                           const LocalVar *locals, int total_locals) {
     (void)callee;
     (void)locals;
@@ -1234,7 +1234,7 @@ static int m816_tail_call(size_t target_addr, const FuncSig *sig, const FuncSig 
     return 1;
 }
 
-static void m816_call_extern(const FuncSig *sig) {
+static void m816_call_extern(const FnSig *sig) {
     (void)sig;
     ir4_die("extern functions are not supported on 65816");
 }
