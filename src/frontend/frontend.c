@@ -1,7 +1,6 @@
 /* frontend.c - Parser, type-checker, constant folder, and IR builder */
 #include "internal.h"
 #include "codebuf.h"
-#include "strpool.h"
 
 typedef enum { BLOCK_IF = 1, BLOCK_BEGIN = 2 } BlockKind;
 
@@ -174,28 +173,22 @@ static int find_local(const char *name) {
     return -1;
 }
 
+static SymHt func_ht;
+static SymHt buf_ht;
+static SymHt const_ht;
+
 int ir4_find_func(const char *name) {
-    size_t i;
     const char *p = intern_find(name);
-    if (!p)
-        return -1;
-    for (i = 0; i < funcs.len; i++) {
-        if (funcs.data[i]->name == p)
-            return (int)i;
-    }
-    return -1;
+    return p ? sym_ht_find(&func_ht, p) : -1;
+}
+
+void register_func_sym(const char *interned_name, size_t idx) {
+    sym_ht_put(&func_ht, interned_name, idx);
 }
 
 static int find_buffer(const char *name) {
-    size_t i;
     const char *p = intern_find(name);
-    if (!p)
-        return -1;
-    for (i = 0; i < buffers.len; i++) {
-        if (buffers.data[i]->name == p)
-            return (int)i;
-    }
-    return -1;
+    return p ? sym_ht_find(&buf_ht, p) : -1;
 }
 
 typedef struct {
@@ -213,24 +206,21 @@ VEC_OF(ConstVec, ConstSym *);
 static ConstVec consts;
 
 static int find_const(const char *name) {
-    size_t i;
     const char *p = intern_find(name);
-    if (!p)
-        return -1;
-    for (i = 0; i < consts.len; i++) {
-        if (consts.data[i]->name == p)
-            return (int)i;
-    }
-    return -1;
+    return p ? sym_ht_find(&const_ht, p) : -1;
 }
 
 static void remove_const(size_t idx) {
+    size_t i;
     free(consts.data[idx]);
     if (idx + 1 < consts.len) {
         memmove(&consts.data[idx], &consts.data[idx + 1],
                 (consts.len - idx - 1) * sizeof(ConstSym *));
     }
     consts.len--;
+    sym_ht_clear(&const_ht);
+    for (i = 0; i < consts.len; i++)
+        sym_ht_put(&const_ht, consts.data[i]->name, i);
 }
 
 static int const_matches_fn(StackType ty, const FuncSig *fn) {
@@ -1153,6 +1143,7 @@ static void compile_word(int is_default, int is_hot) {
                 sig->is_hot = (u8)is_hot;
                 sig->req_group = cur_grp;
                 sig->req_rank = cur_rank;
+                sym_ht_put(&func_ht, sig->name, fidx);
             }
         } else {
             fidx = alloc_func(&sig, &w);
@@ -1162,6 +1153,7 @@ static void compile_word(int is_default, int is_hot) {
             sig->is_hot = (u8)is_hot;
             sig->req_group = cur_grp;
             sig->req_rank = cur_rank;
+            sym_ht_put(&func_ht, sig->name, fidx);
             tstack.len = 0;
             blocks.len = 0;
             parse_sig_body(sig, &param_cnt, 1);
@@ -1334,6 +1326,7 @@ static void compile_code(int is_hot) {
         sig->name = name;
         sig->is_defined = 1;
         sig->is_hot = (Bool)is_hot;
+        sym_ht_put(&func_ht, sig->name, fidx);
         sig->req_group = cur_grp;
         sig->req_rank = cur_rank;
         parse_sig_body(sig, NULL, 0);
@@ -1353,6 +1346,7 @@ static void compile_init(void) {
     sprintf(iname, "__init_%u", (unsigned)init_funcs.len);
     sig->name = intern_str(iname);
     sig->is_defined = 1;
+    sym_ht_put(&func_ht, sig->name, fidx);
     VEC_PUSH(init_funcs, fidx);
 
     tstack.len = 0;
@@ -2112,6 +2106,7 @@ static void compile_data(void) {
     bs->offset = cb_alloc_data(0, be->word_bytes);
     bs->type = TY_NONE;
     VEC_PUSH(buffers, bs);
+    sym_ht_put(&buf_ht, bs->name, buffers.len - 1);
 
     while ((ch = skip_ws_and_comments()) != EOF) {
         if (ch == '"') {
@@ -2310,6 +2305,7 @@ static void compile_const(int is_default) {
         ConstSym *ncs = NEW(ConstSym);
         *ncs = cs;
         VEC_PUSH(consts, ncs);
+        sym_ht_put(&const_ht, ncs->name, consts.len - 1);
     }
 }
 
@@ -2320,6 +2316,7 @@ static void add_builtin_const(const char *name, i32 val) {
     cs->type = TY_W;
     cs->w_val = val;
     VEC_PUSH(consts, cs);
+    sym_ht_put(&const_ht, cs->name, consts.len - 1);
 }
 
 static void init_frontend(FILE *in, const char *path, const Backend *target_be,
@@ -2333,6 +2330,9 @@ static void init_frontend(FILE *in, const char *path, const Backend *target_be,
     buffers.len = 0;
     consts.len = 0;
     jtab_targets.len = 0;
+    sym_ht_clear(&func_ht);
+    sym_ht_clear(&buf_ht);
+    sym_ht_clear(&const_ht);
     add_builtin_const("true", -1);
     add_builtin_const("false", 0);
     add_builtin_const("size_i", (i32)be->word_bytes);
@@ -2426,8 +2426,9 @@ static void parse_toplevel(void) {
                 free(tmp_sig.in_types.data);
                 free(tmp_sig.out_types.data);
             } else {
-                alloc_func(&sig, NULL);
+                size_t fidx = alloc_func(&sig, NULL);
                 sig->name = name;
+                sym_ht_put(&func_ht, sig->name, fidx);
                 tok = next_tok();
                 if (!tok || strcmp(tok, "(") != 0)
                     ir4_die("expected '(' after 'fwd' name");
@@ -2493,8 +2494,9 @@ static void parse_toplevel(void) {
                 }
             } else {
                 FuncSig *sig;
-                alloc_func(&sig, NULL);
+                size_t fidx = alloc_func(&sig, NULL);
                 *sig = ex_sig;
+                sym_ht_put(&func_ht, sig->name, fidx);
             }
         } else if (strcmp(tok, "require") == 0) {
             push_require(read_require_path());
@@ -2535,6 +2537,7 @@ static void parse_toplevel(void) {
                 bs->type = ty;
             }
             VEC_PUSH(buffers, bs);
+    sym_ht_put(&buf_ht, bs->name, buffers.len - 1);
         } else {
             ir4_die("expected top-level 'fn', 'var', 'data', 'extern', or 'require'");
         }

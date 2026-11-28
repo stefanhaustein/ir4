@@ -8,7 +8,6 @@
 #include "backend/ez80_rt.h"
 #include "backend/bc.h"
 #include "codebuf.h"
-#include "vec.h"
 
 static size_t ez_rsp_off = 0;
 static size_t ez_rstack_off = 0;

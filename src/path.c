@@ -7,8 +7,8 @@
 #include <windows.h>
 #endif
 
+#include "ir4.h"
 #include "path.h"
-#include "strpool.h"
 
 static StrBuf path_scratch;
 static const char *exe_dir = NULL;

@@ -6,7 +6,6 @@
  */
 #include "codebuf.h"
 #include "backend/reg_lower.h"
-#include "vec.h"
 
 /* --- Native Hardware-SP Push/Pop (16-byte aligned slots) --- */
 static void push_x0(void) { cb_emit32(0xF81F0FE0UL); } /* STR X0, [SP, #-16]! */

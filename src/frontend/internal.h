@@ -3,7 +3,6 @@
 #define FRONTEND_INT_H
 
 #include "frontend.h"
-#include "vec.h"
 
 VEC_OF(ByteVec, u8);
 VEC_OF(LocalVec, LocalVar);
@@ -116,6 +115,7 @@ extern CodeRelocVec code_relocs;
 extern SizeVec init_funcs;
 
 size_t alloc_func(FuncSig **sig_out, WordIR **w_out);
+void register_func_sym(const char *interned_name, size_t idx);
 IrInstr *emit_ir(IrKind kind, WordIR *w);
 
 /* Lexer & require loader (defined in lexer.c) */

@@ -11,7 +11,6 @@
 #include "codebuf.h"
 #include "backend/reg_lower.h"
 #include "backend/rv32.h"
-#include "vec.h"
 #include "backend/rv32_fp.h"
 
 #define RV_LOAD_BASE 0x80000000UL

@@ -3,7 +3,7 @@ CFLAGS  = -std=c89 -Wall -Wextra -O2 -Isrc
 
 BUILD   = build
 TARGET  = $(BUILD)/ir4c
-SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
+SRCS    = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/collections.c \
           src/backend/z80.c src/backend/ez80.c src/backend/6502.c src/backend/65816.c src/backend/arm64.c src/backend/rv32.c src/backend/reg_lower.c src/backend/bc.c \
           src/platform/cpm.c src/platform/zx81.c src/platform/agon.c src/platform/sim65.c src/platform/sim65816.c src/platform/x16gs.c src/platform/c64.c src/platform/x16.c \
           src/platform/jit.c src/platform/elf.c src/platform/bc.c
@@ -30,26 +30,24 @@ $(BUILD)/.asm_sync: $(ASM_IR4_FILES) tools/sync_asm.py | $(BUILD)
 	fi
 	@touch $(BUILD)/.asm_sync
 
-$(BUILD)/%.o: src/%.c src/ir4.h
+$(BUILD)/%.o: src/%.c src/ir4.h src/collections.h
 	mkdir -p $(@D)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD)/ir4c.o: src/codebuf.h src/frontend.h src/path.h src/backend/bc.h
-$(BUILD)/frontend/frontend.o: src/codebuf.h src/frontend.h src/frontend/internal.h src/strpool.h src/vec.h
-$(BUILD)/frontend/lexer.o: src/frontend.h src/frontend/internal.h src/path.h src/strpool.h src/vec.h
-$(BUILD)/frontend/ir_emit.o: src/codebuf.h src/frontend.h src/frontend/internal.h src/strpool.h src/vec.h
-$(BUILD)/codebuf.o: src/codebuf.h src/strpool.h src/vec.h
-$(BUILD)/path.o: src/path.h src/strpool.h src/vec.h
-$(BUILD)/strpool.o: src/strpool.h src/vec.h
-$(BUILD)/vec.o: src/vec.h
-$(BUILD)/backend/bc.o: src/backend/bc.h src/codebuf.h src/vec.h
-$(BUILD)/backend/z80.o: src/codebuf.h src/backend/z80.h src/backend/z80_math48.h src/vec.h
-$(BUILD)/backend/ez80.o: src/codebuf.h src/backend/ez80.h src/backend/ez80_rt.h src/vec.h
-$(BUILD)/backend/6502.o: src/codebuf.h src/backend/6502.h src/backend/6502_wozfp.h src/backend/bc.h src/vec.h
-$(BUILD)/backend/arm64.o: src/codebuf.h src/backend/reg_lower.h src/vec.h
-$(BUILD)/backend/rv32.o: src/codebuf.h src/backend/reg_lower.h src/backend/rv32.h src/backend/rv32_fp.h src/vec.h
-$(BUILD)/backend/reg_lower.o: src/backend/reg_lower.h src/codebuf.h src/frontend/internal.h src/vec.h
-$(BUILD)/platform/bc.o: src/backend/bc.h src/codebuf.h src/frontend.h src/plat_web_vm.h src/vec.h
+$(BUILD)/frontend/frontend.o: src/codebuf.h src/frontend.h src/frontend/internal.h
+$(BUILD)/frontend/lexer.o: src/frontend.h src/frontend/internal.h src/path.h
+$(BUILD)/frontend/ir_emit.o: src/codebuf.h src/frontend.h src/frontend/internal.h
+$(BUILD)/codebuf.o: src/codebuf.h
+$(BUILD)/path.o: src/path.h
+$(BUILD)/backend/bc.o: src/backend/bc.h src/codebuf.h
+$(BUILD)/backend/z80.o: src/codebuf.h src/backend/z80.h src/backend/z80_math48.h
+$(BUILD)/backend/ez80.o: src/codebuf.h src/backend/ez80.h src/backend/ez80_rt.h
+$(BUILD)/backend/6502.o: src/codebuf.h src/backend/6502.h src/backend/6502_wozfp.h src/backend/bc.h
+$(BUILD)/backend/arm64.o: src/codebuf.h src/backend/reg_lower.h
+$(BUILD)/backend/rv32.o: src/codebuf.h src/backend/reg_lower.h src/backend/rv32.h src/backend/rv32_fp.h
+$(BUILD)/backend/reg_lower.o: src/backend/reg_lower.h src/codebuf.h src/frontend/internal.h
+$(BUILD)/platform/bc.o: src/backend/bc.h src/codebuf.h src/frontend.h src/plat_web_vm.h
 $(BUILD)/platform/cpm.o: src/codebuf.h src/frontend.h src/backend/z80.h
 $(BUILD)/platform/zx81.o: src/codebuf.h src/frontend.h src/backend/z80.h
 $(BUILD)/platform/agon.o: src/codebuf.h src/frontend.h src/backend/ez80.h
@@ -372,7 +370,7 @@ rt-6502:
 rt-rv32:
 	python3 tools/rv32/gen_rv32_fp.py --input tools/rv32/rv32_fp.c --output src/be_rv32_fp.h
 
-AGON_SRCS = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/strpool.c src/vec.c \
+AGON_SRCS = src/ir4c.c src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c src/codebuf.c src/path.c src/collections.c \
             src/backend/ez80.c src/backend/bc.c src/platform/agon.c
 
 agon: $(AGON_SRCS)
@@ -393,7 +391,7 @@ agon: $(AGON_SRCS)
 	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin && \
 	echo "Built $(BUILD)/ir4c_agon.bin"
 
-X16GS_SRCS = src/vec.c src/strpool.c src/path.c src/codebuf.c \
+X16GS_SRCS = src/collections.c src/path.c src/codebuf.c \
              src/frontend/frontend.c src/frontend/lexer.c src/frontend/ir_emit.c \
              src/backend/65816.c src/platform/x16gs.c src/ir4c.c
 

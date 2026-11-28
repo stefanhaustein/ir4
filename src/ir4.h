@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "vec.h"
+#include "collections.h"
 
 typedef unsigned char u8;
 typedef int Bool;

@@ -3,7 +3,6 @@
 #include "codebuf.h"
 #include "frontend.h"
 #include "plat_web_vm.h"
-#include "vec.h"
 
 VEC_OF(U8Vec, u8);
 

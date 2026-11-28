@@ -1,7 +1,6 @@
 /* lexer.c - Tokenizer, #line directives, and require resolution */
 #include "internal.h"
 #include "path.h"
-#include "strpool.h"
 
 VEC_OF(SrcVec, SrcFile);
 

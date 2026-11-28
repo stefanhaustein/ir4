@@ -1,7 +1,5 @@
 /* codebuf.c - Shared binary code & data emission buffer for IR4th */
 #include "codebuf.h"
-#include "strpool.h"
-#include "vec.h"
 
 typedef struct {
     Bool split;

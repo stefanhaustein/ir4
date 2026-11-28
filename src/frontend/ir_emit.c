@@ -7,7 +7,6 @@
 #include "backend/reg_lower.h"
 #endif
 #include "codebuf.h"
-#include "strpool.h"
 
 #define HOT_CODE_INLINE_MAX 16
 
@@ -626,9 +625,11 @@ void run_reachability_dce(void) {
         IrInstr *ins;
         size_t k;
         funcs.data[main_idx]->name = intern_str("__main_body");
+        register_func_sym(funcs.data[main_idx]->name, (size_t)main_idx);
         wrap_idx = alloc_func(&wsig, &ww);
         wsig->name = intern_str("main");
         wsig->is_defined = 1;
+        register_func_sym(wsig->name, wrap_idx);
         for (k = 0; k < funcs.data[main_idx]->out_types.len; k++) {
             VEC_PUSH(wsig->out_types, funcs.data[main_idx]->out_types.data[k]);
         }

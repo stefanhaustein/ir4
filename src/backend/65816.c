@@ -11,7 +11,6 @@
  */
 #include "backend/65816.h"
 #include "codebuf.h"
-#include "vec.h"
 #include <math.h>
 
 static size_t m816_rstack_off = 0;

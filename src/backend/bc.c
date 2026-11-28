@@ -1,7 +1,6 @@
 /* bc.c - Compact 16-bit Bytecode Backend for IR4th */
 #include "backend/bc.h"
 #include "codebuf.h"
-#include "vec.h"
 
 VEC_OF(SizeVec, size_t);
 VEC_OF(U8Vec, u8);

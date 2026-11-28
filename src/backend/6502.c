@@ -8,7 +8,6 @@
 #include "codebuf.h"
 #include "backend/6502.h"
 #include "backend/6502_wozfp.h"
-#include "vec.h"
 #include <math.h>
 
 static u8 zp_scratch = 0xFB;

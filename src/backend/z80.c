@@ -6,7 +6,6 @@
 #include "codebuf.h"
 #include "backend/z80.h"
 #include "backend/z80_math48.h"
-#include "vec.h"
 #include <math.h>
 
 static u16 rt_mul_addr = 0;
