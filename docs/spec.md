@@ -60,7 +60,7 @@ end
 * **Initialization Blocks (`init ... end`):**
   * One or more top-level `init ... end` blocks may be defined across the program and `require`d modules. Each behaves as an anonymous void function (`( )`) and runs once in source order before `main`.
 * **Machine-Code Words (`code ... end`):**
-  * `code <target> <name> ( <inputs> -> <outputs> ) <bytes> end` (or `hot code ...`, which inlines short `<= 16`-byte blocks directly into callers) defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), `:as` (16-bit address relative to the 6502 data stack buffer), and `& <ident>` (`size_a`-wide relocated address of a `var` or `data` symbol on 16-bit and 24-bit targets), following the target's `call` / `return` convention. `<target>` must be a valid architecture or platform name matching the active compilation target (`6502`, `65816`, `z80`, `ez80`, `rv32`, `arm64`, `bc32`, `c64`, `x16`, `x16gs`, `agon`, `cpm`, `zx81`, `sim65`, `sim65816`, `virt`, `web`, etc.; not supported on `-t bc`). On 6502, 65816, Z80/eZ80, and RV32, `end` implicitly emits `RTS` (`0x60`), `RTL` (`0x6B`), `RET` (`0xC9`), or `RET` (`0x00008067`) when the word is emitted out-of-line, and omits it when `hot code` is inlined into a caller.
+  * `code <target> <name> ( <inputs> -> <outputs> ) <bytes> end` (or `hot code ...`, which inlines short `<= 16`-byte blocks directly into callers) defines a raw machine-code word emitted into the executable code segment (subject to DCE) using `:i8`, `:i16`, `:i32`, `:ar` (16-bit address relative to the start of the `code` block), `:as` (16-bit address relative to the 6502 data stack buffer), and `& <ident>` (`size_a`-wide relocated address of a `var` or `data` symbol on 16-bit and 24-bit targets), following the target's `call` / `return` convention. `<target>` must be a valid architecture or platform name matching the active compilation target (`6502`, `65816`, `z80`, `ez80`, `rv32`, `arm64`, `bc32`, `c64`, `x16`, `x16gs`, `agon`, `cpm`, `zx81`, `sim65`, `sim65816`, `virt`, `web`, etc.; not supported on `-t bc`). On 6502, 65816, Z80/eZ80, and RV32, `end` implicitly emits `RTS` (`0x60`), `RTL` (`0x6B`), `RET` (`0xC9`), or `RET` (`0x00008067`) when the word is emitted out-of-line, and omits it when `hot code` is inlined into a caller. *(Note: `code` words are currently disabled on `arm64` and `rv32` while their register calling conventions are being aligned.)*
 
 ### 3.1 Accessing, Mutating & Addressing Locals
 * **Read (`<ident>`):** Pushes the value of parameter or local `<ident>` (of its declared type `T`) onto the stack.
@@ -262,10 +262,10 @@ A conforming IR4th implementation must support at least the following limits:
 | Locals per function | 128 | Includes parameters, `:bytes` parameter copies, and body `var` declarations |
 | Return values | 4 | Per `fn`, `fwd`, `code`, or indirect call signature (`extern` supports at most 1) |
 | Indirect call inputs | 255 | Subject to target virtual-stack / register limits |
-| Virtual stack depth | 128 | Maximum expression/call stack depth in register-based backends |
+| Virtual stack depth | 256 | Maximum expression/call stack depth in register-based backends |
 
-Target `extern` calls are additionally bounded by each backend's register-passing convention (for example, up to 3 registers on 6502, 8 on RV32, and 16 on ARM64).
+Target `extern` calls are additionally bounded by each backend's register-passing convention (for example, up to 3 registers on 6502, 8 on RV32, and 8 integer + 8 float on ARM64).
 
-Compiler-internal tables and indexable buffers (such as total functions, constants, labels, jump-table entries, per-word IR instructions, and `data` offsets) are additionally bounded by the host platform's unsigned integer range (`unsigned int`, at least 65,535 entries on 16-bit hosts) and available host memory.
+Compiler-internal tables and indices (such as total functions, constants, labels, jump-table entries, and per-word IR instructions) are additionally bounded by the host platform's signed integer range (`int`, at least 32,767 entries on 16-bit hosts), while `data` offsets are bounded by `size_t` and available host memory.
 
 For complete runnable programs, see [examples/](../examples/) and [tests/](../tests/).
