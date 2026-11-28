@@ -378,6 +378,7 @@ agon: $(AGON_SRCS)
 	if ! command -v agondev-config >/dev/null 2>&1; then \
 		echo "agondev-config not found (install agondev or add its bin/ to PATH)"; exit 1; \
 	fi; \
+	rm -rf $(BUILD)/agon-build/src $(BUILD)/agon-build/obj; \
 	mkdir -p $(BUILD)/agon-build/src; \
 	cp $(AGON_SRCS) $(BUILD)/agon-build/src/; \
 	{ \

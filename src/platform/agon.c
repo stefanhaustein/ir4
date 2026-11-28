@@ -126,3 +126,18 @@ static void agon_end(int main_idx) {
 
 const Platform plat_ez80_agon = {"--agon", &be_ez80, 0x040000UL, "agon", true,
                                  agon_begin, agon_end, NULL, NULL, "bin"};
+
+#if defined(__EZ80__)
+/* Override libagon.a(sbrk.o), which sets ___heaptop == __stack == 0x0B0000
+ * with zero stack margin and overwrites the active C stack on OOM. */
+char *_sbrkbase;
+
+void *sbrk(size_t incr) {
+    char *old_brk = _sbrkbase;
+    size_t lim = 0x0AE800UL; /* Reserve 6 KB [0x0AE800..0x0B0000) for C stack */
+    if ((size_t)old_brk >= lim || incr > lim - (size_t)old_brk)
+        return 0;
+    _sbrkbase = old_brk + incr;
+    return old_brk;
+}
+#endif

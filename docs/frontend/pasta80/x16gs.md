@@ -62,15 +62,15 @@ Results of PASTA/80 version 1.00 tests
 
    Tests    Passed    Failed     Total  PASTA/80      ir4c       Run
 --------  --------  --------  --------  --------  --------  --------
-    core      1572         0      1572     63.6s     65.0s      3.7s
-    heap        26         0        26      8.5s     57.6s      4.3s
-   files       194         0       194     24.2s      3.1s     10.7s
-    more        49         0        49      8.9s     58.3s      0.6s
-  params         6         0         6      5.2s     50.8s      0.0s
-   sound         4         0         4      5.1s     50.4s      4.6s
-overlays        32         0        32      8.7s     61.2s      0.0s
+    core      1572         0      1572     63.6s     59.5s      3.7s
+    heap        26         0        26      8.5s     46.6s      4.3s
+   files       194         0       194     24.2s     78.0s     10.7s
+    more        49         0        49      8.9s     46.9s      0.6s
+  params         6         0         6      5.2s     41.6s      0.0s
+   sound         4         0         4      5.1s     41.4s      4.6s
+overlays        32         0        32      8.7s     47.9s      0.0s
 --------  --------  --------  --------  --------  --------  --------
-   Total      1883         0      1883    124.2s    346.4s     23.9s
+   Total      1883         0      1883    124.2s    361.9s     23.9s
 
                              [  PASS  ]
 ```
