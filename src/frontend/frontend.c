@@ -161,9 +161,8 @@ static void free_block(BlockInfo *b) {
     free(b);
 }
 
-static int find_local(const char *name) {
+static int find_local(const char *p) {
     size_t i;
-    const char *p = intern_find(name);
     if (!p)
         return -1;
     for (i = 0; i < locals.len; i++) {
@@ -177,17 +176,19 @@ static SymHt func_ht;
 static SymHt buf_ht;
 static SymHt const_ht;
 
-int ir4_find_func(const char *name) {
-    const char *p = intern_find(name);
+static int find_func(const char *p) {
     return p ? sym_ht_find(&func_ht, p) : -1;
+}
+
+int ir4_find_func(const char *name) {
+    return find_func(intern_find(name));
 }
 
 void register_func_sym(const char *interned_name, size_t idx) {
     sym_ht_put(&func_ht, interned_name, idx);
 }
 
-static int find_buffer(const char *name) {
-    const char *p = intern_find(name);
+static int find_buffer(const char *p) {
     return p ? sym_ht_find(&buf_ht, p) : -1;
 }
 
@@ -205,8 +206,7 @@ typedef struct {
 VEC_OF(ConstVec, ConstSym *);
 static ConstVec consts;
 
-static int find_const(const char *name) {
-    const char *p = intern_find(name);
+static int find_const(const char *p) {
     return p ? sym_ht_find(&const_ht, p) : -1;
 }
 
@@ -1057,7 +1057,7 @@ static void compile_word(int is_default, int is_hot) {
     if (!tok || strcmp(tok, "(") != 0)
         ir4_die("expected '(' after word name");
 
-    existing = ir4_find_func(name);
+    existing = find_func(name);
     if (existing >= 0) {
         FuncSig fn_sig;
         FuncSig *ex = funcs.data[existing];
@@ -1079,7 +1079,7 @@ static void compile_word(int is_default, int is_hot) {
         }
         fidx = (size_t)existing;
         memset(&fn_sig, 0, sizeof(FuncSig));
-        fn_sig.name = intern_str(name);
+        fn_sig.name = name;
         tstack.len = 0;
         blocks.len = 0;
         parse_sig_body(&fn_sig, &param_cnt, 1);
@@ -1113,7 +1113,7 @@ static void compile_word(int is_default, int is_hot) {
         if (ex_const >= 0) {
             ConstSym *cs = consts.data[ex_const];
             memset(&fn_sig, 0, sizeof(FuncSig));
-            fn_sig.name = intern_str(name);
+            fn_sig.name = name;
             tstack.len = 0;
             blocks.len = 0;
             parse_sig_body(&fn_sig, &param_cnt, 1);
@@ -1250,7 +1250,7 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
             if (!tok)
                 ir4_die("expected identifier after '&' in raw code");
             lex_feed_code_tok(tok);
-            idx = find_buffer(tok);
+            idx = find_buffer(intern_find(tok));
             if (idx < 0)
                 ir4_die("expected 'var' or 'data' identifier after '&' in raw code");
             rel = VEC_ADD(code_relocs);
@@ -1290,7 +1290,7 @@ static void compile_code(int is_hot) {
         ir4_die("expected word name after 'code'");
     if (find_const(name) >= 0)
         ir4_die("code word conflicts with existing constant");
-    existing = ir4_find_func(name);
+    existing = find_func(name);
     if (existing >= 0) {
         FuncSig code_sig;
         FuncSig *ex = funcs.data[existing];
@@ -1473,13 +1473,15 @@ static int parse_local_var(int allow_bytes) {
 
 static int handle_var_op(const char *tok, WordIR *w) {
     IrInstr *ins;
+    const char *sym;
     int idx;
 
     if (strcmp(tok, "&") == 0) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '&'");
-        idx = find_local(tok);
+        sym = intern_find(tok);
+        idx = find_local(sym);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
             if (lv->size > 0)
@@ -1492,7 +1494,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
             tpush(TY_A);
             return 1;
         }
-        idx = find_buffer(tok);
+        idx = find_buffer(sym);
         if (idx >= 0) {
             BufferSym *bs = buffers.data[idx];
             if (bs->type == TY_NONE)
@@ -1502,9 +1504,9 @@ static int handle_var_op(const char *tok, WordIR *w) {
             tpush(TY_A);
             return 1;
         }
-        if (find_const(tok) >= 0)
+        if (find_const(sym) >= 0)
             ir4_die("cannot take address of 'const'");
-        idx = ir4_find_func(tok);
+        idx = find_func(sym);
         if (idx >= 0) {
             if (funcs.data[idx]->is_extern)
                 ir4_die("cannot take address of 'extern' function");
@@ -1520,7 +1522,8 @@ static int handle_var_op(const char *tok, WordIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '+->'");
-        idx = find_local(tok);
+        sym = intern_find(tok);
+        idx = find_local(sym);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
             StackType dt = (lv->type == TY_A) ? TY_W : lv->type;
@@ -1549,7 +1552,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
             }
             return 1;
         }
-        idx = find_buffer(tok);
+        idx = find_buffer(sym);
         if (idx < 0)
             ir4_die("unknown variable in '+->'");
         {
@@ -1595,7 +1598,13 @@ static int handle_var_op(const char *tok, WordIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '->'");
-        idx = (strcmp(tok, "var") == 0) ? parse_local_var(0) : find_local(tok);
+        if (strcmp(tok, "var") == 0) {
+            sym = NULL;
+            idx = parse_local_var(0);
+        } else {
+            sym = intern_find(tok);
+            idx = find_local(sym);
+        }
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
             if (lv->size > 0)
@@ -1632,7 +1641,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
             ins->u.loc.stack_bytes = tstack_bytes();
             return 1;
         }
-        idx = find_buffer(tok);
+        idx = find_buffer(sym);
         if (idx < 0)
             ir4_die("unknown variable in '->'");
         {
@@ -1954,74 +1963,79 @@ static void compile_body(WordIR *w) {
             continue;
         }
 
-        /* Local variable read (or ':bytes' local base address) */
-        idx = find_local(tok);
-        if (idx >= 0) {
-            LocalVar *lv = &locals.data[idx];
-            ins = emit_ir(IR_LOCAL_OP, w);
-            ins->u.loc.op = (lv->size > 0) ? LOCAL_ADDR : LOCAL_GET;
-            ins->u.loc.slot = lv->slot;
-            ins->u.loc.type = lv->type;
-            ins->u.loc.stack_bytes = tstack_bytes();
-            tpush((lv->size > 0) ? TY_A : lv->type);
-            continue;
-        }
+        {
+            const char *sym = intern_find(tok);
+            if (sym) {
+                /* Local variable read (or ':bytes' local base address) */
+                idx = find_local(sym);
+                if (idx >= 0) {
+                    LocalVar *lv = &locals.data[idx];
+                    ins = emit_ir(IR_LOCAL_OP, w);
+                    ins->u.loc.op = (lv->size > 0) ? LOCAL_ADDR : LOCAL_GET;
+                    ins->u.loc.slot = lv->slot;
+                    ins->u.loc.type = lv->type;
+                    ins->u.loc.stack_bytes = tstack_bytes();
+                    tpush((lv->size > 0) ? TY_A : lv->type);
+                    continue;
+                }
 
-        /* Buffer address or typed global read */
-        idx = find_buffer(tok);
-        if (idx >= 0) {
-            BufferSym *bs = buffers.data[idx];
-            if (bs->type == TY_NONE) {
-                tpush(TY_A);
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-            } else {
-                tpush(bs->type);
-                ins = emit_ir(IR_PUSH_DATA, w);
-                ins->u.offset = bs->offset;
-                ins = emit_ir(IR_ALU_OP, w);
-                ins->u.op = global_fetch_op(bs->type);
-            }
-            continue;
-        }
+                /* Buffer address or typed global read */
+                idx = find_buffer(sym);
+                if (idx >= 0) {
+                    BufferSym *bs = buffers.data[idx];
+                    if (bs->type == TY_NONE) {
+                        tpush(TY_A);
+                        ins = emit_ir(IR_PUSH_DATA, w);
+                        ins->u.offset = bs->offset;
+                    } else {
+                        tpush(bs->type);
+                        ins = emit_ir(IR_PUSH_DATA, w);
+                        ins->u.offset = bs->offset;
+                        ins = emit_ir(IR_ALU_OP, w);
+                        ins->u.op = global_fetch_op(bs->type);
+                    }
+                    continue;
+                }
 
-        idx = find_const(tok);
-        if (idx >= 0) {
-            const ConstSym *cs = consts.data[idx];
-            tpush(cs->type);
-            if (cs->type == TY_W) {
-                ins = emit_ir(IR_PUSH_W, w);
-                ins->u.w = cs->w_val;
-            } else if (cs->type == TY_A) {
-                ins = emit_ir(IR_PUSH_A, w);
-                ins->u.a = cs->a_val;
-            } else if (cs->type == TY_I32) {
-                ins = emit_ir(IR_PUSH_I32, w);
-                ins->u.w = cs->w_val;
-            } else {
-                ins = emit_ir(IR_PUSH_F, w);
-                ins->u.f = cs->f_val;
-            }
-            continue;
-        }
+                idx = find_const(sym);
+                if (idx >= 0) {
+                    const ConstSym *cs = consts.data[idx];
+                    tpush(cs->type);
+                    if (cs->type == TY_W) {
+                        ins = emit_ir(IR_PUSH_W, w);
+                        ins->u.w = cs->w_val;
+                    } else if (cs->type == TY_A) {
+                        ins = emit_ir(IR_PUSH_A, w);
+                        ins->u.a = cs->a_val;
+                    } else if (cs->type == TY_I32) {
+                        ins = emit_ir(IR_PUSH_I32, w);
+                        ins->u.w = cs->w_val;
+                    } else {
+                        ins = emit_ir(IR_PUSH_F, w);
+                        ins->u.f = cs->f_val;
+                    }
+                    continue;
+                }
 
-        idx = ir4_find_func(tok);
-        if (idx >= 0) {
-            FuncSig *callee = funcs.data[idx];
-            size_t i;
-            for (i = callee->in_types.len; i > 0; i--) {
-                tpop_expect(callee->in_types.data[i - 1]);
+                idx = find_func(sym);
+                if (idx >= 0) {
+                    FuncSig *callee = funcs.data[idx];
+                    size_t i;
+                    for (i = callee->in_types.len; i > 0; i--) {
+                        tpop_expect(callee->in_types.data[i - 1]);
+                    }
+                    for (i = 0; i < callee->out_types.len; i++) {
+                        tpush(callee->out_types.data[i]);
+                    }
+                    if (callee->is_extern) {
+                        ins = emit_ir(IR_CALL_EXTERN, w);
+                    } else {
+                        ins = emit_ir(IR_CALL, w);
+                    }
+                    ins->u.func_idx = (size_t)idx;
+                    continue;
+                }
             }
-            for (i = 0; i < callee->out_types.len; i++) {
-                tpush(callee->out_types.data[i]);
-            }
-            if (callee->is_extern) {
-                ins = emit_ir(IR_CALL_EXTERN, w);
-            } else {
-                ins = emit_ir(IR_CALL, w);
-            }
-            ins->u.func_idx = (size_t)idx;
-            continue;
         }
 
         {
@@ -2132,6 +2146,7 @@ static void compile_data(void) {
             }
             cb_alloc_data(0, be->word_bytes);
         } else if (strcmp(tok, "&") == 0) {
+            const char *sym;
             int idx;
             size_t patch_off;
             if (has_pending) {
@@ -2141,15 +2156,16 @@ static void compile_data(void) {
             tok = next_tok();
             if (!tok)
                 ir4_die("expected identifier after '&' in 'data'");
+            sym = intern_find(tok);
             patch_off = cb_data_size();
-            idx = find_buffer(tok);
+            idx = find_buffer(sym);
             if (idx >= 0) {
                 cb_emit_data_word(0, be->addr_bytes);
                 cb_add_data_init_reloc(patch_off, buffers.data[idx]->offset, be->addr_bytes, false);
             } else {
-                if (find_const(tok) >= 0)
+                if (find_const(sym) >= 0)
                     ir4_die("cannot take address of 'const'");
-                idx = ir4_find_func(tok);
+                idx = find_func(sym);
                 if (idx < 0)
                     ir4_die("unknown variable or function in '&' inside 'data'");
                 if (funcs.data[idx]->is_extern)
@@ -2261,7 +2277,7 @@ static void compile_const(int is_default) {
         }
     }
 
-    ex_fn = ir4_find_func(name);
+    ex_fn = find_func(name);
     if (ex_fn >= 0) {
         FuncSig *fn = funcs.data[ex_fn];
         if (!fn->is_defined || fn->is_extern || cur_grp == 0 || fn->req_group != cur_grp)
@@ -2413,7 +2429,7 @@ static void parse_toplevel(void) {
                 ir4_die("expected word name after 'fwd'");
             if (find_const(name) >= 0)
                 ir4_die("forward declaration conflicts with existing constant");
-            existing = ir4_find_func(name);
+            existing = find_func(name);
             if (existing >= 0) {
                 FuncSig tmp_sig;
                 memset(&tmp_sig, 0, sizeof(FuncSig));
@@ -2471,7 +2487,7 @@ static void parse_toplevel(void) {
             parse_sig_body(&ex_sig, NULL, 0);
             if (ex_sig.out_types.len > 1)
                 ir4_die("extern supports at most 1 return value");
-            existing = ir4_find_func(name);
+            existing = find_func(name);
             if (existing >= 0) {
                 FuncSig *ex = funcs.data[existing];
                 if (!ex->is_defined) {

@@ -2,7 +2,7 @@
 
 [PASTA/84](https://github.com/stefanhaustein/pasta84/tree/pasta84) is a fork of [PASTA/80](https://github.com/pleumann/pasta80) that replaces the Z80/eZ80 code generator with an **IR4(th)** backend. Because `pasta80` emits target-independent `.ir4` source files, a single Pascal build can be compiled by `ir4c` for Commodore 64, Commander X16, Agon Light, CP/M, ZX81, ARM64, RISC-V, and the bytecode VM.
 
-## 1. Prerequisites (Linux / macOS)
+## Prerequisites (Linux / macOS)
 
 - C89-capable C compiler (`clang` or `gcc`) and `make` (for `ir4c`)
 - [Free Pascal (`fpc`)](https://www.freepascal.org/) (for building the host `pasta80` compiler)
@@ -11,7 +11,7 @@
   - **Commander X16:** [x16emu](https://github.com/X16Community/x16-emulator)
   - **Other targets:** `fab-agon-emulator` (Agon), `tnylpo` (CP/M), `sim65` / `qemu-system-riscv32`
 
-## 2. Clone and Build
+## Clone and Build
 
 Clone IR4(th) and check out the `pasta84` branch inside it:
 
@@ -31,7 +31,7 @@ This produces:
 - `pasta84/pasta80` — the Pascal-to-IR4(th) frontend
 - `pasta84/pasta84.sh` — wrapper script that runs `pasta80` and `ir4c` in one step
 
-## 3. Compiling Pascal Programs
+## Compiling Pascal Programs
 
 Use `pasta84/pasta84.sh` to compile a `.pas` file to a target binary in one step (it emits `<program>.ir4` via `pasta80`, invokes `build/ir4c -I pasta84/rtl` with your target flags, and defaults `-o` to `<program>.<ext>` when omitted):
 
@@ -78,7 +78,7 @@ If you need a cartridge ROM image instead of a `.prg`, use `-t x16-cart`.
 
 *(If you prefer to invoke the two stages manually: `./pasta84/pasta80 <program>.pas` followed by `./build/ir4c -I pasta84/rtl -t <target> -o <output> <program>.ir4`.)*
 
-## 4. Other Targets & Fast Host Testing
+## Other Targets & Fast Host Testing
 
 `pasta80` emits the same `.ir4` file regardless of target, and `pasta84.sh` forwards any `ir4c` target flags:
 
@@ -100,7 +100,7 @@ Example host test run:
 
 To run the full PASTA/80 test suite and print per-target report cards (pass -t x16gs, -t agon, -t arm64, etc., or omit -t for all available targets), run `python3 pasta84/selftest.py`; see [Cross-Target Test Results](test-results.md) for the current matrix.
 
-## 5. Compiler Options
+## Compiler Options
 
 `pasta84/pasta80` accepts:
 
@@ -109,6 +109,6 @@ To run the full PASTA/80 test suite and print per-target report cards (pass -t x
 
 For `ir4c`, `-O1` (constant folding, immediate lowering, static locals on 8-bit/eZ80, and `PUSH`/`POP` peepholes) is enabled by default; pass `-O0` to disable optimizations if debugging generated code.
 
-## 6. Self-Hosted IDE on Agon
+## Self-Hosted IDE on Agon and X16GS
 
-For building and running the self-hosted Pascal IDE directly on Agon, see [Self-Hosted PASTA/80 IDE on Agon](agon.md).
+For building and running the self-hosted Pascal IDE directly on Agon, see [Self-Hosted PASTA/80 IDE on Agon](agon.md) and [X16GS](x16gs.md).
