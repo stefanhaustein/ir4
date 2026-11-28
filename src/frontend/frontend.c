@@ -161,12 +161,12 @@ static void free_block(BlockInfo *b) {
     free(b);
 }
 
-static int find_local(const char *p) {
+static int find_local(const char *name) {
     size_t i;
-    if (!p)
+    if (!name)
         return -1;
     for (i = 0; i < locals.len; i++) {
-        if (locals.data[i].name == p)
+        if (locals.data[i].name && strcmp(locals.data[i].name, name) == 0)
             return (int)i;
     }
     return -1;
@@ -882,17 +882,35 @@ static void parse_icall_sig(FnSig *sig) {
     ir4_die("unterminated '(' in indirect call");
 }
 
+static char *local_dup(const char *s) {
+    size_t len = strlen(s);
+    char *p = (char *)malloc(len + 1);
+    if (!p)
+        ir4_die("out of memory");
+    memcpy(p, s, len + 1);
+    return p;
+}
+
+static void free_local_names(void) {
+    size_t i;
+    for (i = 0; i < locals.len; i++) {
+        free((void *)locals.data[i].name);
+        locals.data[i].name = NULL;
+    }
+}
+
 static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
     const char *tok;
     size_t param_cnt = 0;
     u8 in_outs = 0;
     u8 params_flushed = 0;
 
+    free_local_names();
     locals.len = 0;
     cur_outs.len = 0;
     cur_bytes_copies.len = 0;
     cur_bytes_cnt_slot = 0;
-    sig->out_reg = intern_str("");
+    sig->out_reg = "";
 
     /* Parse inputs -> outputs ) (after '(' has been consumed) */
     while ((tok = next_tok()) != NULL) {
@@ -940,7 +958,7 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
             if (slot >= IR4_MAX_LOCALS)
                 ir4_die("too many local variables/parameters");
             lv = VEC_ADD(locals);
-            lv->name = intern_str(tok);
+            lv->name = local_dup(tok);
             ty_tok = next_tok();
             if (!ty_tok)
                 ir4_die("expected type token (:i, :a, :f) after identifier in signature");
@@ -955,16 +973,15 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
                 if (!allow_bytes)
                     ir4_die("':bytes' not allowed in extern signature");
                 bc = VEC_ADD(cur_bytes_copies);
-                bc->src_slot = slot;
+                bc->src_slot = (int)slot;
                 bc->size = (size_t)sz;
                 bc->name = lv->name;
                 sprintf(bp_name, "__bp%u", (unsigned)param_cnt);
-                lv->name = intern_str(bp_name);
+                lv->name = local_dup(bp_name);
                 lv->type = TY_A;
-                lv->slot = slot;
+                lv->slot = (int)slot;
                 lv->size = 0;
                 VEC_PUSH(sig->in_types, TY_A);
-                VEC_PUSH(sig->in_regs, lv->name);
                 param_cnt++;
                 continue;
             }
@@ -972,10 +989,11 @@ static void parse_sig_body(FnSig *sig, size_t *param_cnt_out, int allow_bytes) {
             if (ty == TY_NONE)
                 ir4_die("expected type token (:i, :a, :f) in signature");
             lv->type = ty;
-            lv->slot = slot;
+            lv->slot = (int)slot;
             lv->size = 0;
             VEC_PUSH(sig->in_types, ty);
-            VEC_PUSH(sig->in_regs, lv->name);
+            if (!allow_bytes)
+                VEC_PUSH(sig->in_regs, intern_str(lv->name));
             param_cnt++;
         }
     }
@@ -1409,14 +1427,13 @@ static size_t global_type_bytes(StackType ty) {
 
 static size_t find_or_add_label(LabelVec *labels, const char *name) {
     size_t i;
-    const char *p = intern_str(name);
     LabelInfo *li;
     for (i = 0; i < labels->len; i++) {
-        if (labels->data[i].name == p)
+        if (strcmp(labels->data[i].name, name) == 0)
             return i;
     }
     li = VEC_ADD(*labels);
-    li->name = p;
+    li->name = local_dup(name);
     li->target_ir = 0;
     li->defined = 0;
     return labels->len - 1;
@@ -1445,22 +1462,22 @@ static int parse_local_var(int allow_bytes) {
     StackType ty;
     size_t slot;
     LocalVar *lv;
-    vname = next_tok_intern();
+    vname = next_tok();
     if (!vname)
         ir4_die("expected local variable name after 'var'");
     if (parse_type_tok(vname) != TY_NONE)
         ir4_die("expected identifier after 'var'");
     if (find_local(vname) >= 0)
         ir4_die("duplicate local variable name");
-    vtype = next_tok();
-    if (!vtype)
-        ir4_die("expected type after local 'var' name");
     slot = locals.len;
     if (slot >= IR4_MAX_LOCALS)
         ir4_die("too many local variables/parameters");
     lv = VEC_ADD(locals);
-    lv->name = vname;
-    lv->slot = slot;
+    lv->name = local_dup(vname);
+    vtype = next_tok();
+    if (!vtype)
+        ir4_die("expected type after local 'var' name");
+    lv->slot = (int)slot;
     if (strcmp(vtype, ":bytes") == 0) {
         i32 sz = 0;
         if (!allow_bytes)
@@ -1489,8 +1506,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '&'");
-        sym = intern_find_n(tok, (size_t)lex_tok_len());
-        idx = find_local(sym);
+        idx = find_local(tok);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
             if (lv->size > 0)
@@ -1503,6 +1519,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
             tpush(TY_A);
             return 1;
         }
+        sym = intern_find_n(tok, (size_t)lex_tok_len());
         idx = find_buffer(sym);
         if (idx >= 0) {
             BufferSym *bs = buffers.data[idx];
@@ -1531,8 +1548,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '+->'");
-        sym = intern_find_n(tok, (size_t)lex_tok_len());
-        idx = find_local(sym);
+        idx = find_local(tok);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
             StackType dt = (lv->type == TY_A) ? TY_W : lv->type;
@@ -1561,6 +1577,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
             }
             return 1;
         }
+        sym = intern_find_n(tok, (size_t)lex_tok_len());
         idx = find_buffer(sym);
         if (idx < 0)
             ir4_die("unknown variable in '+->'");
@@ -1611,8 +1628,8 @@ static int handle_var_op(const char *tok, FnIR *w) {
             sym = NULL;
             idx = parse_local_var(0);
         } else {
-            sym = intern_find_n(tok, (size_t)lex_tok_len());
-            idx = find_local(sym);
+            idx = find_local(tok);
+            sym = (idx < 0) ? intern_find_n(tok, (size_t)lex_tok_len()) : NULL;
         }
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
@@ -1650,6 +1667,7 @@ static int handle_var_op(const char *tok, FnIR *w) {
             ins->u.loc.stack_bytes = tstack_bytes();
             return 1;
         }
+        sym = intern_find_n(tok, (size_t)lex_tok_len());
         idx = find_buffer(sym);
         if (idx < 0)
             ir4_die("unknown variable in '->'");
@@ -1869,6 +1887,8 @@ static void resolve_word_labels(FnIR *w, LabelVec *labels, LabelRefVec *label_re
             ir4_die("undefined label");
         jtab_targets.data[r] = labels->data[lidx].target_ir;
     }
+    for (r = 0; r < labels->len; r++)
+        free((void *)labels->data[r].name);
     free(labels->data);
     free(label_refs->data);
 }
@@ -1902,6 +1922,7 @@ static void compile_body(FnIR *w) {
                 check_return_stack();
                 emit_ir(IR_FN_END, w);
             }
+            free_local_names();
             if (locals.len > 0) {
                 VEC_ENSURE(w->locals, locals.len);
                 memcpy(w->locals.data, locals.data, locals.len * sizeof(LocalVar));
@@ -1973,21 +1994,22 @@ static void compile_body(FnIR *w) {
         }
 
         {
+            /* Local variable read (or ':bytes' local base address) */
+            idx = find_local(tok);
+            if (idx >= 0) {
+                LocalVar *lv = &locals.data[idx];
+                ins = emit_ir(IR_LOCAL_OP, w);
+                ins->u.loc.op = (lv->size > 0) ? LOCAL_ADDR : LOCAL_GET;
+                ins->u.loc.slot = lv->slot;
+                ins->u.loc.type = lv->type;
+                ins->u.loc.stack_bytes = tstack_bytes();
+                tpush((lv->size > 0) ? TY_A : lv->type);
+                continue;
+            }
+        }
+        {
             const char *sym = intern_find_n(tok, (size_t)lex_tok_len());
             if (sym) {
-                /* Local variable read (or ':bytes' local base address) */
-                idx = find_local(sym);
-                if (idx >= 0) {
-                    LocalVar *lv = &locals.data[idx];
-                    ins = emit_ir(IR_LOCAL_OP, w);
-                    ins->u.loc.op = (lv->size > 0) ? LOCAL_ADDR : LOCAL_GET;
-                    ins->u.loc.slot = lv->slot;
-                    ins->u.loc.type = lv->type;
-                    ins->u.loc.stack_bytes = tstack_bytes();
-                    tpush((lv->size > 0) ? TY_A : lv->type);
-                    continue;
-                }
-
                 /* Buffer address or typed global read */
                 idx = find_buffer(sym);
                 if (idx >= 0) {
