@@ -72,26 +72,28 @@ but please don't expect too much.
 
 ## Test Results
 
-Via mcp --selftest
+Via `mcp --selftest` (or `mcp --selftest <suite>`) in `fab-agon-emulator`:
 
-```
+```text
 ======================================
 Results of PASTA/80 version 1.00 tests
 ======================================
 
-           Agon ---> Agon
+                           Agon ---> Agon
 
-   Tests    Passed    Failed     Total
---------  --------  --------  --------
-    core       ???       ???       ???
-    heap        26         0        26
-   files       ???       ???       ???
-    more        45         4        49
-  params         6         0         6
-   sound         4         0         4
-overlays        32         0        32
---------  --------  --------  --------
-   Total       113         4       117
+   Tests    Passed    Failed     Total  PASTA/80      ir4c       Run
+--------  --------  --------  --------  --------  --------  --------
+    core       ???       ???       ???     24.2s      1.8s       ???
+    heap       ???       ???       ???      2.9s      2.0s       ???
+   files       ???       ???       ???      9.6s      1.8s       ???
+    more       ???       ???       ???      3.6s      1.9s       ???
+  params         6         0         6      1.6s      1.8s      0.0s
+   sound         4         0         4      1.6s      1.8s      4.5s
+overlays       ???       ???       ???      3.4s      1.9s       ???
+--------  --------  --------  --------  --------  --------  --------
+   Total        10         0        10     46.9s     13.0s      4.5s
 
-              [  FAIL  ]
+                             [  FAIL  ]
 ```
+
+(`core`, `heap`, `files`, `more`, and `overlays` currently hit `ir4c: out of memory` in Agon's ~329 KB user heap while loading the full runtime.)

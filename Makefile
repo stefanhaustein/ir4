@@ -386,7 +386,7 @@ agon: $(AGON_SRCS)
 		echo "LDHAS_ARG_PROCESSING = 1"; \
 		echo "LDHAS_EXIT_HANDLER = 0"; \
 		echo "include $$(agondev-config --makefile)"; \
-		echo "CFLAGS += -I$(CURDIR)/src -I$(CURDIR)/src/frontend -DIR4_MINIMAL -DIR4_ENABLE_EZ80=1 -DIR4_ENABLE_AGON=1"; \
+		echo "CFLAGS += -I$(CURDIR)/src -I$(CURDIR)/src/frontend -DIR4_MINIMAL -DIR4_STATUS -DIR4_ENABLE_EZ80=1 -DIR4_ENABLE_AGON=1"; \
 	} > $(BUILD)/agon-build/Makefile; \
 	$(MAKE) -C $(BUILD)/agon-build && \
 	cp $(BUILD)/agon-build/bin/ir4c.bin $(BUILD)/ir4c_agon.bin && \
@@ -397,7 +397,7 @@ X16GS_SRCS = src/collections.c src/path.c src/codebuf.c \
              src/backend/65816.c src/platform/x16gs.c src/ir4c.c
 
 X16GS_CPP_FLAGS = -E -P -nostdinc -U__APPLE__ -Ilcc/include/ir4 -Isrc -Isrc/frontend \
-                  -D__IR4_16__ -D__IR4_16X24__ -DIR4_INTERACTIVE_ARGS -DIR4_MINIMAL \
+                  -D__IR4_16__ -D__IR4_16X24__ -DIR4_INTERACTIVE_ARGS -DIR4_MINIMAL -DIR4_STATUS \
                   -DIR4_ENABLE_65816=1 -DIR4_ENABLE_SIM65816=0 -DIR4_ENABLE_X16GS=1
 
 x16gs: $(BUILD)/x16gs/ir4c.prg

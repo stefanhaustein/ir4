@@ -8,7 +8,14 @@ static SrcVec src_stack;
 static u16 next_req_group = 1;
 static StrVec extra_lib_roots;
 static StrVec seen_files;
-static StrBuf tok_sb;
+static char tok_buf[IR4_MAX_TOK];
+static int tok_len = 0;
+
+int lex_tok_len(void) { return tok_len; }
+
+#define IS_SPACE(c)                                                                                \
+    ((unsigned int)(c) <= ' ' &&                                                                   \
+     ((c) == ' ' || (c) == '\n' || (c) == '\r' || (c) == '\t' || (c) == '\v' || (c) == '\f'))
 
 #define ASM_HASH_INIT 5381UL
 
@@ -25,9 +32,9 @@ static u32 asm_hash_byte(u32 h, u8 b) {
     return (((h << 5) + h) ^ (u32)b) & 0xFFFFFFFFUL;
 }
 
-static u32 asm_hash_trimmed_line(u32 h, const char *s, size_t len) {
-    size_t a = 0;
-    size_t b = len;
+static u32 asm_hash_trimmed_line(u32 h, const char *s, int len) {
+    int a = 0;
+    int b = len;
     while (a < b && (s[a] == ' ' || s[a] == '\t' || s[a] == '\r'))
         a++;
     while (b > a && (s[b - 1] == ' ' || s[b - 1] == '\t' || s[b - 1] == '\r'))
@@ -44,8 +51,10 @@ void ir4_add_lib_root(const char *path) {
     VEC_PUSH(extra_lib_roots, path);
 }
 
-#if defined(__ez80__) || defined(__EZ80__) || defined(IR4_MINIMAL) || defined(IR4_STATUS)
-static size_t status_len = 0;
+/* Live terminal progress (\r status lines) for slow on-device builds (agon, x16gs);
+ * disabled on host builds so test logs and --run stdout stay clean. */
+#ifdef IR4_STATUS
+static int status_len = 0;
 
 static const char *short_path(const char *path) {
     const char *p = path;
@@ -61,8 +70,8 @@ static const char *short_path(const char *path) {
 }
 
 void ir4_status(const char *msg) {
-    size_t n = strlen(msg) + 2;
-    size_t i;
+    int n = (int)strlen(msg) + 2;
+    int i;
     fprintf(stdout, "\r  %s", msg);
     for (i = n; i < status_len; i++)
         fputc(' ', stdout);
@@ -87,7 +96,7 @@ void ir4_status_prog(const char *prefix, size_t done, size_t total) {
 }
 
 void ir4_status_clear(void) {
-    size_t i;
+    int i;
     if (status_len > 0) {
         fputc('\r', stdout);
         for (i = 0; i < status_len; i++)
@@ -123,6 +132,13 @@ void ir4_die(const char *msg) {
     if (src_stack.len > 0) {
         const SrcFile *cur = &src_stack.data[src_stack.len - 1];
         fprintf(stderr, "%s:%lu: error: ir4c: %s\n", cur->path, (unsigned long)cur->line_num, msg);
+        while (src_stack.len > 0) {
+            SrcFile *sf = &src_stack.data[--src_stack.len];
+            if (sf->fp && sf->fp != stdin) {
+                fclose(sf->fp);
+                sf->fp = NULL;
+            }
+        }
     } else {
         fprintf(stderr, "error: ir4c: %s\n", msg);
     }
@@ -186,9 +202,9 @@ int src_getc(SrcFile *sf) {
                 ir4_die("cannot open required file");
             sf->can_reopen = 0;
         }
-        sf->buf_len = fread(sf->buf, 1, sizeof(sf->buf), sf->fp);
+        sf->buf_len = (int)fread(sf->buf, 1, sizeof(sf->buf), sf->fp);
         sf->buf_pos = 0;
-        if (sf->buf_len < sizeof(sf->buf)) {
+        if (sf->buf_len < (int)sizeof(sf->buf)) {
             if (sf->fp != stdin)
                 fclose(sf->fp);
             sf->fp = NULL;
@@ -203,6 +219,27 @@ void src_ungetc(SrcFile *sf, int c) {
     sf->pushback = c;
 }
 
+static void skip_to_eol(SrcFile *cur) {
+    int c;
+    if (cur->pushback < 0) {
+        int pos = cur->buf_pos;
+        int blen = cur->buf_len;
+        const u8 *buf = cur->buf;
+        while (pos < blen) {
+            if (buf[pos++] == '\n') {
+                cur->buf_pos = pos;
+                bump_line(cur);
+                return;
+            }
+        }
+        cur->buf_pos = pos;
+    }
+    while ((c = src_getc(cur)) != EOF && c != '\n')
+        ;
+    if (c == '\n')
+        bump_line(cur);
+}
+
 int skip_ws_and_comments(void) {
     for (;;) {
         SrcFile *cur;
@@ -210,6 +247,27 @@ int skip_ws_and_comments(void) {
         if (src_stack.len == 0)
             return EOF;
         cur = &src_stack.data[src_stack.len - 1];
+        if (cur->pushback < 0) {
+            while (cur->buf_pos < cur->buf_len) {
+                unsigned int b = cur->buf[cur->buf_pos];
+                if (b > ' ') {
+                    if (b == '\\')
+                        break;
+                    cur->buf_pos++;
+                    return (int)b;
+                }
+                if (b == ' ' || b == '\t' || b == '\r' || b == '\v' || b == '\f') {
+                    cur->buf_pos++;
+                    continue;
+                }
+                if (b == '\n') {
+                    cur->buf_pos++;
+                    bump_line(cur);
+                    continue;
+                }
+                break;
+            }
+        }
         c = src_getc(cur);
         if (c == EOF) {
             if (src_stack.len > 1) {
@@ -226,18 +284,18 @@ int skip_ws_and_comments(void) {
             bump_line(cur);
             continue;
         }
-        if (isspace((unsigned char)c))
+        if (IS_SPACE(c))
             continue;
         if (c == '\\') {
             int c2 = src_getc(cur);
             if (c2 == '\\') {
                 int c3 = src_getc(cur);
-                if (c3 == EOF || c3 == '\n' || isspace((unsigned char)c3)) {
+                if (c3 == EOF || c3 == '\n' || IS_SPACE(c3)) {
                     char ln[256];
-                    size_t n = 0;
+                    int n = 0;
                     if (c3 != EOF && c3 != '\n') {
                         while ((c = src_getc(cur)) != EOF && c != '\n') {
-                            if (n < sizeof(ln))
+                            if (n < (int)sizeof(ln))
                                 ln[n++] = (char)c;
                         }
                         if (c == '\n')
@@ -253,19 +311,13 @@ int skip_ws_and_comments(void) {
                     }
                     continue;
                 }
-                /* Token starting with \\<non-space>: push back c3 and return first '\\'?
-                   Wait: single pushback cannot unget both c2 and c3; handle directly in next_tok if needed,
-                   or reject invalid '\\' comment syntax. */
                 ir4_die("expected whitespace after '\\\\'");
             }
-            if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
+            if (c2 == EOF || c2 == '\n' || IS_SPACE(c2)) {
                 if (c2 == '\n') {
                     bump_line(cur);
                 } else if (c2 != EOF) {
-                    while ((c = src_getc(cur)) != EOF && c != '\n')
-                        ;
-                    if (c == '\n')
-                        bump_line(cur);
+                    skip_to_eol(cur);
                 }
                 continue;
             }
@@ -277,14 +329,17 @@ int skip_ws_and_comments(void) {
 
 static const char *read_quoted_intern(SrcFile *sf, const char *err_unterm) {
     int c = src_getc(sf);
-    sb_reset(&tok_sb);
+    int n = 0;
     while (c != EOF && c != '\n' && c != '"') {
-        sb_putc(&tok_sb, (char)c);
+        if (n >= IR4_MAX_TOK - 1)
+            ir4_die("quoted string exceeds maximum token length");
+        tok_buf[n++] = (char)c;
         c = src_getc(sf);
     }
     if (c != '"')
         ir4_die(err_unterm);
-    return sb_intern(&tok_sb);
+    tok_buf[n] = '\0';
+    return intern_str_n(tok_buf, (size_t)n);
 }
 
 static void parse_line_directive(SrcFile *cur, int last_c) {
@@ -309,33 +364,56 @@ static void parse_line_directive(SrcFile *cur, int last_c) {
         cur->path = read_quoted_intern(cur, "unterminated filename in '#line'");
         c = src_getc(cur);
     }
-    while (c != EOF && c != '\n')
-        c = src_getc(cur);
+    if (c != EOF && c != '\n')
+        skip_to_eol(cur);
     cur->line_num = new_line;
 }
 
 const char *next_tok(void) {
     for (;;) {
         int c = skip_ws_and_comments();
-        if (c == EOF)
+        SrcFile *cur;
+        int n;
+        if (c == EOF) {
+            tok_len = 0;
             return NULL;
-
-        {
-            SrcFile *cur = &src_stack.data[src_stack.len - 1];
-            sb_reset(&tok_sb);
-            while (c != EOF && !isspace((unsigned char)c)) {
-                sb_putc(&tok_sb, (char)c);
-                c = src_getc(cur);
-            }
-            if (strcmp(tok_sb.data, "#line") == 0) {
-                parse_line_directive(cur, c);
-                continue;
-            }
-            last_tok_ended_line = (c == '\n' || c == EOF) ? 1 : 0;
-            if (c == '\n')
-                bump_line(cur);
         }
-        return tok_sb.data;
+
+        cur = &src_stack.data[src_stack.len - 1];
+        tok_buf[0] = (char)c;
+        n = 1;
+        if (cur->pushback < 0) {
+            int pos = cur->buf_pos;
+            int blen = cur->buf_len;
+            const u8 *buf = cur->buf;
+            while (pos < blen) {
+                unsigned int b = buf[pos];
+                if (b <= ' ' && IS_SPACE(b))
+                    break;
+                if (n >= IR4_MAX_TOK - 1)
+                    ir4_die("token exceeds maximum length (255 bytes)");
+                tok_buf[n++] = (char)b;
+                pos++;
+            }
+            cur->buf_pos = pos;
+        }
+        c = src_getc(cur);
+        while (c != EOF && !IS_SPACE(c)) {
+            if (n >= IR4_MAX_TOK - 1)
+                ir4_die("token exceeds maximum length (255 bytes)");
+            tok_buf[n++] = (char)c;
+            c = src_getc(cur);
+        }
+        tok_buf[n] = '\0';
+        tok_len = n;
+        if (n == 5 && tok_buf[0] == '#' && memcmp(tok_buf, "#line", 5) == 0) {
+            parse_line_directive(cur, c);
+            continue;
+        }
+        last_tok_ended_line = (c == '\n' || c == EOF) ? 1 : 0;
+        if (c == '\n')
+            bump_line(cur);
+        return tok_buf;
     }
 }
 
@@ -395,14 +473,11 @@ void lex_finish_code_asm(void) {
                 if (c == '\n')
                     bump_line(cur);
                 has_tag = 1;
-            } else if (c2 == EOF || c2 == '\n' || isspace((unsigned char)c2)) {
+            } else if (c2 == EOF || c2 == '\n' || IS_SPACE(c2)) {
                 if (c2 == '\n') {
                     bump_line(cur);
                 } else if (c2 != EOF) {
-                    while ((c = src_getc(cur)) != EOF && c != '\n')
-                        ;
-                    if (c == '\n')
-                        bump_line(cur);
+                    skip_to_eol(cur);
                 }
             } else {
                 ir4_die("unexpected token after 'end'");
@@ -424,7 +499,9 @@ void lex_finish_code_asm(void) {
     }
 }
 
-const char *next_tok_intern(void) { return next_tok() ? sb_intern(&tok_sb) : NULL; }
+const char *next_tok_intern(void) {
+    return next_tok() ? intern_str_n(tok_buf, (size_t)tok_len) : NULL;
+}
 
 static FILE *try_open_require(const char *path, int *already_seen) {
     size_t i;

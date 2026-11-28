@@ -25,10 +25,11 @@ static char **ht_slots = NULL;
 static size_t ht_cap = 0;
 static size_t ht_len = 0;
 
-static size_t hash_str_n(const char *s, size_t len) {
-    size_t h = 5381U;
-    size_t i;
-    for (i = 0; i < len; i++) {
+static unsigned int hash_str_n(const char *s, size_t len) {
+    unsigned int h = 5381U;
+    unsigned int n = (unsigned int)len;
+    unsigned int i;
+    for (i = 0; i < n; i++) {
         h = ((h << 5) + h) ^ (unsigned char)s[i];
     }
     return h;
@@ -41,7 +42,7 @@ static void ht_grow(size_t new_cap) {
     for (i = 0; i < ht_cap; i++) {
         char *p = ht_slots[i];
         if (p) {
-            size_t slot = hash_str_n(p, strlen(p)) & mask;
+            size_t slot = (size_t)hash_str_n(p, strlen(p)) & mask;
             while (new_slots[slot])
                 slot = (slot + 1) & mask;
             new_slots[slot] = p;
@@ -52,12 +53,11 @@ static void ht_grow(size_t new_cap) {
     ht_cap = new_cap;
 }
 
-const char *intern_find(const char *s) {
-    size_t len = strlen(s);
-    size_t mask, slot;
+const char *intern_find_n(const char *s, size_t len) {
+    unsigned int mask, slot;
     if (ht_len == 0)
         return NULL;
-    mask = ht_cap - 1;
+    mask = (unsigned int)(ht_cap - 1);
     slot = hash_str_n(s, len) & mask;
     while (ht_slots[slot]) {
         const char *p = ht_slots[slot];
@@ -68,12 +68,14 @@ const char *intern_find(const char *s) {
     return NULL;
 }
 
+const char *intern_find(const char *s) { return intern_find_n(s, strlen(s)); }
+
 const char *intern_str_n(const char *s, size_t len) {
-    size_t mask, slot;
+    unsigned int mask, slot;
     char *copy;
     if (ht_len * 10 >= ht_cap * 7)
         ht_grow(ht_cap ? ht_cap * 2 : 512);
-    mask = ht_cap - 1;
+    mask = (unsigned int)(ht_cap - 1);
     slot = hash_str_n(s, len) & mask;
     while (ht_slots[slot]) {
         const char *p = ht_slots[slot];
@@ -121,8 +123,8 @@ void sb_append(StrBuf *sb, const char *s) { sb_append_n(sb, s, strlen(s)); }
 const char *sb_intern(StrBuf *sb) { return intern_str_n(sb->data ? sb->data : "", sb->len); }
 
 /* Pointer-keyed symbol hash table */
-static size_t sym_ptr_hash(const char *p) {
-    size_t v = (size_t)p;
+static unsigned int sym_ptr_hash(const char *p) {
+    unsigned int v = (unsigned int)(size_t)p;
     return (v >> 2) ^ (v >> 9);
 }
 
@@ -130,10 +132,10 @@ static void sym_ht_grow(SymHt *ht, size_t new_cap) {
     const char **nkeys = (const char **)vec_calloc(new_cap, sizeof(const char *));
     size_t *nvals = (size_t *)vec_calloc(new_cap, sizeof(size_t));
     size_t i;
-    size_t mask = new_cap - 1;
+    unsigned int mask = (unsigned int)(new_cap - 1);
     for (i = 0; i < ht->cap; i++) {
         if (ht->keys[i]) {
-            size_t slot = sym_ptr_hash(ht->keys[i]) & mask;
+            unsigned int slot = sym_ptr_hash(ht->keys[i]) & mask;
             while (nkeys[slot])
                 slot = (slot + 1) & mask;
             nkeys[slot] = ht->keys[i];
@@ -148,10 +150,10 @@ static void sym_ht_grow(SymHt *ht, size_t new_cap) {
 }
 
 int sym_ht_find(const SymHt *ht, const char *p) {
-    size_t mask, slot;
+    unsigned int mask, slot;
     if (ht->len == 0)
         return -1;
-    mask = ht->cap - 1;
+    mask = (unsigned int)(ht->cap - 1);
     slot = sym_ptr_hash(p) & mask;
     while (ht->keys[slot]) {
         if (ht->keys[slot] == p)
@@ -162,10 +164,10 @@ int sym_ht_find(const SymHt *ht, const char *p) {
 }
 
 void sym_ht_put(SymHt *ht, const char *p, size_t val) {
-    size_t mask, slot;
+    unsigned int mask, slot;
     if (ht->len * 10 >= ht->cap * 7)
         sym_ht_grow(ht, ht->cap ? ht->cap * 2 : 128);
-    mask = ht->cap - 1;
+    mask = (unsigned int)(ht->cap - 1);
     slot = sym_ptr_hash(p) & mask;
     while (ht->keys[slot]) {
         if (ht->keys[slot] == p) {

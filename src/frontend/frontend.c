@@ -587,8 +587,8 @@ static short builtin_ht[BUILTIN_HT_SIZE];
 static short builtin_next[sizeof(builtins) / sizeof(builtins[0])];
 static int builtin_ht_init = 0;
 
-static size_t builtin_hash(const char *s) {
-    size_t h = 5381U;
+static unsigned int builtin_hash(const char *s) {
+    unsigned int h = 5381U;
     while (*s) {
         h = ((h << 5) + h) ^ (unsigned char)*s++;
     }
@@ -596,13 +596,13 @@ static size_t builtin_hash(const char *s) {
 }
 
 static void init_builtin_ht(void) {
-    size_t n = sizeof(builtins) / sizeof(builtins[0]);
-    size_t i;
+    int n = (int)(sizeof(builtins) / sizeof(builtins[0]));
+    int i;
     for (i = 0; i < n; i++)
         builtin_next[i] = -1;
     for (i = n; i > 0; i--) {
-        size_t idx = i - 1;
-        u32 slot = builtin_hash(builtins[idx].name) & (BUILTIN_HT_SIZE - 1);
+        int idx = i - 1;
+        unsigned int slot = builtin_hash(builtins[idx].name) & (BUILTIN_HT_SIZE - 1);
         while (builtin_ht[slot] != 0 &&
                strcmp(builtins[builtin_ht[slot] - 1].name, builtins[idx].name) != 0) {
             slot = (slot + 1) & (BUILTIN_HT_SIZE - 1);
@@ -651,7 +651,7 @@ static int handle_builtin(const char *tok, WordIR *w) {
 
     {
         int matched_name = 0;
-        u32 slot;
+        unsigned int slot;
         short cur_bi;
         if (!builtin_ht_init)
             init_builtin_ht();
@@ -1250,7 +1250,7 @@ static void parse_raw_code_body(size_t *out_start, size_t *out_len, size_t *out_
             if (!tok)
                 ir4_die("expected identifier after '&' in raw code");
             lex_feed_code_tok(tok);
-            idx = find_buffer(intern_find(tok));
+            idx = find_buffer(intern_find_n(tok, (size_t)lex_tok_len()));
             if (idx < 0)
                 ir4_die("expected 'var' or 'data' identifier after '&' in raw code");
             rel = VEC_ADD(code_relocs);
@@ -1480,7 +1480,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '&'");
-        sym = intern_find(tok);
+        sym = intern_find_n(tok, (size_t)lex_tok_len());
         idx = find_local(sym);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
@@ -1522,7 +1522,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
         tok = next_tok();
         if (!tok)
             ir4_die("expected identifier after '+->'");
-        sym = intern_find(tok);
+        sym = intern_find_n(tok, (size_t)lex_tok_len());
         idx = find_local(sym);
         if (idx >= 0) {
             LocalVar *lv = &locals.data[idx];
@@ -1602,7 +1602,7 @@ static int handle_var_op(const char *tok, WordIR *w) {
             sym = NULL;
             idx = parse_local_var(0);
         } else {
-            sym = intern_find(tok);
+            sym = intern_find_n(tok, (size_t)lex_tok_len());
             idx = find_local(sym);
         }
         if (idx >= 0) {
@@ -1964,7 +1964,7 @@ static void compile_body(WordIR *w) {
         }
 
         {
-            const char *sym = intern_find(tok);
+            const char *sym = intern_find_n(tok, (size_t)lex_tok_len());
             if (sym) {
                 /* Local variable read (or ':bytes' local base address) */
                 idx = find_local(sym);
@@ -2156,7 +2156,7 @@ static void compile_data(void) {
             tok = next_tok();
             if (!tok)
                 ir4_die("expected identifier after '&' in 'data'");
-            sym = intern_find(tok);
+            sym = intern_find_n(tok, (size_t)lex_tok_len());
             patch_off = cb_data_size();
             idx = find_buffer(sym);
             if (idx >= 0) {

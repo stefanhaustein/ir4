@@ -282,7 +282,7 @@ typedef struct {
     void (*peep_fence)(void);
 } Backend;
 
-/* Error reporting (implemented in frontend/lexer.c) */
+/* Error reporting & optional live progress (no-op unless -DIR4_STATUS; lexer.c) */
 void ir4_die(const char *msg);
 void ir4_status(const char *msg);
 void ir4_status_file(const char *prefix, const char *path, u32 line_num);

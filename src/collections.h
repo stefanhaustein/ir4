@@ -52,6 +52,7 @@ const char *sb_intern(StrBuf *sb);
 
 /* String interning pool (DJB2a open-addressing) */
 const char *intern_find(const char *s);
+const char *intern_find_n(const char *s, size_t len);
 const char *intern_str(const char *s);
 const char *intern_str_n(const char *s, size_t len);
 

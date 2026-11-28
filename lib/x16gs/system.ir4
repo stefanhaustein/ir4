@@ -103,10 +103,90 @@ code x16gs __x16gs_emu_cycles ( -> :i32 )
                                        \\   .a16
 end \\ 4a0d
 
+\ I2C RTC helper via Bank-0 KERNAL $FEC6 (i2c_read_byte) / $FEC9 (i2c_write_byte)
+code x16gs __x16gs_rtc_i2c ( val :i reg :i addr :i -> :i )
+  0xBD :i8 0x00 :i8 0x02 :i8           \\   LDA $0200,X         ; addr ($FEC6 or $FEC9)
+  0x8F :i8 0x54 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000454
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xBD :i8 0x00 :i8 0x02 :i8           \\   LDA $0200,X         ; reg
+  0x85 :i8 0x20 :i8                    \\   STA $20             ; $0420
+  0xE8 :i8                             \\   INX
+  0xE8 :i8                             \\   INX
+  0xBD :i8 0x00 :i8 0x02 :i8           \\   LDA $0200,X         ; val
+  0x85 :i8 0x22 :i8                    \\   STA $22             ; $0422
+  0x86 :i8 0x1E :i8                    \\   STX $1E             ; save data stack X
+  0x3B :i8                             \\   TSC
+  0x85 :i8 0x1C :i8                    \\   STA $1C             ; save native S
+  0xE2 :i8 0x20 :i8                    \\   SEP #$20
+  0xA9 :i8 0x38 :i8                    \\   LDA #$38            ; SEC
+  0x8F :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000450
+  0xA9 :i8 0xFB :i8                    \\   LDA #$FB            ; XCE
+  0x8F :i8 0x51 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000451
+  0xA9 :i8 0x58 :i8                    \\   LDA #$58            ; CLI
+  0x8F :i8 0x52 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000452
+  0xA9 :i8 0x20 :i8                    \\   LDA #$20            ; JSR
+  0x8F :i8 0x53 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000453
+  0xA9 :i8 0x78 :i8                    \\   LDA #$78            ; SEI
+  0x8F :i8 0x56 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000456
+  0xA9 :i8 0x18 :i8                    \\   LDA #$18            ; CLC
+  0x8F :i8 0x57 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000457
+  0xA9 :i8 0xFB :i8                    \\   LDA #$FB            ; XCE
+  0x8F :i8 0x58 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000458
+  0xA9 :i8 0x6B :i8                    \\   LDA #$6B            ; RTL
+  0x8F :i8 0x59 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000459
+  0x8B :i8                             \\   PHB
+  0x68 :i8                             \\   PLA
+  0x8F :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\   STA f:$00042A       ; save caller DBR
+  0xA9 :i8 0x00 :i8                    \\   LDA #$00
+  0x48 :i8                             \\   PHA
+  0xAB :i8                             \\   PLB                 ; DBR = $00
+  0xC2 :i8 0x20 :i8                    \\   REP #$20
+  0xA9 :i8 0x00 :i8 0x00 :i8           \\   LDA #$0000
+  0x5B :i8                             \\   TCD                 ; D = $0000
+  0xA2 :i8 0xDF :i8 0x01 :i8           \\   LDX #$01DF
+  0x9A :i8                             \\   TXS
+  0xE2 :i8 0x30 :i8                    \\   SEP #$30            ; 8-bit A, X, Y
+  0xAD :i8 0x22 :i8 0x04 :i8           \\   LDA $0422           ; val
+  0xA2 :i8 0x6F :i8                    \\   LDX #$6F            ; MCP7940N I2C addr
+  0xAC :i8 0x20 :i8 0x04 :i8           \\   LDY $0420           ; reg
+  0x22 :i8 0x50 :i8 0x04 :i8 0x00 :i8  \\   JSL $000450
+  0x8F :i8 0x20 :i8 0x04 :i8 0x00 :i8  \\   STA f:$000420       ; return A
+  0xAF :i8 0x2A :i8 0x04 :i8 0x00 :i8  \\   LDA f:$00042A       ; restore caller DBR
+  0x48 :i8                             \\   PHA
+  0xAB :i8                             \\   PLB
+  0xC2 :i8 0x30 :i8                    \\   REP #$30
+  0xA9 :i8 0x00 :i8 0x04 :i8           \\   LDA #$0400
+  0x5B :i8                             \\   TCD                 ; D = $0400
+  0xA6 :i8 0x1E :i8                    \\   LDX $1E             ; restore data stack X
+  0xA5 :i8 0x1C :i8                    \\   LDA $1C
+  0x1B :i8                             \\   TCS                 ; restore native S
+  0xA5 :i8 0x20 :i8                    \\   LDA $20
+  0x29 :i8 0xFF :i8 0x00 :i8           \\   AND #$00FF
+  0x9D :i8 0x00 :i8 0x02 :i8           \\   STA $0200,X
+end \\ 2304
+
 var __x16gs_c_per_ms :i32
 var __x16gs_last_cyc :i32
+var __x16gs_last_rtc :i32
 var __x16gs_rem_cyc :i32
 var __x16gs_acc_ms :i32
+
+fn __x16gs_unbcd ( b :i -> :i )
+  b 4 >> 10 * b 15 and +
+end
+
+fn __x16gs_rtc_sec ( ensure_start :i -> :i32 )
+  0 0 0xFEC6 __x16gs_rtc_i2c -> var s :i
+  ensure_start 0 <> s 128 and 0 = and if
+    s 128 or 0 0xFEC9 __x16gs_rtc_i2c drop
+  then
+  0 1 0xFEC6 __x16gs_rtc_i2c -> var m :i
+  0 2 0xFEC6 __x16gs_rtc_i2c -> var h :i
+  h 63 and __x16gs_unbcd i>i32 3600 i>i32 i32*
+  m 127 and __x16gs_unbcd i>i32 60 i>i32 i32* i32+
+  s 127 and __x16gs_unbcd i>i32 i32+
+end
 
 fn sysmillis ( -> :i32 )
   __x16gs_is_emu 0 = if
@@ -124,15 +204,41 @@ fn sysmillis ( -> :i32 )
     cpms 0 i>i32 i32= if 8000 i>i32 -> cpms then
     cpms -> __x16gs_c_per_ms
     c1 -> __x16gs_last_cyc
+    1 __x16gs_rtc_sec -> __x16gs_last_rtc
     0 i>i32 -> __x16gs_rem_cyc
     r2 50 i>i32 i32* 3 i>i32 i32/ -> __x16gs_acc_ms
     __x16gs_acc_ms return
   then
   __x16gs_emu_cycles -> var now :i32
+  0 __x16gs_rtc_sec -> var rtc_now :i32
   now __x16gs_last_cyc i32- -> var delta :i32
   now -> __x16gs_last_cyc
+  rtc_now __x16gs_last_rtc i32- -> var dt_rtc :i32
+  dt_rtc 0 i>i32 i32< if dt_rtc 86400 i>i32 i32+ -> dt_rtc then
+  rtc_now -> __x16gs_last_rtc
+  delta 8000000 i>i32 u32/ -> var mod_rtc :i32
+  dt_rtc mod_rtc i32- 268 i>i32 i32+ -> var wrap_num :i32
+  0 i>i32 -> var wraps :i32
+  wrap_num 0 i>i32 i32> if wrap_num 537 i>i32 i32/ -> wraps then
   delta __x16gs_c_per_ms u32/ -> var q :i32
   delta __x16gs_c_per_ms u32mod __x16gs_rem_cyc i32+ -> var rem :i32
+  wraps 0 i>i32 i32> if
+    -1 i>i32 __x16gs_c_per_ms u32/ -> var wq :i32
+    -1 i>i32 __x16gs_c_per_ms u32mod 1 i>i32 i32+ -> var wr :i32
+    wr __x16gs_c_per_ms u32>= if
+      wq 1 i>i32 i32+ -> wq
+      wr __x16gs_c_per_ms i32- -> wr
+    then
+    begin wraps 0 i>i32 i32> while
+      q wq i32+ -> q
+      rem wr i32+ -> rem
+      rem __x16gs_c_per_ms u32>= if
+        q 1 i>i32 i32+ -> q
+        rem __x16gs_c_per_ms i32- -> rem
+      then
+      wraps 1 i>i32 i32- -> wraps
+    repeat
+  then
   rem __x16gs_c_per_ms u32>= if
     q 1 i>i32 i32+ -> q
     rem __x16gs_c_per_ms i32- -> rem

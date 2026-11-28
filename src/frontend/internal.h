@@ -90,6 +90,8 @@ typedef struct {
 VEC_OF(WordVec, WordIR *);
 VEC_OF(CodeRelocVec, CodeReloc);
 
+#define IR4_MAX_TOK 256
+
 typedef struct {
     FILE *fp;
     const char *path;
@@ -99,8 +101,8 @@ typedef struct {
     u8 req_rank;
     u8 can_reopen;
     u8 buf[512];
-    size_t buf_pos;
-    size_t buf_len;
+    int buf_pos;
+    int buf_len;
     int pushback;
 } SrcFile;
 
@@ -126,6 +128,7 @@ void src_ungetc(SrcFile *sf, int c);
 int skip_ws_and_comments(void);
 const char *next_tok(void);
 const char *next_tok_intern(void);
+int lex_tok_len(void);
 void lex_begin_code_asm(void);
 void lex_feed_code_tok(const char *tok);
 void lex_finish_code_asm(void);
